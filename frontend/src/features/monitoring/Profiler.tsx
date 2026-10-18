@@ -4,7 +4,7 @@ import { IconPlay, IconRefresh, IconTrash } from "../../components/Icons";
 import { SqlEditor } from "../../components/SqlEditor";
 import { fmtNs, fmtNum, fmtTs, monApi } from "./api";
 
-type Props = { serverId: string; dbId: string; visible: boolean; initialSql?: string };
+type Props = { serverId: string; dbId: string; visible: boolean; initialSql?: string; autorun?: boolean };
 
 export function ProfilerTab(props: Props) {
   const app = useApp();
@@ -18,7 +18,10 @@ export function ProfilerTab(props: Props) {
   const [profiling, setProfiling] = useState<Record<number, number>>({}); // attachment -> profile id
 
   const load = () => monApi.profiler(props.serverId, props.dbId).then(setOv).catch((e) => app.toast(errMsg(e), "error"));
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    if (props.autorun && props.initialSql) run(props.initialSql); // opened from the Query Tool's Profile button
+  }, []);
 
   const run = async (text?: string) => {
     const q = (text ?? sql).trim();

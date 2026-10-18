@@ -26,7 +26,9 @@ registerTabKind("performance", {
 });
 registerTabKind("profiler", {
   icon: <IconPlan size={13} />,
-  render: (t, visible) => <ProfilerTab serverId={t.serverId!} dbId={t.dbId!} visible={visible} initialSql={t.props?.sql} />,
+  // a run started from the Query Tool gets its own tab; otherwise reuse the database's profiler tab
+  same: (a, b) => !b.props?.autorun && a.serverId === b.serverId && a.dbId === b.dbId && !a.props?.autorun,
+  render: (t, visible) => <ProfilerTab serverId={t.serverId!} dbId={t.dbId!} visible={visible} initialSql={t.props?.sql} autorun={t.props?.autorun} />,
 });
 
 registerMenu((app, sel) => {

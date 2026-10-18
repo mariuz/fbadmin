@@ -459,6 +459,15 @@ export function QueryTool(props: { serverId: string; dbId: string; initialSql?: 
           </button>
         )}
         <button className="btn" onClick={explain} title="Show the execution plan without running"><IconPlan /> Explain</button>
+        {options && options.engine_major >= 5 && (
+          <button className="btn" title="Run the statement under the Firebird 5 PSQL profiler (in a separate attachment) and show the report"
+            onClick={() => {
+              const q = view.current ? selectionOrAll(view.current) : sql;
+              if (!q.trim()) return;
+              const db = app.servers.find((s) => s.id === props.serverId)?.databases.find((d) => d.id === props.dbId);
+              app.openTab({ kind: "profiler", title: `${db?.name ?? "db"} · profile`, serverId: props.serverId, dbId: props.dbId, props: { sql: q, autorun: true } });
+            }}>Profile</button>
+        )}
         <span className="sep" />
         <button className={"btn" + (autocommit ? " on" : "")} onClick={() => setAutocommit(!autocommit)} title="Commit after every statement">
           Auto-commit {autocommit ? "on" : "off"}
