@@ -6,6 +6,8 @@ versions (e.g. partial indices in Firebird 5) are detected at runtime.
 
 from __future__ import annotations
 
+import re
+
 from functools import cached_property
 from typing import Any
 
@@ -98,6 +100,15 @@ def _is_auto_name(name: str | None) -> bool:
     return not name or name.startswith("INTEG_") or name.startswith("RDB$")
 
 
+_PLG_PROF = re.compile(r"(?<![.\w$'])PLG\$PROF_")
+
+
+def _engine_leftover_index(r: dict) -> bool:
+    """Firebird 6 snapshots leave an undroppable RDB$TEMP_DEPEND_* index behind
+    after a constraint is dropped and re-created; it is not user metadata."""
+    return r["name"].startswith("RDB$TEMP_DEPEND") and not r.get("constraint_name")
+
+
 class Catalog(CatalogExtras):
     """Metadata reader bound to a single open connection."""
 
@@ -110,9 +121,9 @@ class Catalog(CatalogExtras):
     # ----------------------------------------------------------------- schemas (Firebird 6)
     @cached_property
     def schemas_supported(self) -> bool:
-        r = self.rows("SELECT COUNT(*) AS n FROM RDB$RELATIONS WHERE RDB$RELATION_NAME = 'RDB$SCHEMAS'",
-                      scoped=False)
-        return bool(r and r[0]["n"])
+        cur = self.conn.cursor()
+        cur.execute("SELECT COUNT(*) FROM RDB$RELATIONS WHERE RDB$RELATION_NAME = 'RDB$SCHEMAS'")
+        return bool(cur.fetchone()[0])
 
     @cached_property
     def inline_params(self) -> bool:
@@ -147,6 +158,8 @@ class Catalog(CatalogExtras):
     def rows(self, sql: str, params: tuple | list = (), scoped: bool = True) -> list[dict[str, Any]]:
         if scoped and self.schema:  # Firebird 6: only this schema's objects
             sql = scope_sql(sql, self.schema)
+        if "PLG$PROF_" in sql and self.schemas_supported:  # Firebird 6 keeps the profiler tables in their own schema
+            sql = _PLG_PROF.sub("PLG$PROFILER.PLG$PROF_", sql)
         if params and self.inline_params:
             sql, params = inline_params(sql, list(params)), []
         cur = self.conn.cursor()
@@ -324,7 +337,8 @@ class Catalog(CatalogExtras):
             "i.RDB$UNIQUE_FLAG AS is_unique, i.RDB$INDEX_TYPE AS descending, i.RDB$INDEX_INACTIVE AS inactive, "
             "i.RDB$STATISTICS AS selectivity FROM RDB$INDICES i "
             "JOIN RDB$RELATIONS r ON r.RDB$RELATION_NAME = i.RDB$RELATION_NAME "
-            "WHERE COALESCE(r.RDB$SYSTEM_FLAG, 0) = 0 ORDER BY i.RDB$INDEX_NAME"
+            "WHERE COALESCE(r.RDB$SYSTEM_FLAG, 0) = 0 AND i.RDB$INDEX_NAME NOT STARTING WITH 'RDB$TEMP_DEPEND' "
+            "ORDER BY i.RDB$INDEX_NAME"
         )
 
     def _list_roles(self):
@@ -470,6 +484,7 @@ class Catalog(CatalogExtras):
             "WHERE " + where + " ORDER BY i.RDB$INDEX_NAME",
             (relation or name,),
         )
+        rows = [r for r in rows if not _engine_leftover_index(r)]
         for r in rows:
             r["columns"] = self.index_segments(r["name"])
             r["is_unique"] = bool(r["is_unique"])

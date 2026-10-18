@@ -42,7 +42,8 @@ _PRED_L = re.compile(
     rf"{_COL}\s*(=|<>|!=|<=|>=|<|>|\bNOT\s+IN\b|\bIN\b|\bIS\b|\bNOT\s+LIKE\b|\bLIKE\b|\bSTARTING(?:\s+WITH)?\b|"
     r"\bBETWEEN\b|\bCONTAINING\b|\bSIMILAR\b)\s*('(?:[^']|'')*')?", re.I)
 _PRED_R = re.compile(rf"(=|<>|!=|<=|>=|<|>)\s*{_COL}(?!\s*\()", re.I)
-_PLAN_FULL = re.compile(r'Table "((?:[^"]|"")+)"(?: as "((?:[^"]|"")+)")? Full Scan', re.I)
+# Firebird 6 qualifies tables with their schema: Table "PUBLIC"."ORD" as "O" Full Scan
+_PLAN_FULL = re.compile(r'Table (?:"(?:[^"]|"")+"\.)?"((?:[^"]|"")+)"(?: as "((?:[^"]|"")+)")? Full Scan', re.I)
 _PLAN_NATURAL = re.compile(r"([A-Za-z0-9_$\" ]+?)\s+NATURAL\b")
 
 EQ_OPS = {"=", "IN", "IS"}

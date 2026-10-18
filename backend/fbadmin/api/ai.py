@@ -71,7 +71,7 @@ def _context(server_id: str, db_id: str, sql: str, with_plan: bool) -> tuple[str
                 plan = explain(conn, bound)
                 detailed = explain(conn, bound, detailed=True)
                 parts.append(f"Plan:\n{plan}\n\nDetailed plan:\n{detailed}")
-                names += re.findall(r'Table "([^"]+)"', detailed or "")
+                names += re.findall(r'Table (?:"[^"]+"\.)?"([^"]+)"', detailed or "")  # FB6: "SCHEMA"."T"
             except Exception as exc:  # noqa: BLE001
                 parts.append(f"(could not prepare the statement: {exc})")
         tables = {r["name"] for r in cat.list_objects("tables")} | {r["name"] for r in cat.list_objects("views")}

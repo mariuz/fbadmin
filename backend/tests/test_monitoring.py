@@ -110,6 +110,10 @@ def test_compiled_statements(client, database):
         assert r["available"] is False and "5.0" in r["reason"]
         return
     assert r["available"]
+    if _major(client, database) >= 6:
+        # FB6 snapshots only list statements cached by live attachments
+        assert any("MON$COMPILED_STATEMENTS" in (s["sql_text"] or "") for s in r["statements"])
+        return
     texts = [s["sql_text"] or "" for s in r["statements"]]
     assert any("FROM CS WHERE ID > 5" in t for t in texts)
     assert any(s["object_name"] == "P_SUM" and s["object_type_name"] == "procedure" for s in r["statements"])

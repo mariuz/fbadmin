@@ -498,8 +498,8 @@ def database_state(server_id: str, db_id: str) -> dict:
     """Header page (via Services, works in shutdown) plus MON$DATABASE / RDB$DATABASE when attachable."""
     db = _db(server_id, db_id)
     with get_state().manager.service(server_id) as svc:
+        major = ops.engine_major(svc)  # first: on FB6 a failed header read drops the service link
         hdr = ops.header(svc, db.path)
-        major = ops.engine_major(svc)
     out: dict = {"header": hdr, "engine_major": major, "database": None, "error": None}
     if hdr["shutdown_mode"] in ("full", "single"):
         out["error"] = f"Database is in {hdr['shutdown_mode']} shutdown; showing header page only"

@@ -12,7 +12,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        firebird: ["3", "4", "5"]
+        firebird: ["3", "4", "5", "6-snapshot"]
+    # Firebird 6 is pre-release: report, but do not fail the build
+    continue-on-error: ${{ matrix.firebird == '6-snapshot' }}
     services:
       firebird:
         image: firebirdsql/firebird:${{ matrix.firebird }}

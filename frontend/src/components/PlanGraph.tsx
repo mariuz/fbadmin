@@ -24,12 +24,14 @@ export function parsePlan(text: string): PlanNode[] {
 }
 
 function classify(text: string): { kind: string; title: string; detail: string } {
-  const t = /^Table "([^"]+)"(?: as "([^"]+)")?\s*(.*)$/.exec(text);
+  // Firebird 6 qualifies the table with its schema: Table "PUBLIC"."T" as "A" Full Scan
+  const t = /^Table (?:"([^"]+)"\.)?"([^"]+)"(?: as "([^"]+)")?\s*(.*)$/.exec(text);
   if (t) {
-    const scan = t[3] || "";
-    return { kind: /Full Scan/i.test(scan) ? "scan-full" : "table", title: t[2] ? `${t[1]} ${t[2]}` : t[1], detail: scan };
+    const scan = t[4] || "";
+    const table = t[1] && t[1] !== "PUBLIC" ? `${t[1]}.${t[2]}` : t[2];
+    return { kind: /Full Scan/i.test(scan) ? "scan-full" : "table", title: t[3] ? `${table} ${t[3]}` : table, detail: scan };
   }
-  const i = /^Index "([^"]+)"\s*(.*)$/.exec(text);
+  const i = /^Index (?:"[^"]+"\.)?"([^"]+)"\s*(.*)$/.exec(text);
   if (i) return { kind: "index", title: i[1], detail: i[2] };
   const op = /^([A-Za-z][A-Za-z ]*?)(\s*\(.*\))?$/.exec(text);
   if (op) return { kind: /Sort|Aggregate|Hash/i.test(op[1]) ? "heavy" : "op", title: op[1], detail: (op[2] || "").trim() };

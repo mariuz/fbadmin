@@ -142,7 +142,7 @@ function PlanTree(props: { text: string }) {
   return (
     <pre className="plan-tree">
       {props.text.split("\n").map((line, i) => {
-        const parts = line.split(/(->\s*[A-Za-z][A-Za-z ]*?(?=\s"|$|\s\(|,)|Table "[^"]+"(?: as "[^"]+")?|Index "[^"]+")/g);
+        const parts = line.split(/(->\s*[A-Za-z][A-Za-z ]*?(?=\s"|$|\s\(|,)|Table (?:"[^"]+"\.)?"[^"]+"(?: as "[^"]+")?|Index (?:"[^"]+"\.)?"[^"]+")/g);
         return (
           <div key={i}>
             {parts.map((p, j) =>

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Start (or restart) local Firebird 3/4/5 test servers in Docker.
-# FB5 -> 127.0.0.1:3050, FB3 -> :3053, FB4 -> :3054 (SYSDBA / masterkey).
+# Start (or restart) local Firebird 3/4/5/6 test servers in Docker.
+# FB5 -> 127.0.0.1:3050, FB3 -> :3053, FB4 -> :3054, FB6 snapshot -> :3056 (SYSDBA / masterkey).
 set -euo pipefail
 if ! docker info >/dev/null 2>&1; then
   (setsid dockerd >/tmp/dockerd.log 2>&1 &)
@@ -16,7 +16,8 @@ start() {  # name tag port
 start fb5 5 3050
 start fb3 3 3053
 start fb4 4 3054
-for p in 3050 3053 3054; do
+start fb6 6-snapshot 3056
+for p in 3050 3053 3054 3056; do
   for _ in $(seq 1 30); do (echo >/dev/tcp/127.0.0.1/$p) 2>/dev/null && break; sleep 1; done
 done
 docker ps --format '{{.Names}} {{.Status}}'

@@ -92,7 +92,7 @@ def register(client, sid, path, name="r"):
 # ------------------------------------------------------------- backup/restore
 def test_capabilities(client, server):
     caps = client.get(f"/api/servers/{server['id']}/maintenance/capabilities").json()
-    assert caps["engine_major"] in (3, 4, 5)
+    assert caps["engine_major"] >= 3
     assert caps["features"]["parallel_workers"] == (caps["engine_major"] >= 5)
     assert caps["features"]["rdb_config"] == (caps["engine_major"] >= 4)
 

@@ -36,7 +36,7 @@ def require(conn) -> None:
 
 
 def _tables_exist(conn) -> bool:
-    r = Catalog(conn).one("SELECT COUNT(*) AS n FROM RDB$RELATIONS WHERE RDB$RELATION_NAME = 'PLG$PROF_SESSIONS'")
+    r = Catalog(conn).one("SELECT COUNT(*) AS n FROM RDB$RELATIONS WHERE RDB$RELATION_NAME = 'PLG$PROF_SESSIONS'", scoped=False)
     return bool(r and r["n"])
 
 
@@ -120,11 +120,10 @@ def sessions(conn) -> list[dict[str, Any]]:
 
 def delete_session(conn, profile_id: int | None = None) -> None:
     """Delete one profile (or all with ``None``) via ``RDB$PROFILER.PURGE`` semantics."""
-    cur = conn.cursor()
     if profile_id is None:
-        cur.execute("DELETE FROM PLG$PROF_SESSIONS")
+        Catalog(conn).rows("DELETE FROM PLG$PROF_SESSIONS")
     else:
-        cur.execute("DELETE FROM PLG$PROF_SESSIONS WHERE PROFILE_ID = ?", [profile_id])
+        Catalog(conn).rows("DELETE FROM PLG$PROF_SESSIONS WHERE PROFILE_ID = ?", [profile_id])
 
 
 def report(conn, profile_id: int) -> dict[str, Any]:

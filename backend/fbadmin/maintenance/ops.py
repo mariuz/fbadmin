@@ -384,7 +384,17 @@ def statistics_text(svc, db_path: str, *, header_only: bool = False, data: bool 
 
 def header(svc, db_path: str) -> dict:
     """Parsed header page (works for databases in shutdown, too)."""
-    hdr = gstat.parse_header(statistics_text(svc, db_path, header_only=True).splitlines())
+    try:
+        text = statistics_text(svc, db_path, header_only=True)
+    except Exception as e:
+        # Firebird 6 gstat refuses to read the header of a database in full
+        # shutdown; the error itself tells us the state.
+        if "shutdown" not in str(e).lower():
+            raise
+        return {"attributes": ["full shutdown"], "shutdown_mode": "full", "forced_writes": None,
+                "read_only": None, "reserve_space": None, "backup_state": None,
+                "encrypted": None, "partial": True}
+    hdr = gstat.parse_header(text.splitlines())
     attrs = hdr["attributes"]
     hdr["shutdown_mode"] = gstat.shutdown_mode(attrs)
     hdr["forced_writes"] = "force write" in attrs
