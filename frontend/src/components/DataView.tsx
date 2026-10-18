@@ -3,6 +3,7 @@ import { api } from "../api";
 import { errMsg, useApp } from "../context";
 import { cellText, displayValue, download, toDelimited } from "./ResultGrid";
 import { getPrefs } from "../prefs";
+import { t } from "../i18n";
 import { Modal } from "./Modal";
 import { IconDownload, IconFilter, IconPlus, IconRefresh, IconSave, IconTrash } from "./Icons";
 
@@ -78,7 +79,7 @@ export function DataView(props: { serverId: string; dbId: string; otype: string;
     };
     try {
       const res = await api.saveTableData(props.serverId, props.dbId, props.name, changes);
-      app.toast(`Saved: ${res.statements} statement(s), ${res.affected} row(s)`);
+      app.toast(t("Saved: {statements} statement(s), {affected} row(s)", { statements: res.statements, affected: res.affected }));
       load(offset);
     } catch (e) {
       app.toast(errMsg(e), "error");
@@ -95,26 +96,26 @@ export function DataView(props: { serverId: string; dbId: string; otype: string;
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       <div className="toolbar">
-        <button className="btn icon" title="Refresh" onClick={() => load(offset)}><IconRefresh /></button>
-        <button className={"btn icon" + (showFilter ? " on" : "")} title="Filter" onClick={() => setShowFilter(!showFilter)}><IconFilter /></button>
+        <button className="btn icon" title={t("Refresh")} onClick={() => load(offset)}><IconRefresh /></button>
+        <button className={"btn icon" + (showFilter ? " on" : "")} title={t("Filter")} onClick={() => setShowFilter(!showFilter)}><IconFilter /></button>
         {editable && (
           <>
             <span className="sep" />
-            <button className="btn" onClick={addRow}><IconPlus /> Row</button>
+            <button className="btn" onClick={addRow}><IconPlus /> {t("Row")}</button>
             <button className="btn" disabled={sel === null} onClick={() => {
               if (sel === null) return;
               setRows((rs) => rs.flatMap((r, i) => (i !== sel ? [r] : r.status === "new" ? [] : [{ ...r, status: "deleted" as const }])));
-            }}><IconTrash /> Delete</button>
-            <button className="btn primary" disabled={!dirty} onClick={save}><IconSave /> Save</button>
-            <button className="btn" disabled={!dirty} onClick={() => load(offset)}>Discard</button>
+            }}><IconTrash /> {t("Delete")}</button>
+            <button className="btn primary" disabled={!dirty} onClick={save}><IconSave /> {t("Save")}</button>
+            <button className="btn" disabled={!dirty} onClick={() => load(offset)}>{t("Discard")}</button>
           </>
         )}
         <span className="sep" />
-        <button className="btn" disabled={offset === 0 || loading} onClick={() => load(Math.max(0, offset - limit))}>‹ Prev</button>
-        <span className="muted">rows {rows.length ? offset + 1 : 0}–{offset + (data?.rows.length ?? 0)}</span>
-        <button className="btn" disabled={!data?.has_more || loading} onClick={() => load(offset + limit)}>Next ›</button>
+        <button className="btn" disabled={offset === 0 || loading} onClick={() => load(Math.max(0, offset - limit))}>‹ {t("Prev")}</button>
+        <span className="muted">{t("rows {from}–{to}", { from: rows.length ? offset + 1 : 0, to: offset + (data?.rows.length ?? 0) })}</span>
+        <button className="btn" disabled={!data?.has_more || loading} onClick={() => load(offset + limit)}>{t("Next")} ›</button>
         <select className="text" value={limit} onChange={(e) => setLimit(Number(e.target.value))}>
-          {[50, 100, 500, 1000, 5000].map((n) => <option key={n} value={n}>{n} / page</option>)}
+          {[50, 100, 500, 1000, 5000].map((n) => <option key={n} value={n}>{t("{count} / page", { count: n })}</option>)}
         </select>
         <span className="grow" />
         {data && <button className="btn small" onClick={() => download(`${props.name}.csv`, toDelimited(visibleCols.map(({ c }) => c), rows.map((r) => visibleCols.map(({ i }) => r.values[i]))))}><IconDownload size={13} /> CSV</button>}
@@ -122,14 +123,14 @@ export function DataView(props: { serverId: string; dbId: string; otype: string;
       {showFilter && (
         <div className="toolbar">
           <span className="muted">WHERE</span>
-          <input className="text mono" style={{ flex: 1 }} value={whereInput} placeholder="e.g. NAME LIKE 'A%' AND ID > 10" onChange={(e) => setWhereInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && setWhere(whereInput)} autoFocus />
-          <button className="btn" onClick={() => setWhere(whereInput)}>Apply</button>
-          <button className="btn" onClick={() => { setWhereInput(""); setWhere(""); }}>Clear</button>
+          <input className="text mono" style={{ flex: 1 }} value={whereInput} placeholder={t("e.g. NAME LIKE 'A%' AND ID > 10")} onChange={(e) => setWhereInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && setWhere(whereInput)} autoFocus />
+          <button className="btn" onClick={() => setWhere(whereInput)}>{t("Apply")}</button>
+          <button className="btn" onClick={() => { setWhereInput(""); setWhere(""); }}>{t("Clear")}</button>
         </div>
       )}
       {error && <div className="pad err" style={{ whiteSpace: "pre-wrap" }}>{error}</div>}
-      {!editable && <div className="pad muted" style={{ padding: "4px 10px" }}>Read-only ({props.otype === "views" ? "view" : "system table"}).</div>}
-      {editable && data && !data.primary_key.length && <div className="pad warn" style={{ padding: "4px 10px" }}>No primary key: rows are identified by RDB$DB_KEY (valid only within this session's view of the data).</div>}
+      {!editable && <div className="pad muted" style={{ padding: "4px 10px" }}>{props.otype === "views" ? t("Read-only (view).") : t("Read-only (system table).")}</div>}
+      {editable && data && !data.primary_key.length && <div className="pad warn" style={{ padding: "4px 10px" }}>{t("No primary key: rows are identified by RDB$DB_KEY (valid only within this session's view of the data).")}</div>}
       <div style={{ flex: 1, overflow: "auto" }}>
         <table className="grid">
           <thead>
@@ -171,14 +172,14 @@ export function DataView(props: { serverId: string; dbId: string; otype: string;
                             }}
                             onBlur={(e) => { if (e.target.value !== (v === undefined || v === null ? "" : cellText(v))) setCell(ri, i, e.target.value); setEdit(null); }}
                           />
-                          <button className="btn small" title="Set NULL" onMouseDown={(e) => { e.preventDefault(); setCell(ri, i, null); setEdit(null); }}>∅</button>
-                          <button className="btn small" title="Edit in a larger editor / upload a file" onMouseDown={(e) => { e.preventDefault(); setEdit(null); setBig({ ri, ci: i, name: c.name, blob: m?.field_type === 261, text: m?.field_sub_type === 1 }); }}>…</button>
+                          <button className="btn small" title={t("Set NULL")} onMouseDown={(e) => { e.preventDefault(); setCell(ri, i, null); setEdit(null); }}>∅</button>
+                          <button className="btn small" title={t("Edit in a larger editor / upload a file")} onMouseDown={(e) => { e.preventDefault(); setEdit(null); setBig({ ri, ci: i, name: c.name, blob: m?.field_type === 261, text: m?.field_sub_type === 1 }); }}>…</button>
                         </div>
                       </td>
                     );
                   }
                   return (
-                    <td key={c.name} className={cls} onDoubleClick={() => !readOnly && setEdit([ri, i])} title={readOnly ? undefined : "Double-click to edit"}>
+                    <td key={c.name} className={cls} onDoubleClick={() => !readOnly && setEdit([ri, i])} title={readOnly ? undefined : t("Double-click to edit")}>
                       {v === undefined ? <span className="muted">{m?.identity || m?.default ? "default" : ""}</span>
                         : isNull ? getPrefs().nullDisplay
                         : isBinary(v) ? <span className="muted">{blobLabel(v as string)}</span>
@@ -190,7 +191,7 @@ export function DataView(props: { serverId: string; dbId: string; otype: string;
             ))}
           </tbody>
         </table>
-        {data && rows.length === 0 && <div className="pad muted">No rows.</div>}
+        {data && rows.length === 0 && <div className="pad muted">{t("No rows.")}</div>}
       </div>
       {data && <div className="status"><span className="mono" title={data.sql}>{data.sql.length > 160 ? data.sql.slice(0, 160) + "…" : data.sql}</span></div>}
       {big && (
@@ -232,23 +233,25 @@ function BigEditor(props: {
   };
   const hexValue = typeof props.value === "string" && /^0x[0-9A-F]+$/.test(props.value) ? props.value.slice(2) : null;
   return (
-    <Modal wide title={`Edit ${props.title}`} onClose={props.onClose} footer={<>
-      <button className="btn" onClick={pick} style={{ marginRight: "auto" }}>Load from file…</button>
+    <Modal wide title={t("Edit {name}", { name: props.title })} onClose={props.onClose} footer={<>
+      <button className="btn" onClick={pick} style={{ marginRight: "auto" }}>{t("Load from file…")}</button>
       {hexValue && <button className="btn" onClick={() => {
         const bytes = new Uint8Array(new ArrayBuffer(hexValue.length / 2));
         for (let i = 0; i < bytes.length; i++) bytes[i] = parseInt(hexValue.substr(i * 2, 2), 16);
         const url = URL.createObjectURL(new Blob([bytes]));
         const a = document.createElement("a"); a.href = url; a.download = props.title + ".bin"; a.click();
-      }}>Download current</button>}
-      <button className="btn" onClick={() => props.onSave(null)}>Set NULL</button>
-      <button className="btn" onClick={props.onClose}>Cancel</button>
+      }}>{t("Download current")}</button>}
+      <button className="btn" onClick={() => props.onSave(null)}>{t("Set NULL")}</button>
+      <button className="btn" onClick={props.onClose}>{t("Cancel")}</button>
       <button className="btn primary" disabled={props.binary && !file}
-        onClick={() => props.onSave(props.binary ? { $hex: file!.hex } : text)}>OK</button>
+        onClick={() => props.onSave(props.binary ? { $hex: file!.hex } : text)}>{t("OK")}</button>
     </>}>
       {props.binary ? (
         <div className="pad">
-          {file ? <p>Selected <b>{file.name}</b> ({file.size.toLocaleString()} bytes). Click OK, then Save in the grid.</p>
-            : <p className="muted">Binary BLOB: load a file to replace the value{hexValue ? ` (current: ${hexValue.length / 2} bytes)` : ""}.</p>}
+          {file ? <p>{t("Selected")} <b>{file.name}</b> {t("({count} bytes). Click OK, then Save in the grid.", { count: file.size.toLocaleString() })}</p>
+            : <p className="muted">{hexValue
+              ? t("Binary BLOB: load a file to replace the value (current: {count} bytes).", { count: hexValue.length / 2 })
+              : t("Binary BLOB: load a file to replace the value.")}</p>}
         </div>
       ) : (
         <textarea className="text mono" style={{ width: "100%", height: "50vh" }} value={text} onChange={(e) => setText(e.target.value)} autoFocus />

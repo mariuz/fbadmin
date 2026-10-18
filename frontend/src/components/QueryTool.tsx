@@ -6,6 +6,7 @@ import type { ScriptResult, SessionOptions, StatementResult } from "../types";
 import { Modal } from "./Modal";
 import { PlanDiff, PlanGraph } from "./PlanGraph";
 import { getPrefs } from "../prefs";
+import { N_, t } from "../i18n";
 import { AI_TASKS, AssistantPane, askAi, useAiStatus } from "./Assistant";
 import { ResultGrid, download } from "./ResultGrid";
 import {
@@ -43,17 +44,18 @@ const DEFAULT_SNIPPETS: Snippet[] = [
 ];
 
 const DDL_RE = /^\s*(create|alter|drop|recreate|declare|comment|grant|revoke)\b/im;
-const ISOLATIONS: Array<[string, string, number]> = [
-  ["read_committed", "Read committed", 3],
-  ["read_consistency", "Read committed – read consistency", 4],
-  ["read_committed_no_rec_version", "Read committed – no record version", 3],
-  ["snapshot", "Snapshot (concurrency)", 3],
-  ["snapshot_table_stability", "Snapshot table stability (consistency)", 3],
+// [key, label, minimum engine major, short label for the toolbar button]
+const ISOLATIONS: Array<[string, string, number, string]> = [
+  ["read_committed", N_("Read committed"), 3, N_("Read committed")],
+  ["read_consistency", N_("Read committed – read consistency"), 4, N_("Read committed")],
+  ["read_committed_no_rec_version", N_("Read committed – no record version"), 3, N_("Read committed")],
+  ["snapshot", N_("Snapshot (concurrency)"), 3, N_("Snapshot")],
+  ["snapshot_table_stability", N_("Snapshot table stability (consistency)"), 3, N_("Snapshot table stability (consistency)")],
 ];
 const STAT_LABELS: Array<[string, string]> = [
-  ["fetches", "Page fetches"], ["reads", "Page reads"], ["writes", "Page writes"], ["marks", "Page marks"],
-  ["seq_reads", "Seq. reads"], ["idx_reads", "Index reads"], ["inserts", "Inserts"], ["updates", "Updates"],
-  ["deletes", "Deletes"], ["backouts", "Backouts"], ["purges", "Purges"], ["expunges", "Expunges"],
+  ["fetches", N_("Page fetches")], ["reads", N_("Page reads")], ["writes", N_("Page writes")], ["marks", N_("Page marks")],
+  ["seq_reads", N_("Seq. reads")], ["idx_reads", N_("Index reads")], ["inserts", N_("Inserts")], ["updates", N_("Updates")],
+  ["deletes", N_("Deletes")], ["backouts", N_("Backouts")], ["purges", N_("Purges")], ["expunges", N_("Expunges")],
 ];
 
 // ------------------------------------------------------------- dialogs
@@ -68,11 +70,11 @@ function ParamsDialog(props: { names: string[]; onDone: (v: Record<string, unkno
   };
   return (
     <Modal
-      title="Query parameters"
+      title={t("Query parameters")}
       onClose={() => props.onDone(null)}
       footer={<>
-        <button className="btn" onClick={() => props.onDone(null)}>Cancel</button>
-        <button className="btn primary" onClick={submit}>Execute</button>
+        <button className="btn" onClick={() => props.onDone(null)}>{t("Cancel")}</button>
+        <button className="btn primary" onClick={submit}>{t("Execute")}</button>
       </>}
     >
       <div className="form" onKeyDown={(e) => e.key === "Enter" && submit()}>
@@ -89,7 +91,7 @@ function ParamsDialog(props: { names: string[]; onDone: (v: Record<string, unkno
           </div>
         ))}
         <span />
-        <span className="muted">Values are sent as text; Firebird converts them to the column type.</span>
+        <span className="muted">{t("Values are sent as text; Firebird converts them to the column type.")}</span>
       </div>
     </Modal>
   );
@@ -102,36 +104,36 @@ function TxSettings(props: { options: SessionOptions; onApply: (o: Partial<Sessi
   return (
     <div className="popover" onMouseDown={(e) => e.stopPropagation()}>
       <div className="form">
-        <label className="l">Isolation</label>
+        <label className="l">{t("Isolation")}</label>
         <select className="text" value={o.isolation} onChange={(e) => setO({ ...o, isolation: e.target.value })}>
-          {ISOLATIONS.map(([k, label, min]) => <option key={k} value={k} disabled={o.engine_major < min}>{label}</option>)}
+          {ISOLATIONS.map(([k, label, min]) => <option key={k} value={k} disabled={o.engine_major < min}>{t(label)}</option>)}
         </select>
         <span />
-        <label className="check"><input type="checkbox" checked={o.read_only} onChange={(e) => setO({ ...o, read_only: e.target.checked })} /> Read only</label>
-        <label className="l">Lock resolution</label>
+        <label className="check"><input type="checkbox" checked={o.read_only} onChange={(e) => setO({ ...o, read_only: e.target.checked })} /> {t("Read only")}</label>
+        <label className="l">{t("Lock resolution")}</label>
         <select className="text" value={o.wait ? "wait" : "nowait"} onChange={(e) => setO({ ...o, wait: e.target.value === "wait" })}>
-          <option value="wait">Wait</option>
-          <option value="nowait">No wait</option>
+          <option value="wait">{t("Wait")}</option>
+          <option value="nowait">{t("No wait")}</option>
         </select>
-        <label className="l">Lock timeout (s)</label>
-        <input className="text" type="number" min={0} disabled={!o.wait} value={o.lock_timeout ?? ""} placeholder="infinite"
+        <label className="l">{t("Lock timeout (s)")}</label>
+        <input className="text" type="number" min={0} disabled={!o.wait} value={o.lock_timeout ?? ""} placeholder={t("infinite")}
           onChange={(e) => setO({ ...o, lock_timeout: e.target.value ? Number(e.target.value) : null })} />
-        <label className="l">Statement timeout</label>
+        <label className="l">{t("Statement timeout")}</label>
         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-          <input className="text" type="number" min={0} disabled={!v4} value={o.statement_timeout || ""} placeholder={v4 ? "none" : "Firebird 4+"}
+          <input className="text" type="number" min={0} disabled={!v4} value={o.statement_timeout || ""} placeholder={v4 ? t("none") : "Firebird 4+"}
             onChange={(e) => setO({ ...o, statement_timeout: Number(e.target.value || 0) })} style={{ flex: 1 }} />
           <span className="muted">ms</span>
         </div>
       </div>
       {err && <div className="err" style={{ marginTop: 8, whiteSpace: "pre-wrap" }}>{err}</div>}
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 12 }}>
-        <button className="btn" onClick={props.onClose}>Close</button>
+        <button className="btn" onClick={props.onClose}>{t("Close")}</button>
         <button className="btn primary" onClick={async () => {
           try {
             await props.onApply({ isolation: o.isolation, read_only: o.read_only, wait: o.wait, lock_timeout: o.wait ? o.lock_timeout : null, statement_timeout: v4 ? o.statement_timeout : undefined });
             props.onClose();
           } catch (e) { setErr(errMsg(e)); }
-        }}>Apply</button>
+        }}>{t("Apply")}</button>
       </div>
     </div>
   );
@@ -160,10 +162,10 @@ function PlanTree(props: { text: string }) {
 
 function StatsTable(props: { stats: Record<string, number> }) {
   const items = STAT_LABELS.filter(([k]) => props.stats[k]);
-  if (!items.length) return <span className="muted">no I/O</span>;
+  if (!items.length) return <span className="muted">{t("no I/O")}</span>;
   return (
     <table className="stats-table"><tbody><tr>
-      {items.map(([k, label]) => <td key={k}><span className="muted">{label}</span> {props.stats[k].toLocaleString()}</td>)}
+      {items.map(([k, label]) => <td key={k}><span className="muted">{t(label)}</span> {props.stats[k].toLocaleString()}</td>)}
     </tr></tbody></table>
   );
 }
@@ -178,7 +180,7 @@ function SchemaPicker(props: { serverId: string; dbId: string; searchPath?: stri
   const m = /^\s*(?:"((?:[^"]|"")+)"|([^,\s]+))/.exec(props.searchPath ?? "");
   const current = m ? (m[1]?.replace(/""/g, '"') ?? m[2]) : "";
   return (
-    <label title={`Search path: ${props.searchPath ?? ""}`}>Schema
+    <label title={t("Search path: {path}", { path: props.searchPath ?? "" })}>{t("Schema")}
       <select className="text" value={current} onChange={(e) => props.onChange(e.target.value)}>
         {!schemas.includes(current) && <option value={current}>{current}</option>}
         {schemas.map((s) => <option key={s} value={s}>{s}</option>)}
@@ -246,8 +248,8 @@ export function QueryTool(props: { serverId: string; dbId: string; schema?: stri
   useEffect(() => {
     if (!running) return;
     const t0 = performance.now();
-    const t = setInterval(() => setElapsed(Math.round((performance.now() - t0) / 100) / 10), 100);
-    return () => clearInterval(t);
+    const timer = setInterval(() => setElapsed(Math.round((performance.now() - t0) / 100) / 10), 100);
+    return () => clearInterval(timer);
   }, [running]);
 
   const askParams = (names: string[]) =>
@@ -327,7 +329,7 @@ export function QueryTool(props: { serverId: string; dbId: string; schema?: stri
     setCancelling(true);
     try {
       const r = await api.cancel(sessionRef.current);
-      if (!r.cancelled) app.toast("Nothing to cancel (the statement may be finishing)", "info");
+      if (!r.cancelled) app.toast(t("Nothing to cancel (the statement may be finishing)"), "info");
     } catch (e) {
       app.toast(errMsg(e), "error");
       setCancelling(false);
@@ -361,10 +363,10 @@ export function QueryTool(props: { serverId: string; dbId: string; schema?: stri
       const sid = await ensureSession();
       const r = await api.explain(sid, q);
       setResult((x) => (x ? { ...x, cursor_open: false } : x)); // explain closes the open cursor
-      setPlan(r.plan || r.detailed ? { ...r, sql: q } : { plan: "(no plan — the statement does not read tables)", detailed: null });
+      setPlan(r.plan || r.detailed ? { ...r, sql: q } : { plan: t("(no plan — the statement does not read tables)"), detailed: null });
       setPane("plan");
     } catch (e) {
-      setPlan({ plan: "Error: " + errMsg(e), detailed: null });
+      setPlan({ plan: t("Error: {message}", { message: errMsg(e) }), detailed: null });
       setPane("plan");
     }
   };
@@ -375,7 +377,7 @@ export function QueryTool(props: { serverId: string; dbId: string; schema?: stri
       await (what === "commit" ? api.commit(session) : api.rollback(session));
       setTxOpen(false);
       setResult((r) => (r ? { ...r, cursor_open: false } : r));
-      app.toast(what === "commit" ? "Transaction committed" : "Transaction rolled back");
+      app.toast(what === "commit" ? t("Transaction committed") : t("Transaction rolled back"));
       if (what === "commit") app.invalidate(keys.db(props.serverId, props.dbId));
     } catch (e) {
       app.toast(errMsg(e), "error");
@@ -387,17 +389,17 @@ export function QueryTool(props: { serverId: string; dbId: string; schema?: stri
     const q = view.current ? selectionOrAll(view.current) : sql;
     const body: Record<string, unknown> = { task, sql: q, server_id: props.serverId, database_id: props.dbId };
     if (task === "convert_sql") {
-      const d = window.prompt("Convert from which SQL dialect?", "MySQL");
+      const d = window.prompt(t("Convert from which SQL dialect?"), "MySQL");
       if (!d) return;
       body.dialect = d;
     }
     if (task === "ask") {
-      const qn = window.prompt("Your question about this SQL / database:");
+      const qn = window.prompt(t("Your question about this SQL / database:"));
       if (!qn) return;
       body.question = qn;
     }
     if (task === "explain_error") {
-      if (!result?.error) { app.toast("No error to explain — run a query first", "info"); return; }
+      if (!result?.error) { app.toast(t("No error to explain — run a query first"), "info"); return; }
       body.error = result.error.message;
       body.sql = result.error.sql;
     }
@@ -415,7 +417,7 @@ export function QueryTool(props: { serverId: string; dbId: string; schema?: stri
     try {
       formatEditor(view.current);
     } catch (e) {
-      app.toast("Cannot format: " + errMsg(e), "error");
+      app.toast(t("Cannot format: {message}", { message: errMsg(e) }), "error");
     }
   };
 
@@ -432,7 +434,7 @@ export function QueryTool(props: { serverId: string; dbId: string; schema?: stri
   const saveSnippet = () => {
     const text = view.current ? selectionOrAll(view.current) : sql;
     if (!text.trim()) return;
-    const name = window.prompt("Snippet name", text.trim().split("\n")[0].slice(0, 60));
+    const name = window.prompt(t("Snippet name"), text.trim().split("\n")[0].slice(0, 60));
     if (!name) return;
     const next = [{ name, sql: text }, ...snippets.filter((s) => s.name !== name)];
     setSnippets(next);
@@ -462,38 +464,39 @@ export function QueryTool(props: { serverId: string; dbId: string; schema?: stri
   const selects = result?.results.filter((r) => r.kind === "select") ?? [];
   const current: StatementResult | undefined = selects[activeResult];
   const isLastSelect = current && current === selects[selects.length - 1];
-  const txLabel = options ? ISOLATIONS.find(([k]) => k === options.isolation)?.[1].split(" – ")[0].replace(" (concurrency)", "") : "";
+  const txShort = options ? ISOLATIONS.find(([k]) => k === options.isolation)?.[3] : undefined;
+  const txLabel = txShort ? t(txShort) : "";
 
   return (
     <div className="qt" style={{ display: props.visible ? "flex" : "none" }}>
       <div className="toolbar">
         {running ? (
-          <button className="btn stop" disabled={cancelling} onClick={cancel} title="Cancel the running statement">
-            <IconSpinner className="spin" /> {cancelling ? "Cancelling…" : `Cancel (${elapsed.toFixed(1)} s)`}
+          <button className="btn stop" disabled={cancelling} onClick={cancel} title={t("Cancel the running statement")}>
+            <IconSpinner className="spin" /> {cancelling ? t("Cancelling…") : t("Cancel ({seconds} s)", { seconds: elapsed.toFixed(1) })}
           </button>
         ) : (
-          <button className="btn primary" onClick={() => run()} title="Execute (F5 / Ctrl+Enter). Runs the selection if any.">
-            <IconPlay /> Execute
+          <button className="btn primary" onClick={() => run()} title={t("Execute (F5 / Ctrl+Enter). Runs the selection if any.")}>
+            <IconPlay /> {t("Execute")}
           </button>
         )}
-        <button className="btn" onClick={explain} title="Show the execution plan without running"><IconPlan /> Explain</button>
+        <button className="btn" onClick={explain} title={t("Show the execution plan without running")}><IconPlan /> {t("Explain")}</button>
         {options && options.engine_major >= 5 && (
-          <button className="btn" title="Run the statement under the Firebird 5 PSQL profiler (in a separate attachment) and show the report"
+          <button className="btn" title={t("Run the statement under the Firebird 5 PSQL profiler (in a separate attachment) and show the report")}
             onClick={() => {
               const q = view.current ? selectionOrAll(view.current) : sql;
               if (!q.trim()) return;
               const db = app.servers.find((s) => s.id === props.serverId)?.databases.find((d) => d.id === props.dbId);
               app.openTab({ kind: "profiler", title: `${db?.name ?? "db"} · profile`, serverId: props.serverId, dbId: props.dbId, props: { sql: q, autorun: true } });
-            }}>Profile</button>
+            }}>{t("Profile")}</button>
         )}
         <span className="sep" />
-        <button className={"btn" + (autocommit ? " on" : "")} onClick={() => setAutocommit(!autocommit)} title="Commit after every statement">
-          Auto-commit {autocommit ? "on" : "off"}
+        <button className={"btn" + (autocommit ? " on" : "")} onClick={() => setAutocommit(!autocommit)} title={t("Commit after every statement")}>
+          {autocommit ? t("Auto-commit on") : t("Auto-commit off")}
         </button>
-        <button className="btn" disabled={!txOpen} onClick={() => txAction("commit")}>Commit</button>
-        <button className="btn" disabled={!txOpen} onClick={() => txAction("rollback")}>Rollback</button>
+        <button className="btn" disabled={!txOpen} onClick={() => txAction("commit")}>{t("Commit")}</button>
+        <button className="btn" disabled={!txOpen} onClick={() => txAction("rollback")}>{t("Rollback")}</button>
         <div style={{ position: "relative" }}>
-          <button className={"btn" + (showTx ? " on" : "")} disabled={!options} onClick={() => setShowTx(!showTx)} title="Transaction isolation, read-only, lock and statement timeouts">
+          <button className={"btn" + (showTx ? " on" : "")} disabled={!options} onClick={() => setShowTx(!showTx)} title={t("Transaction isolation, read-only, lock and statement timeouts")}>
             {txLabel}{options?.read_only ? " · RO" : ""}{options?.statement_timeout ? ` · ${options.statement_timeout} ms` : ""} ▾
           </button>
           {showTx && options && session && (
@@ -510,34 +513,34 @@ export function QueryTool(props: { serverId: string; dbId: string; schema?: stri
             }} />
         )}
         <span className="sep" />
-        <label>Rows
+        <label>{t("Rows")}
           <select className="text" value={maxRows} onChange={(e) => setMaxRows(Number(e.target.value))}>
             {[100, 1000, 10000, 100000].map((n) => <option key={n} value={n}>{n.toLocaleString()}</option>)}
           </select>
         </label>
-        <label className="check" title="Fetch the PLAN of every executed statement"><input type="checkbox" checked={withPlan} onChange={(e) => setWithPlan(e.target.checked)} /> Plans</label>
-        <label className="check" title="Measure page and record I/O of every statement (from MON$ tables)"><input type="checkbox" checked={withStats} onChange={(e) => setWithStats(e.target.checked)} /> Stats</label>
+        <label className="check" title={t("Fetch the PLAN of every executed statement")}><input type="checkbox" checked={withPlan} onChange={(e) => setWithPlan(e.target.checked)} /> {t("Plans")}</label>
+        <label className="check" title={t("Measure page and record I/O of every statement (from MON$ tables)")}><input type="checkbox" checked={withStats} onChange={(e) => setWithStats(e.target.checked)} /> {t("Stats")}</label>
         <span className="grow" />
         {aiStatus?.enabled && (
           <div style={{ position: "relative" }}>
-            <button className={"btn small" + (aiMenu ? " on" : "")} onClick={() => setAiMenu(!aiMenu)} title={`AI assistant (${aiStatus.provider})`}>✦ Assistant ▾</button>
+            <button className={"btn small" + (aiMenu ? " on" : "")} onClick={() => setAiMenu(!aiMenu)} title={t("AI assistant ({provider})", { provider: aiStatus.provider ?? "" })}>✦ {t("Assistant")} ▾</button>
             {aiMenu && (
               <div className="ctx" style={{ position: "absolute", right: 0, top: "100%" }} onMouseLeave={() => setAiMenu(false)}>
-                {AI_TASKS.map(([k, label]) => <button key={k} onClick={() => runAi(k)}>{label}</button>)}
+                {AI_TASKS.map(([k, label]) => <button key={k} onClick={() => runAi(k)}>{t(label)}</button>)}
               </div>
             )}
           </div>
         )}
-        <button className="btn small" title="Format SQL (Shift+Alt+F)" onClick={format}>Format</button>
-        <button className="btn icon" title="Save selection as snippet" onClick={saveSnippet}><IconPlus /></button>
-        <button className="btn icon" title="Open .sql file" onClick={openFile}><IconUpload /></button>
-        <button className="btn icon" title="Save as .sql file" onClick={() => download("query.sql", sql, "text/sql")}><IconDownload /></button>
+        <button className="btn small" title={t("Format SQL (Shift+Alt+F)")} onClick={format}>{t("Format")}</button>
+        <button className="btn icon" title={t("Save selection as snippet")} onClick={saveSnippet}><IconPlus /></button>
+        <button className="btn icon" title={t("Open .sql file")} onClick={openFile}><IconUpload /></button>
+        <button className="btn icon" title={t("Save as .sql file")} onClick={() => download("query.sql", sql, "text/sql")}><IconDownload /></button>
       </div>
       <div className="qt-editor" style={{ height: editorH }}>
         <SqlEditor
           value={sql}
           onChange={setSql}
-          onExecute={(t) => run(t)}
+          onExecute={(text) => run(text)}
           onExplain={() => explain()}
           onMacro={(key) => {
             const m = getPrefs().macros.find((x) => x.key === key);
@@ -549,22 +552,22 @@ export function QueryTool(props: { serverId: string; dbId: string; schema?: stri
           }}
           schema={schema}
           extra={extra}
-          onFormatError={(m) => app.toast("Cannot format: " + m, "error")}
-          placeholder="-- Write SQL here. F5 / Ctrl+Enter runs the selection or the script. :name and ? prompt for values. Ctrl+/ comments, Shift+Alt+F formats."
+          onFormatError={(m) => app.toast(t("Cannot format: {message}", { message: m }), "error")}
+          placeholder={t("-- Write SQL here. F5 / Ctrl+Enter runs the selection or the script. :name and ? prompt for values. Ctrl+/ comments, Shift+Alt+F formats.")}
           editorRef={(v) => (view.current = v)}
         />
       </div>
       <div className="splitter-h" onMouseDown={startDrag} />
       <div className="qt-results">
         <div className="subtabs">
-          <button className={pane === "data" ? "active" : ""} onClick={() => setPane("data")}>Data output{selects.length > 1 ? ` (${selects.length})` : ""}</button>
+          <button className={pane === "data" ? "active" : ""} onClick={() => setPane("data")}>{t("Data output")}{selects.length > 1 ? ` (${selects.length})` : ""}</button>
           <button className={pane === "messages" ? "active" : ""} onClick={() => setPane("messages")}>
-            Messages {result?.error && <span className="err">●</span>}
+            {t("Messages")} {result?.error && <span className="err">●</span>}
           </button>
-          <button className={pane === "plan" ? "active" : ""} onClick={() => setPane("plan")}>Plan</button>
-          <button className={pane === "history" ? "active" : ""} onClick={() => setPane("history")}>History</button>
-          <button className={pane === "snippets" ? "active" : ""} onClick={() => setPane("snippets")}>Snippets</button>
-          {aiStatus?.enabled && <button className={pane === "assistant" ? "active" : ""} onClick={() => setPane("assistant")}>Assistant</button>}
+          <button className={pane === "plan" ? "active" : ""} onClick={() => setPane("plan")}>{t("Plan")}</button>
+          <button className={pane === "history" ? "active" : ""} onClick={() => setPane("history")}>{t("History")}</button>
+          <button className={pane === "snippets" ? "active" : ""} onClick={() => setPane("snippets")}>{t("Snippets")}</button>
+          {aiStatus?.enabled && <button className={pane === "assistant" ? "active" : ""} onClick={() => setPane("assistant")}>{t("Assistant")}</button>}
         </div>
         <div className="qt-out">
           {pane === "data" && (
@@ -574,7 +577,7 @@ export function QueryTool(props: { serverId: string; dbId: string; schema?: stri
                   <div className="toolbar">
                     {selects.map((s, i) => (
                       <button key={i} className={"btn small" + (i === activeResult ? " on" : "")} onClick={() => setActiveResult(i)}>
-                        Result {i + 1} <span className="muted">(line {s.line})</span>
+                        {t("Result {n}", { n: i + 1 })} <span className="muted">{t("(line {line})", { line: s.line })}</span>
                       </button>
                     ))}
                   </div>
@@ -585,25 +588,25 @@ export function QueryTool(props: { serverId: string; dbId: string; schema?: stri
                 </div>
               </div>
             ) : (
-              <div className="empty-state">{result ? "The script returned no result set." : "Run a query to see results."}</div>
+              <div className="empty-state">{result ? t("The script returned no result set.") : t("Run a query to see results.")}</div>
             )
           )}
           {pane === "messages" && (
             <div className="messages">
-              {!result && <span className="muted">No messages.</span>}
+              {!result && <span className="muted">{t("No messages.")}</span>}
               {result?.results.map((r) => (
                 <div key={r.index} className="stmt">
-                  <div className="muted">-- line {r.line} · {r.elapsed_ms} ms</div>
+                  <div className="muted">{t("-- line {line} · {ms} ms", { line: r.line, ms: r.elapsed_ms })}</div>
                   <div>{r.sql.length > 300 ? r.sql.slice(0, 300) + "…" : r.sql}</div>
                   <div className={r.kind === "error" ? "err" : "ok"}>
-                    {r.kind === "error" ? "ERROR: " : ""}{r.message}
-                    {r.truncated ? ` — first ${r.row_count?.toLocaleString()} rows; more available` : ""}
+                    {r.kind === "error" ? t("ERROR:") + " " : ""}{r.message}
+                    {r.truncated ? " — " + t("first {count} rows; more available", { count: r.row_count?.toLocaleString() ?? "" }) : ""}
                   </div>
                   {r.stats && <StatsTable stats={r.stats} />}
                 </div>
               ))}
               {result?.error && result.results.length === 0 && <div className="err">{result.error.message}</div>}
-              {result && <div className="muted" style={{ paddingTop: 8 }}>Total: {result.elapsed_ms} ms</div>}
+              {result && <div className="muted" style={{ paddingTop: 8 }}>{t("Total: {ms} ms", { ms: result.elapsed_ms })}</div>}
             </div>
           )}
           {pane === "plan" && (
@@ -611,36 +614,36 @@ export function QueryTool(props: { serverId: string; dbId: string; schema?: stri
               <div>
                 <div className="toolbar">
                   <div className="seg">
-                    <button className={planView === "graph" ? "on" : ""} onClick={() => setPlanView("graph")} disabled={!plan.detailed}>Diagram</button>
-                    <button className={planView === "text" ? "on" : ""} onClick={() => setPlanView("text")}>Text</button>
-                    <button className={planView === "diff" ? "on" : ""} onClick={() => setPlanView("diff")} disabled={!pinned}>Compare with pinned</button>
+                    <button className={planView === "graph" ? "on" : ""} onClick={() => setPlanView("graph")} disabled={!plan.detailed}>{t("Diagram")}</button>
+                    <button className={planView === "text" ? "on" : ""} onClick={() => setPlanView("text")}>{t("Text")}</button>
+                    <button className={planView === "diff" ? "on" : ""} onClick={() => setPlanView("diff")} disabled={!pinned}>{t("Compare with pinned")}</button>
                   </div>
                   <span className="grow" />
-                  <button className="btn small" onClick={() => { setPinned(plan); app.toast("Plan pinned — change the query, Explain again and compare", "info"); }}>Pin plan</button>
-                  {pinned && <button className="btn small" onClick={() => { setPinned(null); setPlanView("graph"); }}>Unpin</button>}
+                  <button className="btn small" onClick={() => { setPinned(plan); app.toast(t("Plan pinned — change the query, Explain again and compare"), "info"); }}>{t("Pin plan")}</button>
+                  {pinned && <button className="btn small" onClick={() => { setPinned(null); setPlanView("graph"); }}>{t("Unpin")}</button>}
                 </div>
                 {planView === "diff" && pinned ? (
                   <PlanDiff left={pinned.detailed ?? pinned.plan ?? ""} right={plan.detailed ?? plan.plan ?? ""}
-                    leftTitle={"Pinned: " + (pinned.sql ?? "").slice(0, 80)} rightTitle={"Current: " + (plan.sql ?? "").slice(0, 80)} />
+                    leftTitle={t("Pinned: {sql}", { sql: (pinned.sql ?? "").slice(0, 80) })} rightTitle={t("Current: {sql}", { sql: (plan.sql ?? "").slice(0, 80) })} />
                 ) : planView === "graph" && plan.detailed ? (
                   <>{plan.plan && <pre className="plan mono">{plan.plan}</pre>}<PlanGraph text={plan.detailed} /></>
                 ) : (
                   <>
-                    {plan.plan && <><h3 style={{ margin: "12px 12px 0" }}>Plan</h3><pre className="plan mono">{plan.plan}</pre></>}
-                    {plan.detailed && <><h3 style={{ margin: "12px 12px 0" }}>Detailed plan</h3><PlanTree text={plan.detailed} /></>}
+                    {plan.plan && <><h3 style={{ margin: "12px 12px 0" }}>{t("Plan")}</h3><pre className="plan mono">{plan.plan}</pre></>}
+                    {plan.detailed && <><h3 style={{ margin: "12px 12px 0" }}>{t("Detailed plan")}</h3><PlanTree text={plan.detailed} /></>}
                   </>
                 )}
               </div>
-            ) : <div className="empty-state">Click Explain, or enable Plans and execute.</div>
+            ) : <div className="empty-state">{t("Click Explain, or enable Plans and execute.")}</div>
           )}
           {pane === "history" && (
             <div>
-              {history.length === 0 && <div className="pad muted">No history yet.</div>}
+              {history.length === 0 && <div className="pad muted">{t("No history yet.")}</div>}
               {history.length > 0 && (
-                <div className="toolbar"><span className="grow" /><button className="btn small" onClick={() => { save(HISTORY_KEY, []); setHistory([]); }}>Clear history</button></div>
+                <div className="toolbar"><span className="grow" /><button className="btn small" onClick={() => { save(HISTORY_KEY, []); setHistory([]); }}>{t("Clear history")}</button></div>
               )}
               {history.map((h, i) => (
-                <div key={i} className="history-item" title="Click to load into the editor" onClick={() => setSql(h.sql)}>
+                <div key={i} className="history-item" title={t("Click to load into the editor")} onClick={() => setSql(h.sql)}>
                   <span className={h.ok ? "ok" : "err"}>{h.ok ? "✓" : "✗"}</span>{" "}
                   <span className="muted">{new Date(h.at).toLocaleString()} · {h.ms} ms</span>
                   <pre className="mono">{h.sql}</pre>
@@ -652,9 +655,9 @@ export function QueryTool(props: { serverId: string; dbId: string; schema?: stri
           {pane === "snippets" && (
             <div>
               <div className="toolbar">
-                <span className="muted">Click to insert at the cursor. Use + in the toolbar to save the selection.</span>
+                <span className="muted">{t("Click to insert at the cursor. Use + in the toolbar to save the selection.")}</span>
                 <span className="grow" />
-                <button className="btn small" onClick={() => download("fbadmin-snippets.json", JSON.stringify(snippets, null, 2), "application/json")}>Export</button>
+                <button className="btn small" onClick={() => download("fbadmin-snippets.json", JSON.stringify(snippets, null, 2), "application/json")}>{t("Export")}</button>
               </div>
               {snippets.map((s, i) => (
                 <div key={i} className="snippet">
@@ -662,7 +665,7 @@ export function QueryTool(props: { serverId: string; dbId: string; schema?: stri
                     <b>{s.name}</b>
                     <pre className="mono">{s.sql}</pre>
                   </div>
-                  <button className="btn icon small" title="Delete snippet" onClick={() => {
+                  <button className="btn icon small" title={t("Delete snippet")} onClick={() => {
                     const next = snippets.filter((_, j) => j !== i);
                     setSnippets(next);
                     save(SNIPPETS_KEY, next);
@@ -674,12 +677,12 @@ export function QueryTool(props: { serverId: string; dbId: string; schema?: stri
         </div>
       </div>
       <div className="status">
-        <span>{session ? `Connected · attachment ${options?.attachment_id ?? "?"}` : "Not connected"}</span>
-        {txOpen && <span className="tx">Transaction open — commit or rollback</span>}
-        {result?.cursor_open && <span>Result set open</span>}
-        {result && <span>{result.results.length} statement(s) · {result.elapsed_ms} ms</span>}
-        {current && <span>{current.row_count?.toLocaleString()}{current.truncated ? "+" : ""} rows</span>}
-        {result?.error && <span className="err" style={{ cursor: "pointer" }} onClick={() => setPane("messages")}><IconX size={11} /> error at line {result.error.position?.line ?? result.error.line}</span>}
+        <span>{session ? t("Connected · attachment {id}", { id: options?.attachment_id ?? "?" }) : t("Not connected")}</span>
+        {txOpen && <span className="tx">{t("Transaction open — commit or rollback")}</span>}
+        {result?.cursor_open && <span>{t("Result set open")}</span>}
+        {result && <span>{t("{count} statement(s) · {ms} ms", { count: result.results.length, ms: result.elapsed_ms })}</span>}
+        {current && <span>{t("{count} rows", { count: `${current.row_count?.toLocaleString() ?? ""}${current.truncated ? "+" : ""}` })}</span>}
+        {result?.error && <span className="err" style={{ cursor: "pointer" }} onClick={() => setPane("messages")}><IconX size={11} /> {t("error at line {line}", { line: result.error.position?.line ?? result.error.line })}</span>}
       </div>
       {paramReq && <ParamsDialog names={paramReq.names} onDone={(v) => { setParamReq(null); paramReq.resolve(v); }} />}
     </div>

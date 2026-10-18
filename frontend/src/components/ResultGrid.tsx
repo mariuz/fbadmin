@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import type { ColumnInfo } from "../types";
 import { buildXlsx } from "../lib/xlsx";
 import { getPrefs } from "../prefs";
+import { t } from "../i18n";
 import { IconCopy, IconDownload, IconFilter, IconSpinner, IconX } from "./Icons";
 
 const ROW_H = 25;
@@ -90,7 +91,7 @@ function hexDump(bytes: Uint8Array, max = 4096): string {
     const asc = chunk.map((b) => (b >= 32 && b < 127 ? String.fromCharCode(b) : ".")).join("");
     lines.push(`${off.toString(16).padStart(8, "0")}  ${hex} ${asc}`);
   }
-  if (bytes.length > max) lines.push(`… ${bytes.length - max} more bytes`);
+  if (bytes.length > max) lines.push(t("… {count} more bytes", { count: bytes.length - max }));
   return lines.join("\n");
 }
 
@@ -113,24 +114,24 @@ export function CellViewer(props: { column: ColumnInfo; value: unknown; onClose:
       <div className="toolbar">
         <b>{column.name}</b> <span className="muted">{column.type.toLowerCase()}</span>
         {value === null || value === undefined ? <span className="muted">NULL</span> : (
-          <span className="muted">{bytes ? `${bytes.length.toLocaleString()} bytes` : `${text.length.toLocaleString()} chars`}</span>
+          <span className="muted">{bytes ? t("{count} bytes", { count: bytes.length.toLocaleString() }) : t("{count} chars", { count: text.length.toLocaleString() })}</span>
         )}
         <span className="grow" />
         <div className="seg">
-          <button className={mode === "text" ? "on" : ""} onClick={() => setMode("text")}>Text</button>
+          <button className={mode === "text" ? "on" : ""} onClick={() => setMode("text")}>{t("Text")}</button>
           {json && <button className={mode === "json" ? "on" : ""} onClick={() => setMode("json")}>JSON</button>}
-          {bytes && <button className={mode === "hex" ? "on" : ""} onClick={() => setMode("hex")}>Hex</button>}
-          {imgUrl && <button className={mode === "image" ? "on" : ""} onClick={() => setMode("image")}>Image</button>}
+          {bytes && <button className={mode === "hex" ? "on" : ""} onClick={() => setMode("hex")}>{t("Hex")}</button>}
+          {imgUrl && <button className={mode === "image" ? "on" : ""} onClick={() => setMode("image")}>{t("Image")}</button>}
         </div>
-        <button className="btn icon small" title="Copy value" onClick={() => navigator.clipboard?.writeText(text)}><IconCopy size={13} /></button>
-        {bytes && <button className="btn icon small" title="Download" onClick={() => {
+        <button className="btn icon small" title={t("Copy value")} onClick={() => navigator.clipboard?.writeText(text)}><IconCopy size={13} /></button>
+        {bytes && <button className="btn icon small" title={t("Download")} onClick={() => {
           const url = URL.createObjectURL(new Blob([bytes], { type: mime ?? "application/octet-stream" }));
           const a = document.createElement("a"); a.href = url; a.download = `${column.name}.bin`; a.click();
         }}><IconDownload size={13} /></button>}
-        <button className="btn icon small" title="Close" onClick={props.onClose}><IconX size={13} /></button>
+        <button className="btn icon small" title={t("Close")} onClick={props.onClose}><IconX size={13} /></button>
       </div>
       <div className="cell-body">
-        {truncated && <div className="warn" style={{ padding: "6px 10px" }}>Value is larger than the preview limit; only the start is shown.</div>}
+        {truncated && <div className="warn" style={{ padding: "6px 10px" }}>{t("Value is larger than the preview limit; only the start is shown.")}</div>}
         {mode === "image" && imgUrl ? <img src={imgUrl} alt={column.name} style={{ maxWidth: "100%", padding: 10 }} /> :
           <pre className="mono">{mode === "json" ? json : mode === "hex" && bytes ? hexDump(bytes) : value === null || value === undefined ? "NULL" : text}</pre>}
       </div>
@@ -208,21 +209,23 @@ export function ResultGrid(props: {
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       <div className="toolbar">
         <span className="muted">
-          {filter ? `${sorted.length.toLocaleString()} of ` : ""}{rows.length.toLocaleString()}{props.hasMore ? "+" : ""} rows
+          {filter
+            ? t("{shown} of {count} rows", { shown: sorted.length.toLocaleString(), count: rows.length.toLocaleString() + (props.hasMore ? "+" : "") })
+            : t("{count} rows", { count: rows.length.toLocaleString() + (props.hasMore ? "+" : "") })}
         </span>
         {props.hasMore && (
-          <button className="btn small" disabled={props.loadingMore} onClick={props.onLoadMore} title="Fetch the next rows from the open cursor">
-            {props.loadingMore ? <IconSpinner size={13} className="spin" /> : null} Load more
+          <button className="btn small" disabled={props.loadingMore} onClick={props.onLoadMore} title={t("Fetch the next rows from the open cursor")}>
+            {props.loadingMore ? <IconSpinner size={13} className="spin" /> : null} {t("Load more")}
           </button>
         )}
         <span className="grow" />
-        <button className={"btn small" + (showFilter ? " on" : "")} onClick={() => setShowFilter(!showFilter)} title="Filter rows"><IconFilter size={13} /></button>
-        {showFilter && <input className="text" autoFocus placeholder="filter rows…" value={filter} onChange={(e) => setFilter(e.target.value)} style={{ width: 180, padding: "2px 6px" }} />}
-        <button className={"btn small" + (freeze ? " on" : "")} onClick={() => setFreeze(!freeze)} title="Keep the first column visible while scrolling sideways">Freeze 1st</button>
-        <button className={"btn small" + (viewer ? " on" : "")} onClick={() => setViewer(!viewer)} title="Show the selected cell in full (text, JSON, hex, image)">Cell viewer</button>
-        <button className="btn small" title="Copy rows as TSV (paste into a spreadsheet)" onClick={() => navigator.clipboard?.writeText(toDelimited(columns, shownRows(), "\t"))}><IconCopy size={13} /> Copy</button>
+        <button className={"btn small" + (showFilter ? " on" : "")} onClick={() => setShowFilter(!showFilter)} title={t("Filter rows")}><IconFilter size={13} /></button>
+        {showFilter && <input className="text" autoFocus placeholder={t("filter rows…")} value={filter} onChange={(e) => setFilter(e.target.value)} style={{ width: 180, padding: "2px 6px" }} />}
+        <button className={"btn small" + (freeze ? " on" : "")} onClick={() => setFreeze(!freeze)} title={t("Keep the first column visible while scrolling sideways")}>{t("Freeze 1st")}</button>
+        <button className={"btn small" + (viewer ? " on" : "")} onClick={() => setViewer(!viewer)} title={t("Show the selected cell in full (text, JSON, hex, image)")}>{t("Cell viewer")}</button>
+        <button className="btn small" title={t("Copy rows as TSV (paste into a spreadsheet)")} onClick={() => navigator.clipboard?.writeText(toDelimited(columns, shownRows(), "\t"))}><IconCopy size={13} /> {t("Copy")}</button>
         <div style={{ position: "relative" }}>
-          <button className="btn small" onClick={() => setExportOpen(!exportOpen)}><IconDownload size={13} /> Export ▾</button>
+          <button className="btn small" onClick={() => setExportOpen(!exportOpen)}><IconDownload size={13} /> {t("Export")} ▾</button>
           {exportOpen && (
             <div className="ctx" style={{ position: "absolute", right: 0, top: "100%", minWidth: 150 }} onMouseLeave={() => setExportOpen(false)}>
               {exports.map(([label, fn]) => <button key={label} onClick={() => { setExportOpen(false); fn(); }}>{label}</button>)}
@@ -259,7 +262,7 @@ export function ResultGrid(props: {
               <tr>
                 <th className="rn">#</th>
                 {columns.map((c, i) => (
-                  <th key={i} style={{ cursor: "pointer", position: "sticky", ...colStyle(i) }} title="Click to sort, drag the right edge to resize"
+                  <th key={i} style={{ cursor: "pointer", position: "sticky", ...colStyle(i) }} title={t("Click to sort, drag the right edge to resize")}
                     onClick={() => setSort(sort?.col === i ? (sort.desc ? null : { col: i, desc: true }) : { col: i, desc: false })}>
                     {c.name} {sort?.col === i ? (sort.desc ? "▼" : "▲") : ""}
                     <span className="ty">{c.type.toLowerCase()}</span>
@@ -297,7 +300,7 @@ export function ResultGrid(props: {
           <div style={{ width: "38%", minWidth: 260, borderLeft: "1px solid var(--border)", display: "flex" }}>
             {sel && sorted[sel[0]] ? (
               <CellViewer key={`${sel[0]}:${sel[1]}`} column={columns[sel[1]]} value={sorted[sel[0]].r[sel[1]]} onClose={() => setViewer(false)} />
-            ) : <div className="empty-state">Select a cell (double-click opens this panel).</div>}
+            ) : <div className="empty-state">{t("Select a cell (double-click opens this panel).")}</div>}
           </div>
         )}
       </div>

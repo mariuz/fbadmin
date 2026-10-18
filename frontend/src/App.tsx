@@ -13,15 +13,15 @@ const JobsPanel = lazy(() => import("./components/Jobs").then((m) => ({ default:
 const ServerLog = lazy(() => import("./components/Jobs").then((m) => ({ default: m.ServerLog })));
 import { getObjectTabs, getTabKind, getTopbarItems } from "./registry";
 import { setPrefs, usePrefs } from "./prefs";
-import { currentLanguage } from "./i18n";
+import { currentLanguage, N_, t } from "./i18n";
 import { PreferencesDialog } from "./components/Preferences";
 import { Flame, IconActivity, IconMoon, IconPlus, IconRefresh, IconSun, IconTable, IconTerminal, IconX } from "./components/Icons";
 
 const FIXED_TABS = [
-  { id: "dashboard", title: "Dashboard" },
-  { id: "properties", title: "Properties" },
-  { id: "sql", title: "SQL" },
-  { id: "deps", title: "Dependencies" },
+  { id: "dashboard", title: N_("Dashboard") },
+  { id: "properties", title: N_("Properties") },
+  { id: "sql", title: N_("SQL") },
+  { id: "deps", title: N_("Dependencies") },
 ];
 
 let tabSeq = 0;
@@ -53,8 +53,8 @@ export default function App() {
 
   const toast = useCallback((msg: string, kind: "ok" | "error" | "info" = "ok") => {
     const id = Date.now() + Math.random();
-    setToasts((t) => [...t, { id, msg, kind }]);
-    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), kind === "error" ? 8000 : 3500);
+    setToasts((ts) => [...ts, { id, msg, kind }]);
+    setTimeout(() => setToasts((ts) => ts.filter((x) => x.id !== id)), kind === "error" ? 8000 : 3500);
   }, []);
 
   const reloadServers = useCallback(async () => {
@@ -67,30 +67,30 @@ export default function App() {
 
   const openTab = useCallback((t0: Omit<WorkTab, "id"> & { id?: string }) => {
     // tabs remember the Firebird 6 schema they were opened in
-    const t = { ...t0, schema: t0.schema ?? activeSchemaOf(t0.serverId, t0.dbId) };
+    const tab = { ...t0, schema: t0.schema ?? activeSchemaOf(t0.serverId, t0.dbId) };
     // reuse an existing data/monitor/log tab for the same object
-    let id = t.id;
+    let id = tab.id;
     setTabs((cur) => {
-      if (t.kind !== "query") {
-        const reg = getTabKind(t.kind);
-        const existing = cur.find((x) => x.kind === t.kind && (reg?.same
-          ? reg.same(x, t)
-          : x.serverId === t.serverId && x.dbId === t.dbId && x.name === t.name && x.schema === t.schema));
+      if (tab.kind !== "query") {
+        const reg = getTabKind(tab.kind);
+        const existing = cur.find((x) => x.kind === tab.kind && (reg?.same
+          ? reg.same(x, tab)
+          : x.serverId === tab.serverId && x.dbId === tab.dbId && x.name === tab.name && x.schema === tab.schema));
         if (existing) {
           id = existing.id;
           return cur;
         }
       }
       id = id ?? `tab${++tabSeq}`;
-      return [...cur, { ...t, id } as WorkTab];
+      return [...cur, { ...tab, id } as WorkTab];
     });
     setTimeout(() => setActive(id!), 0);
   }, []);
 
   const closeTab = useCallback((id: string) => {
     setTabs((cur) => {
-      const idx = cur.findIndex((t) => t.id === id);
-      const next = cur.filter((t) => t.id !== id);
+      const idx = cur.findIndex((tb) => tb.id === id);
+      const next = cur.filter((tb) => tb.id !== id);
       setActive((a) => (a === id ? next[Math.max(0, idx - 1)]?.id ?? "dashboard" : a));
       return next;
     });
@@ -111,8 +111,8 @@ export default function App() {
   }, []);
   // ... and so does switching to a tab opened in a schema
   useEffect(() => {
-    const t = tabs.find((x) => x.id === active);
-    if (t?.serverId && t.dbId && t.schema) setActiveSchema(t.serverId, t.dbId, t.schema);
+    const tab = tabs.find((x) => x.id === active);
+    if (tab?.serverId && tab.dbId && tab.schema) setActiveSchema(tab.serverId, tab.dbId, tab.schema);
   }, [active, tabs]);
 
   const app: AppApi = useMemo(() => ({
@@ -134,13 +134,13 @@ export default function App() {
 
   // poll running jobs count for the badge
   useEffect(() => {
-    const t = setInterval(async () => {
+    const timer = setInterval(async () => {
       try {
         const js = await api.jobs();
         setRunningJobs(js.filter((j) => j.status === "running").length);
       } catch { /* backend down */ }
     }, 3000);
-    return () => clearInterval(t);
+    return () => clearInterval(timer);
   }, []);
 
   // load object detail for properties/sql/deps
@@ -164,9 +164,9 @@ export default function App() {
     const k = selectionKey(selection);
     if (k === lastSel.current) return;
     lastSel.current = k;
-    const extra = getObjectTabs().find((t) => t.id === active);
+    const extra = getObjectTabs().find((ot) => ot.id === active);
     if (extra && !extra.applies(selection)) { setActive("properties"); return; }
-    if (!FIXED_TABS.some((t) => t.id === active)) return;
+    if (!FIXED_TABS.some((ft) => ft.id === active)) return;
     if (selection?.kind === "object" || selection?.kind === "column") {
       if (active === "dashboard") setActive("properties");
     } else if (active !== "dashboard") setActive("dashboard");
@@ -198,73 +198,77 @@ export default function App() {
     <AppCtx.Provider value={app}>
       <div className="app">
         <div className="topbar">
-          <div className="brand"><Flame /> fbadmin <small>Firebird administration</small></div>
-          <button className="tb" onClick={() => setDialog(<ServerDialog />)}><IconPlus /> Add server</button>
-          <button className="tb" disabled={!selDb} style={{ opacity: selDb ? 1 : 0.5 }} onClick={() => selDb && openQueryTool(selDb.serverId, selDb.dbId!)}><IconTerminal /> Query Tool</button>
+          <div className="brand"><Flame /> fbadmin <small>{t("Firebird administration")}</small></div>
+          <button className="tb" onClick={() => setDialog(<ServerDialog />)}><IconPlus /> {t("Add server")}</button>
+          <button className="tb" disabled={!selDb} style={{ opacity: selDb ? 1 : 0.5 }} onClick={() => selDb && openQueryTool(selDb.serverId, selDb.dbId!)}><IconTerminal /> {t("Query Tool")}</button>
           <button className="tb" disabled={!selIsRelation} style={{ opacity: selIsRelation ? 1 : 0.5 }}
             onClick={() => selection && selIsRelation && openTab({ kind: "data", title: selection.name!, serverId: selection.serverId, dbId: selection.dbId, otype: selection.otype, name: selection.name })}>
-            <IconTable /> View data
+            <IconTable /> {t("View data")}
           </button>
           {getTopbarItems().map((it) => <span key={it.id}>{it.render(app)}</span>)}
           <span className="spacer" />
-          <button className="tb" onClick={() => openTab({ kind: "jobs", title: "Processes" })}>
-            <IconActivity /> Processes {runningJobs > 0 && <span className="badge">{runningJobs}</span>}
+          <button className="tb" onClick={() => openTab({ kind: "jobs", title: N_("Processes") })}>
+            <IconActivity /> {t("Processes")} {runningJobs > 0 && <span className="badge">{runningJobs}</span>}
           </button>
-          <button className="tb" title="Preferences" aria-label="Preferences" onClick={() => setDialog(<PreferencesDialog />)}>⚙</button>
-          <button className="tb" title="Toggle theme" aria-label="Toggle theme" onClick={() => setTheme(theme === "dark" ? "light" : theme === "light" ? "contrast" : theme === "contrast" ? "" : "dark")}>
-            {theme === "dark" ? <IconMoon /> : theme === "light" ? <IconSun /> : theme === "contrast" ? <span style={{ fontWeight: 700 }}>◐</span> : <><IconSun /><span style={{ fontSize: 11 }}>auto</span></>}
+          <button className="tb" title={t("Preferences")} aria-label={t("Preferences")} onClick={() => setDialog(<PreferencesDialog />)}>⚙</button>
+          <button className="tb" title={t("Toggle theme")} aria-label={t("Toggle theme")} onClick={() => setTheme(theme === "dark" ? "light" : theme === "light" ? "contrast" : theme === "contrast" ? "" : "dark")}>
+            {theme === "dark" ? <IconMoon /> : theme === "light" ? <IconSun /> : theme === "contrast" ? <span style={{ fontWeight: 700 }}>◐</span> : <><IconSun /><span style={{ fontSize: 11 }}>{t("auto")}</span></>}
           </button>
         </div>
         <div className="main">
           <div className="sidebar" style={{ width: sidebarW }}>
             <div className="sidebar-head">
-              <span className="grow">Object Explorer</span>
-              <button className="btn icon small" title="Reload servers" onClick={() => reloadServers()}><IconRefresh size={13} /></button>
-              <button className="btn icon small" title="Register server" onClick={() => setDialog(<ServerDialog />)}><IconPlus size={13} /></button>
+              <span className="grow">{t("Object Explorer")}</span>
+              <button className="btn icon small" title={t("Reload servers")} onClick={() => reloadServers()}><IconRefresh size={13} /></button>
+              <button className="btn icon small" title={t("Register server")} onClick={() => setDialog(<ServerDialog />)}><IconPlus size={13} /></button>
             </div>
             <Tree />
           </div>
           <div className="splitter-v" onMouseDown={startResize} />
           <div className="workspace">
             <div className="tabs">
-              {FIXED_TABS.map((t) => (
-                <div key={t.id} className={"tab" + (active === t.id ? " active" : "")} onClick={() => setActive(t.id)}>
-                  <span className="t">{t.title}</span>
+              {FIXED_TABS.map((ft) => (
+                <div key={ft.id} className={"tab" + (active === ft.id ? " active" : "")} onClick={() => setActive(ft.id)}>
+                  <span className="t">{t(ft.title)}</span>
                 </div>
               ))}
-              {getObjectTabs().filter((t) => t.applies(selection)).map((t) => (
-                <div key={t.id} className={"tab" + (active === t.id ? " active" : "")} onClick={() => setActive(t.id)}>
-                  <span className="t">{t.title}</span>
+              {getObjectTabs().filter((ot) => ot.applies(selection)).map((ot) => (
+                <div key={ot.id} className={"tab" + (active === ot.id ? " active" : "")} onClick={() => setActive(ot.id)}>
+                  <span className="t">{t(ot.title)}</span>
                 </div>
               ))}
-              {tabs.map((t) => (
-                <div key={t.id} className={"tab" + (active === t.id ? " active" : "")} onClick={() => setActive(t.id)}
-                  onAuxClick={(e) => e.button === 1 && closeTab(t.id)} title={t.title}>
-                  {t.kind === "query" ? <IconTerminal size={13} /> : t.kind === "data" ? <IconTable size={13} /> : getTabKind(t.kind)?.icon ?? <IconActivity size={13} />}
-                  <span className="t">{t.title}</span>
-                  <button className="x" onClick={(e) => { e.stopPropagation(); closeTab(t.id); }}><IconX size={12} /></button>
+              {tabs.map((tab) => {
+                // the Processes tab has a static (N_-marked) title; other titles carry data
+                const title = tab.kind === "jobs" ? t(tab.title) : tab.title;
+                return (
+                <div key={tab.id} className={"tab" + (active === tab.id ? " active" : "")} onClick={() => setActive(tab.id)}
+                  onAuxClick={(e) => e.button === 1 && closeTab(tab.id)} title={title}>
+                  {tab.kind === "query" ? <IconTerminal size={13} /> : tab.kind === "data" ? <IconTable size={13} /> : getTabKind(tab.kind)?.icon ?? <IconActivity size={13} />}
+                  <span className="t">{title}</span>
+                  <button className="x" onClick={(e) => { e.stopPropagation(); closeTab(tab.id); }}><IconX size={12} /></button>
                 </div>
-              ))}
+                );
+              })}
             </div>
             <div className="tab-body">
-              {FIXED_TABS.map((t) => (
-                <div key={t.id} className={"tab-pane" + (active === t.id ? "" : " hidden")}>{active === t.id && renderFixed(t.id)}</div>
+              {FIXED_TABS.map((ft) => (
+                <div key={ft.id} className={"tab-pane" + (active === ft.id ? "" : " hidden")}>{active === ft.id && renderFixed(ft.id)}</div>
               ))}
-              {getObjectTabs().map((t) => (
-                <div key={t.id} className={"tab-pane" + (active === t.id ? "" : " hidden")}>
-                  {active === t.id && selection && t.applies(selection) && t.render(selection, detail)}
+              {getObjectTabs().map((ot) => (
+                <div key={ot.id} className={"tab-pane" + (active === ot.id ? "" : " hidden")}>
+                  {active === ot.id && selection && ot.applies(selection) && ot.render(selection, detail)}
                 </div>
               ))}
-              {tabs.map((t) => (
-                <div key={t.id} className={"tab-pane" + (active === t.id ? "" : " hidden")} style={{ overflow: "hidden" }}>
-                  <Suspense fallback={<div className="empty">Loading…</div>}>
-                  {t.kind === "query" && <QueryTool serverId={t.serverId!} dbId={t.dbId!} schema={t.schema} initialSql={t.initialSql} autorun={t.autorun} visible={active === t.id} />}
-                  {t.kind === "data" && <DataView serverId={t.serverId!} dbId={t.dbId!} otype={t.otype!} name={t.name!} showFilter={t.initialSql === "filter"} />}
-                  {t.kind === "monitor" && <Monitor serverId={t.serverId!} dbId={t.dbId!} visible={active === t.id} />}
-                  {t.kind === "jobs" && <JobsPanel visible={active === t.id} />}
-                  {t.kind === "serverlog" && <ServerLog serverId={t.serverId!} />}
-                  {t.kind === "serverinfo" && <Dashboard sel={{ kind: "server", serverId: t.serverId! }} />}
-                  {getTabKind(t.kind)?.render(t, active === t.id)}
+              {tabs.map((tab) => (
+                <div key={tab.id} className={"tab-pane" + (active === tab.id ? "" : " hidden")} style={{ overflow: "hidden" }}>
+                  <Suspense fallback={<div className="empty">{t("Loading…")}</div>}>
+                  {tab.kind === "query" && <QueryTool serverId={tab.serverId!} dbId={tab.dbId!} schema={tab.schema} initialSql={tab.initialSql} autorun={tab.autorun} visible={active === tab.id} />}
+                  {tab.kind === "data" && <DataView serverId={tab.serverId!} dbId={tab.dbId!} otype={tab.otype!} name={tab.name!} showFilter={tab.initialSql === "filter"} />}
+                  {tab.kind === "monitor" && <Monitor serverId={tab.serverId!} dbId={tab.dbId!} visible={active === tab.id} />}
+                  {tab.kind === "jobs" && <JobsPanel visible={active === tab.id} />}
+                  {tab.kind === "serverlog" && <ServerLog serverId={tab.serverId!} />}
+                  {tab.kind === "serverinfo" && <Dashboard sel={{ kind: "server", serverId: tab.serverId! }} />}
+                  {getTabKind(tab.kind)?.render(tab, active === tab.id)}
                   </Suspense>
                 </div>
               ))}
@@ -273,7 +277,7 @@ export default function App() {
         </div>
         {dialog}
         <div className="toasts">
-          {toasts.map((t) => <div key={t.id} className={"toast " + t.kind}>{t.msg}</div>)}
+          {toasts.map((ts) => <div key={ts.id} className={"toast " + ts.kind}>{ts.msg}</div>)}
         </div>
       </div>
     </AppCtx.Provider>

@@ -1,5 +1,6 @@
 /** Graphical rendering of Firebird detailed ("explained") plans, and a line diff for comparing plans. */
 import { useMemo } from "react";
+import { t } from "../i18n";
 
 export interface PlanNode {
   text: string;
@@ -25,11 +26,11 @@ export function parsePlan(text: string): PlanNode[] {
 
 function classify(text: string): { kind: string; title: string; detail: string } {
   // Firebird 6 qualifies the table with its schema: Table "PUBLIC"."T" as "A" Full Scan
-  const t = /^Table (?:"([^"]+)"\.)?"([^"]+)"(?: as "([^"]+)")?\s*(.*)$/.exec(text);
-  if (t) {
-    const scan = t[4] || "";
-    const table = t[1] && t[1] !== "PUBLIC" ? `${t[1]}.${t[2]}` : t[2];
-    return { kind: /Full Scan/i.test(scan) ? "scan-full" : "table", title: t[3] ? `${table} ${t[3]}` : table, detail: scan };
+  const tm = /^Table (?:"([^"]+)"\.)?"([^"]+)"(?: as "([^"]+)")?\s*(.*)$/.exec(text);
+  if (tm) {
+    const scan = tm[4] || "";
+    const table = tm[1] && tm[1] !== "PUBLIC" ? `${tm[1]}.${tm[2]}` : tm[2];
+    return { kind: /Full Scan/i.test(scan) ? "scan-full" : "table", title: tm[3] ? `${table} ${tm[3]}` : table, detail: scan };
   }
   const i = /^Index (?:"[^"]+"\.)?"([^"]+)"\s*(.*)$/.exec(text);
   if (i) return { kind: "index", title: i[1], detail: i[2] };
@@ -61,10 +62,10 @@ export function PlanGraph(props: { text: string }) {
     <div className="pg">
       {roots.map((r, i) => <Node key={i} node={r} />)}
       <div className="pg-legend">
-        <span className="pg-box pg-scan-full">full scan</span>
-        <span className="pg-box pg-table">table access</span>
-        <span className="pg-box pg-index">index</span>
-        <span className="pg-box pg-heavy">sort / aggregate / hash</span>
+        <span className="pg-box pg-scan-full">{t("full scan")}</span>
+        <span className="pg-box pg-table">{t("table access")}</span>
+        <span className="pg-box pg-index">{t("index")}</span>
+        <span className="pg-box pg-heavy">{t("sort / aggregate / hash")}</span>
       </div>
     </div>
   );
