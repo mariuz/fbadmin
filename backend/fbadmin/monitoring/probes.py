@@ -202,6 +202,7 @@ def transactions_report(conn, long_running: int = 300, gap_warn: int = 10000) ->
         "TRIM(a.MON$REMOTE_PROCESS) AS remote_process, a.MON$REMOTE_PID AS remote_pid, "
         "a.MON$TIMESTAMP AS connected_at, a.MON$STATE AS attachment_state, "
         "IIF(a.MON$ATTACHMENT_ID = CURRENT_CONNECTION, 1, 0) AS is_self, "
+        "COALESCE(a.MON$SYSTEM_FLAG, 0) AS is_system, "
         "r.MON$RECORD_INSERTS AS inserts, r.MON$RECORD_UPDATES AS updates, r.MON$RECORD_DELETES AS deletes "
         "FROM MON$TRANSACTIONS t "
         "JOIN MON$ATTACHMENTS a ON a.MON$ATTACHMENT_ID = t.MON$ATTACHMENT_ID "
@@ -228,9 +229,10 @@ def transactions_report(conn, long_running: int = 300, gap_warn: int = 10000) ->
     if not holders:
         # A read-only read committed transaction does not hold back the OAT on Firebird 4+;
         # otherwise the oldest live transaction is the one pinning it.
-        pinning = [t for t in txs if not (t["read_only"] and t["isolation"] in (2, 3, 4))]
+        pinning = [t for t in txs if not (t["read_only"] and t["isolation"] in (2, 3, 4)) and not t["is_system"]]
         holders = pinning[:1]
-    long_txs = [t for t in txs if (t["age_seconds"] or 0) >= long_running and not t["is_self"]]
+    # fbadmin's own and system (garbage collector, cache writer...) attachments are not reported
+    long_txs = [t for t in txs if (t["age_seconds"] or 0) >= long_running and not t["is_self"] and not t["is_system"]]
 
     alerts: list[dict[str, Any]] = []
     gap_oat = nxt - oat
@@ -252,7 +254,8 @@ def transactions_report(conn, long_running: int = 300, gap_warn: int = 10000) ->
     for t in long_txs:
         level = "critical" if (t["age_seconds"] or 0) >= long_running * 12 else "warning"
         alerts.append({"level": level,
-                       "message": f"Transaction {t['id']} ({t['username']}, {t['remote_process'] or 'unknown process'}) "
+                       "message": f"Transaction {t['id']} ({t['username']}, "
+                                  f"{(t['remote_process'] or 'unknown process').replace(chr(92), '/').split('/')[-1]}) "
                                   f"has been running for {_fmt_age(t['age_seconds'])}.",
                        "transaction_id": t["id"], "attachment_id": t["attachment_id"]})
     return {

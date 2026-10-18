@@ -55,6 +55,15 @@ def _direct(client, database):
                                password=PASSWORD)
 
 
+def _run_quietly(conn, sql):
+    try:
+        cur = conn.cursor()
+        cur.execute(sql)
+        cur.fetchall()
+    except Exception:  # noqa: BLE001 - cancelled on purpose
+        pass
+
+
 def test_snapshot_and_features(client, database):
     m = _base(database) + "/monitoring"
     f = client.get(m + "/features").json()
@@ -229,6 +238,26 @@ def test_history_store_and_sampler(client, database):
     store.add_slow(sid, dbid, "SELECT  *  FROM H WHERE ID = 1", None, 3.0)
     slow = client.get(m + "/history/slow").json()["statements"]
     assert len(slow) == 1 and slow[0]["seen"] == 2 and slow[0]["max_seconds"] == 7.5
+
+    # a statement running longer than slow_seconds is captured by a sample
+    client.put("/api/monitoring/settings", json={"slow_seconds": 1})
+    other = _direct(client, database)
+    slow_sql = "SELECT COUNT(*) FROM RDB$FIELDS a, RDB$FIELDS b, RDB$FIELDS c, RDB$FIELDS d"
+    th = threading.Thread(target=lambda: _run_quietly(other, slow_sql))
+    th.start()
+    try:
+        time.sleep(1.6)
+        client.post(m + "/history/sample").raise_for_status()
+        texts = [s["sql_text"] for s in client.get(m + "/history/slow").json()["statements"]]
+        assert slow_sql in texts
+        assert client.get(m + "/history").json()["tracking"]["last_error"] is None
+    finally:
+        from fbadmin.api.deps import get_state
+
+        with get_state().manager.meta(sid, dbid) as conn:
+            conn.cursor().execute("DELETE FROM MON$STATEMENTS WHERE MON$SQL_TEXT = ?", [slow_sql])
+        th.join(30)
+        other.close()
 
     client.put(m + "/history/tracking", json={"enabled": False})
     client.delete(m + "/history")

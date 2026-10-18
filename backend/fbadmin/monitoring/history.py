@@ -203,14 +203,22 @@ def sample_database(server_id: str, db_id: str) -> dict[str, Any]:
         store.mark(server_id, db_id, str(exc).strip()[:500])
         raise
     store.add_sample(server_id, db_id, snap)
+    error = None
     for s in slow:
-        store.add_slow(server_id, db_id, s["sql_text"], s["explained_plan"], s["seconds"])
-    store.mark(server_id, db_id, None)
+        try:
+            store.add_slow(server_id, db_id, s["sql_text"], s["explained_plan"], s["seconds"])
+        except Exception as exc:  # noqa: BLE001 - the sample itself is stored
+            error = f"slow statement log: {exc}"
+    store.mark(server_id, db_id, error)
     return snap
 
 
 def _slow_running(conn, min_seconds: float) -> list[dict[str, Any]]:
+    """Statements running for at least ``min_seconds`` (0 disables the slow-statement log)."""
     from ..metadata import Catalog
+
+    if min_seconds <= 0:
+        return []
 
     rows = Catalog(conn).rows(
         "SELECT s.MON$SQL_TEXT AS sql_text, s.MON$EXPLAINED_PLAN AS explained_plan, "
@@ -218,7 +226,12 @@ def _slow_running(conn, min_seconds: float) -> list[dict[str, Any]]:
         "FROM MON$STATEMENTS s WHERE s.MON$STATE = 1 AND s.MON$ATTACHMENT_ID <> CURRENT_CONNECTION "
         "AND s.MON$SQL_TEXT IS NOT NULL"
     )
-    return [r for r in rows if r["seconds"] is not None and float(r["seconds"]) >= min_seconds]
+    out = []
+    for r in rows:
+        if r["seconds"] is not None and float(r["seconds"]) >= min_seconds:
+            r["seconds"] = float(r["seconds"])  # Decimal cannot be bound by sqlite3
+            out.append(r)
+    return out
 
 
 def sample_all() -> None:

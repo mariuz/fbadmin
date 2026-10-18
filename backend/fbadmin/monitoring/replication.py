@@ -36,7 +36,9 @@ def status(conn) -> dict[str, Any]:
         "(SELECT COUNT(*) FROM RDB$RELATION_CONSTRAINTS c WHERE c.RDB$RELATION_NAME = r.RDB$RELATION_NAME "
         "AND c.RDB$CONSTRAINT_TYPE IN ('PRIMARY KEY', 'UNIQUE')) AS keys "
         "FROM RDB$RELATIONS r WHERE COALESCE(r.RDB$SYSTEM_FLAG, 0) = 0 AND r.RDB$VIEW_BLR IS NULL "
-        "AND COALESCE(r.RDB$RELATION_TYPE, 0) IN (0, 3) ORDER BY r.RDB$RELATION_NAME")
+        "AND COALESCE(r.RDB$RELATION_TYPE, 0) IN (0, 3) "
+        "AND r.RDB$RELATION_NAME NOT STARTING WITH 'PLG$' "  # profiler / plugin tables
+        "ORDER BY r.RDB$RELATION_NAME")
     for t in tables:
         t["published"] = t["name"] in published
         t["has_key"] = bool(t.pop("keys"))
