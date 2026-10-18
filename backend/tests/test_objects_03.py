@@ -369,7 +369,7 @@ def test_routine_dialogs_roundtrip(db):
     got = db.spec("triggers", "RT_BI")
     assert got["event"] == "BEFORE INSERT OR UPDATE" and got["position"] == 3 and not got["active"]
     db.apply("trigger", {"name": "DB_CONN", "event": "ON CONNECT", "body": "BEGIN END"})
-    assert db.spec("triggers", "DB_CONN")["kind"] == "database"
+    assert db.spec("triggers", "DB_CONN")["trigger_kind"] == "database"
     pkg = {"name": "PK_X", "header": "BEGIN\n  FUNCTION ONE RETURNS INT;\nEND",
            "body": "BEGIN\n  FUNCTION ONE RETURNS INT AS BEGIN RETURN 1; END\nEND"}
     db.apply("package", pkg)
@@ -574,15 +574,22 @@ def test_rename_column_used_by_constraints(db):
 
 def test_drop_preview(db):
     db.run("CREATE DOMAIN D_DP AS INT;\n"
-           "CREATE TABLE DP (ID INT NOT NULL PRIMARY KEY, V D_DP);\n"
-           "CREATE TABLE DP_CHILD (ID INT, P INT REFERENCES DP (ID));\n"
-           "CREATE VIEW V_DP AS SELECT ID, V FROM DP;\n"
+           "CREATE TABLE DP (ID INT NOT NULL PRIMARY KEY, V D_DP CHECK (V > 0), W COMPUTED BY (V * 2));\n"
+           "CREATE INDEX IX_DP_EXPR ON DP COMPUTED BY (V + 1);\n"
+           "CREATE TABLE DP_CHILD (ID INT, P INT REFERENCES DP (ID), "
+           "  CHECK (P IS NULL OR EXISTS (SELECT 1 FROM DP WHERE DP.V = P)));\n"
+           "CREATE VIEW V_DP AS SELECT ID, V FROM DP WHERE V > 1 WITH CHECK OPTION;\n"
            "CREATE VIEW V_DP2 AS SELECT ID FROM V_DP;\n"
            "CREATE PROCEDURE P_DP AS DECLARE X INT; BEGIN SELECT COUNT(*) FROM V_DP2 INTO X; END")
     p = db.c.get(db.b + "/objects/tables/DP/drop-preview").json()
     assert p["sql"] == "DROP TABLE DP;\n"
     deps = {(d["name"], d["type"], d["depth"]) for d in p["dependents"]}
     assert ("V_DP", "views", 1) in deps and ("V_DP2", "views", 2) in deps and ("P_DP", "procedures", 3) in deps
+    # the table's own CHECK trigger, computed column and expression index are not listed; the CHECK of
+    # another table is reported as that table
+    names = {d["name"] for d in p["dependents"]}
+    assert names == {"V_DP", "V_DP2", "P_DP", "DP_CHILD"}, p["dependents"]
+    assert next(d for d in p["dependents"] if d["name"] == "DP_CHILD")["detail"] == "CHECK constraint of DP_CHILD"
     assert p["foreign_keys"][0]["relation"] == "DP_CHILD"
     p = db.c.get(db.b + "/objects/domains/D_DP/drop-preview").json()
     assert {"relation": "DP", "name": "V"} in p["columns"]

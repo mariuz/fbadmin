@@ -204,14 +204,14 @@ def trigger_spec(cat: Catalog, name: str) -> dict[str, Any]:
     return {
         "name": name,
         "relation": t["relation"],
-        "kind": t["kind"],
+        "trigger_kind": t["kind"],
         "event": t["event"],
         "position": t["position"] or 0,
         "active": not t["inactive"],
         "body": None if t["engine"] else _strip_kw(t["source"], "AS"),
         "external": {"name": t["entrypoint"], "engine": t["engine"],
                      "body": _strip_kw(t["source"], "AS") or None} if t["engine"] else None,
-        "kind_external": bool(t["engine"]),
+        "kind": "external" if t["engine"] else "psql",
         "sql_security": _sec(t.get("sql_security")),
         "comment": t["description"],
     }

@@ -391,29 +391,52 @@ class CatalogExtras:
                     params.append(col)
                 for r in self.rows(sql, params):
                     dtype = DEP_TYPES.get(r["dtype"], "other")
-                    key = (r["name"], dtype)
-                    if key in seen or (r["name"] == name and depth > 1):
+                    dep_name = r["name"]
+                    detail = None
+                    owner = self._internal_owner(dep_name, dtype)
+                    if owner is not None:
+                        # CHECK-constraint / view-check triggers, indices and computed fields belong to a
+                        # relation: skip the ones owned by the object itself or by a dependent already listed
+                        rel, what = owner
+                        if rel == name or (rel, "views") in seen or (rel, "tables") in seen:
+                            continue
+                        dep_name, dtype = rel, "views" if self._is_view(rel) else "tables"
+                        # a view's own check trigger is its WITH CHECK OPTION: the view itself depends
+                        detail = None if dtype == "views" else f"{what} of {rel}"
+                    key = (dep_name, dtype)
+                    if key in seen or (dep_name == name and depth > 1):
                         continue
                     seen.add(key)
-                    item = {"name": r["name"], "type": dtype, "depth": depth, "via": obj}
-                    if dtype in ("computed", "validation"):
-                        # computed column / CHECK constraint: report the owning relation or domain
-                        item["detail"] = self._owner_of_generated(r["name"], dtype)
+                    item = {"name": dep_name, "type": dtype, "depth": depth, "via": obj}
+                    if detail:
+                        item["detail"] = detail
                     out.append(item)
-                    nxt.append((r["name"], None))
+                    nxt.append((dep_name, None))
             frontier = nxt
             if not frontier:
                 break
         return out
 
-    def _owner_of_generated(self, name: str, dtype: str) -> str | None:
+    def _internal_owner(self, name: str, dtype: str) -> tuple[str, str] | None:
+        """(relation, description) for dependents that are parts of a relation, else None."""
+        if dtype == "triggers":
+            r = self.one("SELECT TRIM(RDB$RELATION_NAME) AS rel, RDB$SYSTEM_FLAG AS sf FROM RDB$TRIGGERS "
+                         "WHERE RDB$TRIGGER_NAME = ?", (name,))
+            if r and r["rel"] and (r["sf"] or 0) != 0:
+                return r["rel"], "CHECK constraint"
+            return None
         if dtype == "computed":
-            r = self.one("SELECT FIRST 1 TRIM(RDB$RELATION_NAME) || '.' || TRIM(RDB$FIELD_NAME) AS o "
+            r = self.one("SELECT FIRST 1 TRIM(RDB$RELATION_NAME) AS rel, TRIM(RDB$FIELD_NAME) AS fld "
                          "FROM RDB$RELATION_FIELDS WHERE RDB$FIELD_SOURCE = ?", (name,))
-        else:
-            r = self.one("SELECT FIRST 1 TRIM(RDB$RELATION_NAME) AS o FROM RDB$TRIGGERS WHERE RDB$TRIGGER_NAME = ?",
-                         (name,))
-        return (r or {}).get("o")
+            return (r["rel"], f"computed column {r['fld']}") if r else None
+        if dtype in ("indices", "other"):
+            r = self.one("SELECT TRIM(RDB$RELATION_NAME) AS rel FROM RDB$INDICES WHERE RDB$INDEX_NAME = ?", (name,))
+            return (r["rel"], f"index {name}") if r else None
+        return None
+
+    def _is_view(self, rel: str) -> bool:
+        r = self.one("SELECT IIF(RDB$VIEW_BLR IS NULL, 0, 1) AS v FROM RDB$RELATIONS WHERE RDB$RELATION_NAME = ?", (rel,))
+        return bool(r and r["v"])
 
     def referencing_foreign_keys(self, table: str) -> list[dict[str, Any]]:
         return self.rows(

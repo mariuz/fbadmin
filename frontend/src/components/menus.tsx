@@ -1,12 +1,12 @@
 import { api } from "../api";
 import { errMsg, keys, type AppApi } from "../context";
-import { CREATE_TEMPLATES } from "../templates";
 import { typeInfo, type Selection } from "../types";
 import type { MenuItem } from "./ContextMenu";
 import { contributedMenuItems } from "../registry";
 import {
-  BackupDialog, ConfirmDialog, CreateTableDialog, DatabaseDialog, RestoreDialog, ServerDialog, UserDialog,
+  BackupDialog, ConfirmDialog, DatabaseDialog, RestoreDialog, ServerDialog, UserDialog,
 } from "./dialogs";
+import { DropDialog, canDrop } from "../features/objects/manage";
 import {
   IconActivity, IconDatabase, IconDownload, IconFilter, IconInfo, IconLog, IconPlay, IconPlus, IconRefresh,
   IconTable, IconTerminal, IconTrash, IconUpload, IconX,
@@ -144,14 +144,10 @@ function buildBaseMenu(app: AppApi, sel: Selection): MenuItem[] {
 
   if (sel.kind === "folder") {
     const items: MenuItem[] = [{ label: "Refresh", icon: <IconRefresh />, onClick: () => app.invalidate(keys.folder(sid, dbid, otype)) }];
-    if (otype === "tables") {
-      items.push({ label: "Create table…", icon: <IconPlus />, onClick: () => app.showDialog(<CreateTableDialog serverId={sid} dbId={dbid} />) });
-    } else if (otype === "users") {
+    if (otype === "users") {
       items.push({ label: "Create user…", icon: <IconPlus />, onClick: () => app.showDialog(<UserDialog serverId={sid} dbId={dbid} />) });
     }
-    if (CREATE_TEMPLATES[otype]) {
-      items.push({ label: `New ${ti?.singular.toLowerCase()} script`, icon: <IconTerminal />, onClick: () => app.openQueryTool(sid, dbid, CREATE_TEMPLATES[otype]) });
-    }
+    // "Create <object>…" dialogs are contributed by features/objects
     return items;
   }
 
@@ -215,27 +211,15 @@ function buildBaseMenu(app: AppApi, sel: Selection): MenuItem[] {
     { label: "Query Tool", icon: <IconTerminal />, onClick: () => app.openQueryTool(sid, dbid) },
     { label: "Refresh", icon: <IconRefresh />, onClick: () => { app.invalidate(keys.folder(sid, dbid, otype)); app.select({ ...sel }); } },
   );
-  if (otype !== "system_tables") {
+  if (canDrop(otype) && sel.kind === "object") {
     items.push(
       { separator: true },
       {
         label: `Drop ${ti?.singular.toLowerCase()}…`,
         danger: true,
         icon: <IconTrash />,
-        onClick: () =>
-          app.showDialog(
-            <ConfirmDialog
-              title={`Drop ${ti?.singular.toLowerCase()}`}
-              message={`Drop ${ti?.singular.toLowerCase()} ${name}? This cannot be undone.`}
-              action="Drop"
-              onConfirm={async () => {
-                await api.dropObject(sid, dbid, otype, name);
-                app.toast(`Dropped ${name}`);
-                app.select({ kind: "folder", serverId: sid, dbId: dbid, otype });
-                app.invalidate(keys.folder(sid, dbid, otype));
-              }}
-            />,
-          ),
+        // shows what depends on the object before dropping it
+        onClick: () => app.showDialog(<DropDialog serverId={sid} dbId={dbid} otype={otype} name={name} />),
       },
     );
   }

@@ -787,7 +787,10 @@ def collation_script(spec: Spec, original: Spec | None, engine: int) -> Script:
     sc = Script()
     name = _name(spec, what="Collation name")
     if original:
-        sc.warn("Collations cannot be altered; drop and re-create it to change its definition.")
+        fields = ("name", "charset", "base", "external", "pad_space", "case_insensitive", "accent_insensitive",
+                  "attributes")
+        if any(_txt(spec.get(f)) != _txt(original.get(f)) for f in fields):
+            sc.warn("Collations cannot be altered; drop and re-create it to change its definition.")
     else:
         out = f"CREATE COLLATION {q(name)} FOR {_name(spec, 'charset', 'Character set')}"
         if _txt(spec.get("external")):

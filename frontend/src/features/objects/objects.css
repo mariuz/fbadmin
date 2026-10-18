@@ -1,0 +1,35 @@
+/* Object dialogs (features/objects) */
+.modal.objdlg.xl { width: 1180px; }
+.modal.objdlg.wide { width: 920px; }
+.modal.objdlg .modal-body { min-height: 380px; }
+.modal.objdlg .form { grid-template-columns: 160px 1fr; }
+.objdlg-body { min-height: 300px; }
+.small { font-size: 12px; }
+.mono { font-family: var(--mono); }
+.nowrap { white-space: nowrap; }
+.warn-box { border: 1px solid color-mix(in srgb, var(--warn) 45%, transparent); background: color-mix(in srgb, var(--warn) 10%, transparent); color: var(--text); border-radius: var(--radius); padding: 7px 10px; }
+.sql-preview { height: 320px; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.sql-preview.short { height: 110px; }
+.editor-box { height: 300px; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.editor-box.tall { height: 380px; }
+.type-picker { display: flex; gap: 4px; align-items: center; }
+.type-picker select.text { min-width: 0; flex: 1; }
+.type-picker input.text { flex: 1; min-width: 50px; }
+.cols-picker { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.cols-picker .chip { display: inline-flex; align-items: center; gap: 2px; border: 1px solid var(--border); background: var(--panel-2); border-radius: 12px; padding: 1px 4px 1px 9px; font-family: var(--mono); font-size: 12px; }
+.cols-picker .chip button { border: 0; background: none; cursor: pointer; color: var(--muted); padding: 0 3px; }
+.cols-picker select.text { width: auto; }
+table.designer tr.sel td { background: var(--select); }
+table.designer tbody tr { cursor: default; }
+fieldset.detail { border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px 14px; margin: 6px 0 0; }
+fieldset.detail legend { padding: 0 6px; color: var(--muted); }
+.sysprivs { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 6px 14px; }
+.psql-status { padding: 6px 12px; border-bottom: 1px solid var(--border); white-space: pre-wrap; font-size: 12.5px; }
+.psql-status.ok { color: var(--ok); }
+.psql-status.err { color: var(--danger); background: color-mix(in srgb, var(--danger) 7%, transparent); }
+.psql-status.info { color: var(--warn); background: color-mix(in srgb, var(--warn) 8%, transparent); }
+table.grid.privs-grid td.pcell { padding: 2px 6px; max-width: none; overflow: visible; }
+.pcell-inner { display: inline-flex; gap: 6px; align-items: center; white-space: nowrap; }
+.pcell-inner .gopt { display: inline-flex; gap: 2px; align-items: center; font-size: 11px; color: var(--muted); }
+.pcell-inner .btn.cols { flex: none; padding: 0 6px; font-size: 11px; max-width: 220px; overflow: hidden; text-overflow: ellipsis; display: inline-block; }
+.col-pick { border: 1px solid var(--border); border-radius: 8px; padding: 10px; margin-top: 8px; background: var(--panel-2); }
