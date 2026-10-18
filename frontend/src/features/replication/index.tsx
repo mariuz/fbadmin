@@ -10,6 +10,68 @@ import { Modal } from "../../components/Modal";
 import "../monitoring/monitoring.css";
 
 const base = (sid: string, dbid: string) => `/api/servers/${sid}/databases/${dbid}/replication`;
+interface JournalEvent { time: string | null; segment: number | null; error: boolean; text: string }
+interface Journal {
+  replica_mode: string; replication_sequence: number | null; rate_per_hour: number | null;
+  history: Array<{ t: number; seq: number }>; events: JournalEvent[]; last_segment: number | null;
+  errors: number; last_error: JournalEvent | null;
+}
+
+function fmtDuration(sec: number): string {
+  if (sec < 90) return t("{n} s", { n: Math.round(sec) });
+  if (sec < 5400) return t("{n} min", { n: Math.round(sec / 60) });
+  return t("{n} h", { n: (sec / 3600).toFixed(1) });
+}
+
+/** Journal tracking: sequence history/rate (sampled while the tab is open) and firebird.log segment events. */
+function JournalPanel(props: { serverId: string; dbId: string; visible: boolean; tick: number }) {
+  const [j, setJ] = useState<Journal | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!props.visible) return;
+    repApi.journal(props.serverId, props.dbId).then((r) => { setJ(r); setError(null); }).catch((e) => setError(errMsg(e)));
+  }, [props.visible, props.tick]);
+  if (error) return <div className="err">{error}</div>;
+  if (!j) return null;
+  const replica = j.replica_mode !== "none";
+  const pts = j.history;
+  const w = 320, h = 48;
+  let path = "";
+  if (pts.length > 1) {
+    const t0 = pts[0].t, t1 = pts[pts.length - 1].t || t0 + 1, s0 = pts[0].seq, s1 = Math.max(pts[pts.length - 1].seq, s0 + 1);
+    path = pts.map((p, i) => `${i ? "L" : "M"}${((p.t - t0) / Math.max(1, t1 - t0)) * w},${h - ((p.seq - s0) / (s1 - s0)) * h}`).join(" ");
+  }
+  return (
+    <>
+      <div className="cards">
+        <div className="card"><div className="k">{replica ? t("Last applied segment") : t("Current journal segment")}</div><div className="v">{j.replication_sequence ?? "–"}</div></div>
+        <div className="card"><div className="k">{replica ? t("Applied per hour") : t("Segments per hour")}</div><div className="v">{j.rate_per_hour == null ? "–" : j.rate_per_hour.toFixed(1)}</div></div>
+        <div className="card"><div className="k">{t("Last segment in firebird.log")}</div><div className="v">{j.last_segment ?? "–"}</div></div>
+        <div className="card"><div className="k">{t("Replication errors in log")}</div><div className={"v" + (j.errors ? " warn" : "")}>{j.errors}</div></div>
+      </div>
+      {pts.length > 1 && (
+        <svg width={w} height={h + 4} style={{ display: "block", margin: "6px 0" }} aria-label={t("Replication sequence over time")}>
+          <path d={path} fill="none" stroke="var(--accent)" strokeWidth={1.5} />
+        </svg>
+      )}
+      {j.last_error && (
+        <div className="alerts"><div className="alert critical"><span className="lvl">{t("error")}</span><span>{j.last_error.time ? j.last_error.time.replace("T", " ") + " · " : ""}{j.last_error.text}</span></div></div>
+      )}
+      {j.events.length > 0 && (
+        <div className="grid-wrap" style={{ maxHeight: 220, marginTop: 6 }}>
+          <table className="grid">
+            <thead><tr><th>{t("Time")}</th><th>{t("Segment")}</th><th>{t("Event")}</th></tr></thead>
+            <tbody>{j.events.slice(-50).reverse().map((ev, i) => (
+              <tr key={i}><td>{ev.time?.replace("T", " ") ?? "–"}</td><td>{ev.segment ?? "–"}</td><td className={ev.error ? "warn" : ""}>{ev.text}</td></tr>
+            ))}</tbody>
+          </table>
+        </div>
+      )}
+      <p className="muted">{t("Journal and archive segments are files on the server and cannot be listed remotely. The sequence is sampled while this tab is open; set verbose_logging = true in replication.conf to see every applied segment in firebird.log.")}</p>
+    </>
+  );
+}
+
 const repApi = {
   status: (sid: string, dbid: string, peer?: { server: string; db: string }) =>
     request<Record<string, any>>("GET", base(sid, dbid) + (peer ? `?peer_server=${peer.server}&peer_db=${peer.db}` : "")),
@@ -20,6 +82,7 @@ const repApi = {
   replicaMode: (sid: string, dbid: string, mode: string) =>
     request<{ status: Record<string, any> }>("POST", base(sid, dbid) + "/replica-mode", { mode }),
   log: (sid: string, dbid: string) => request<{ entries: string[]; total_entries: number }>("GET", base(sid, dbid) + "/log"),
+  journal: (sid: string, dbid: string) => request<Journal>("GET", base(sid, dbid) + "/journal"),
   conf: (body: Record<string, unknown>) => request<{ text: string; errors: string[]; notes: string[] }>("POST", "/api/replication/conf", body),
 };
 
@@ -42,7 +105,8 @@ function ReplicationTab(props: { serverId: string; dbId: string; visible: boolea
   const [log, setLog] = useState<string[] | null>(null);
   const peerObj = peer ? { server: peer.split("/")[0], db: peer.split("/")[1] } : undefined;
 
-  const load = () => repApi.status(props.serverId, props.dbId, peerObj).then((s) => { setSt(s); setError(null); }).catch((e) => setError(errMsg(e)));
+  const [tick, setTick] = useState(0);
+  const load = () => repApi.status(props.serverId, props.dbId, peerObj).then((s) => { setSt(s); setError(null); setTick((n) => n + 1); }).catch((e) => setError(errMsg(e)));
   useEffect(() => { load(); }, [peer]);
   useEffect(() => {
     if (!props.visible) return;
@@ -136,10 +200,13 @@ function ReplicationTab(props: { serverId: string; dbId: string; visible: boolea
                 <tr><td>{t("Peer replica mode")}</td><td>{st.peer.replica_mode}</td></tr>
                 <tr><td>{t("Peer replication sequence")}</td><td>{st.peer.replication_sequence ?? "–"}</td></tr>
                 <tr><td>{t("Segments behind (approx.)")}</td><td className={st.peer.segments_behind > 1 ? "warn" : ""}>{st.peer.segments_behind ?? "–"}</td></tr>
+                <tr><td>{t("Estimated catch-up time")}</td><td>{st.peer.catch_up_seconds == null ? t("unknown (needs a few samples of the replica)") : fmtDuration(st.peer.catch_up_seconds)}</td></tr>
                 <tr><td>{t("Peer GUID")}</td><td>{st.peer.guid}</td></tr>
               </tbody></table>
             ))}
             <p className="muted">{t("Lag is approximated from RDB$GET_CONTEXT('SYSTEM', 'REPLICATION_SEQUENCE') on both sides (journal segment numbers). Exact apply status is only in the server's replication.log.")}</p>
+            <h3>{t("Journal")}</h3>
+            <JournalPanel serverId={props.serverId} dbId={props.dbId} visible={props.visible} tick={tick} />
             <button className="btn" onClick={() => repApi.log(props.serverId, props.dbId).then((r) => setLog(r.entries)).catch((e) => app.toast(errMsg(e), "error"))}>{t("Show replication entries of firebird.log")}</button>
             {log && (log.length ? <div className="code-block" style={{ maxHeight: 260, overflow: "auto" }}>{log.join("\n\n")}</div> : <div className="muted">{t("No replication-related entries in firebird.log.")}</div>)}
           </>

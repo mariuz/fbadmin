@@ -113,6 +113,7 @@ test("monitoring: profiler runs a procedure and shows PSQL hot spots", async () 
 test("replication: publication panel opens", async () => {
   await menu(DB_LABEL, "Replication");
   await expect(pane()).toContainText(/[Pp]ublication/);
+  await expect(pane()).toContainText("Current journal segment");
 });
 
 test("security: Firebird users via the Services API", async () => {

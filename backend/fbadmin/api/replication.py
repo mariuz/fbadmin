@@ -8,7 +8,7 @@ from typing import Any
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from ..monitoring import replication
+from ..monitoring import journal, replication
 from ..query import end_transaction
 from ..serialize import to_json
 from .deps import get_state
@@ -37,15 +37,20 @@ def replication_status(server_id: str, db_id: str, peer_server: str | None = Non
     both databases is compared, which approximates the replication lag in journal segments.
     """
     st = _status(server_id, db_id)
+    journal.tracker.record((server_id, db_id), st.get("replication_sequence"))
     if peer_server and peer_db and st["supported"]:
         try:
             peer = _status(peer_server, peer_db)
+            journal.tracker.record((peer_server, peer_db), peer.get("replication_sequence"))
             st["peer"] = {k: peer.get(k) for k in ("database_name", "replica_mode", "replication_sequence",
                                                     "publication_enabled", "guid", "engine_version")}
             a, b = st.get("replication_sequence"), peer.get("replication_sequence")
             if a is not None and b is not None:
                 primary_seq, replica_seq = (a, b) if st["replica_mode"] == "none" else (b, a)
-                st["peer"]["segments_behind"] = max(0, primary_seq - replica_seq)
+                st["peer"]["segments_behind"] = behind = max(0, primary_seq - replica_seq)
+                replica_key = (peer_server, peer_db) if st["replica_mode"] == "none" else (server_id, db_id)
+                st["peer"]["catch_up_seconds"] = journal.catch_up_seconds(
+                    behind, journal.tracker.rate_per_hour(replica_key))
         except Exception as exc:  # noqa: BLE001
             st["peer"] = {"error": str(exc).strip()}
     return to_json(st)
@@ -115,6 +120,28 @@ def replication_log(server_id: str, db_id: str, limit: int = 100):
     entries = [e.strip() for e in re.split(r"\n\s*\n", log) if e.strip()]
     hits = [e for e in entries if re.search(r"replic|journal|segment", e, re.I)]
     return {"entries": hits[-limit:], "total_entries": len(entries)}
+
+
+@router.get("/journal")
+def replication_journal(server_id: str, db_id: str, limit: int = 200):
+    """Journal tracking: replication sequence history and rate (sampled whenever the status is
+    read, e.g. by the open Replication tab) and the segment events of firebird.log."""
+    st = _status(server_id, db_id)
+    _require(st)
+    key = (server_id, db_id)
+    journal.tracker.record(key, st.get("replication_sequence"))
+    with get_state().manager.service(server_id) as svc:
+        log = svc.getLog() or ""
+    entries = [e.strip() for e in re.split(r"\n\s*\n", log) if e.strip()]
+    hits = [e for e in entries if re.search(r"replic|journal|segment", e, re.I)]
+    parsed = journal.parse_log(hits[-limit:])
+    return to_json({
+        "replica_mode": st["replica_mode"],
+        "replication_sequence": st.get("replication_sequence"),
+        "history": [{"t": t, "seq": s} for t, s in journal.tracker.history(key)],
+        "rate_per_hour": journal.tracker.rate_per_hour(key),
+        **parsed,
+    })
 
 
 class ConfIn(BaseModel):

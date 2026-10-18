@@ -136,3 +136,41 @@ def test_conf_generator(client):
     assert "sync_replica = SYSDBA:pw@replica:/data/r.fdb" in r["text"]
     assert client.post("/api/replication/conf", json={"role": "x", "database": "main"}).status_code == 400
     assert client.post("/api/replication/conf", json={"role": "replica", "database": " "}).status_code == 400
+
+
+def test_journal_tracker_and_log_parser():
+    from fbadmin.monitoring import journal
+
+    tr = journal.SequenceTracker()
+    key = ("s", "d")
+    assert tr.rate_per_hour(key) is None
+    tr.record(key, 10, now=1000.0)
+    tr.record(key, 10, now=1010.0)  # unchanged within a minute: not stored
+    tr.record(key, 16, now=1000.0 + 1800)
+    assert [s for _, s in tr.history(key)] == [10, 16]
+    assert tr.rate_per_hour(key) == pytest.approx(12.0)
+    assert journal.catch_up_seconds(6, 12.0) == pytest.approx(1800)
+    assert journal.catch_up_seconds(0, None) == 0.0 and journal.catch_up_seconds(3, None) is None
+
+    entries = [
+        "db-host\tSat Oct 18 10:00:01 2026\n\tDatabase: /data/replica.fdb\n\tVERBOSE: Segment 41 (2048 bytes) is replicated in 0.001s, deleting",
+        "db-host\tSat Oct 18 10:00:11 2026\n\tDatabase: /data/replica.fdb\n\tVERBOSE: Segment 42 (1024 bytes) is replicated in 0.002s, deleting",
+        "db-host\tSat Oct 18 10:01:00 2026\n\tDatabase: /data/replica.fdb\n\tERROR: Cannot apply segment 43: table T1 not found",
+        "db-host\tSat Oct 18 10:02:00 2026\n\tReplication is enabled",
+    ]
+    r = journal.parse_log(entries)
+    assert r["last_segment"] == 42 and r["errors"] == 1
+    assert r["last_error"]["segment"] == 43 and r["last_error"]["time"] == "2026-10-18T10:01:00"
+    assert len(r["events"]) == 3 and "Segment 41" in r["events"][0]["text"]
+
+
+def test_journal_endpoint(client, database):
+    sid, dbid = database
+    r = client.get(f"/api/servers/{sid}/databases/{dbid}/replication/journal")
+    major = client.get(f"/api/servers/{sid}/databases/{dbid}/replication").json()["engine_major"]
+    if major < 4:
+        assert r.status_code == 400
+        return
+    j = r.json()
+    assert j["replica_mode"] == "none" and isinstance(j["history"], list) and len(j["history"]) >= 1
+    assert "events" in j and "errors" in j
