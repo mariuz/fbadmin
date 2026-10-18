@@ -3,6 +3,7 @@ import { api } from "../api";
 import { errMsg, useApp } from "../context";
 import type { Job } from "../types";
 import { IconRefresh } from "./Icons";
+import { t } from "../i18n";
 
 export function JobsPanel(props: { visible: boolean }) {
   const app = useApp();
@@ -18,15 +19,15 @@ export function JobsPanel(props: { visible: boolean }) {
   useEffect(() => {
     if (!props.visible) return;
     load();
-    const t = setInterval(load, 1500);
-    return () => clearInterval(t);
+    const timer = setInterval(load, 1500);
+    return () => clearInterval(timer);
   }, [props.visible, open?.id]);
   const srvName = (id: string) => app.servers.find((s) => (s as any).id === id)?.name ?? id;
   return (
     <div style={{ display: "flex", height: "100%" }}>
       <div style={{ width: 460, borderRight: "1px solid var(--border)", overflow: "auto" }}>
-        <div className="toolbar"><b>Processes</b><span className="grow" /><button className="btn icon" onClick={load}><IconRefresh /></button></div>
-        {jobs.length === 0 && <div className="pad muted">No processes yet. Backups, restores, sweeps and statistics run here.</div>}
+        <div className="toolbar"><b>{t("Processes")}</b><span className="grow" /><button className="btn icon" onClick={load}><IconRefresh /></button></div>
+        {jobs.length === 0 && <div className="pad muted">{t("No processes yet. Backups, restores, sweeps and statistics run here.")}</div>}
         {jobs.map((j) => (
           <div key={j.id} className="history-item" style={open?.id === j.id ? { background: "var(--select)" } : undefined}
             onClick={() => api.job(j.id).then(setOpen).catch((e) => app.toast(errMsg(e), "error"))}>
@@ -41,9 +42,9 @@ export function JobsPanel(props: { visible: boolean }) {
           <>
             <h2>{open.description} <span className={"pill " + open.status}>{open.status}</span></h2>
             {open.error && <p className="err">{open.error}</p>}
-            <div className="log">{(open.log ?? []).join("\n") || "(no output)"}</div>
+            <div className="log">{(open.log ?? []).join("\n") || t("(no output)")}</div>
           </>
-        ) : <div className="empty-state">Select a process to see its log.</div>}
+        ) : <div className="empty-state">{t("Select a process to see its log.")}</div>}
       </div>
     </div>
   );
@@ -56,9 +57,9 @@ export function ServerLog(props: { serverId: string }) {
   useEffect(() => { load(); }, []);
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-      <div className="toolbar"><button className="btn" onClick={load}><IconRefresh /> Refresh</button></div>
+      <div className="toolbar"><button className="btn" onClick={load}><IconRefresh /> {t("Refresh")}</button></div>
       <div className="pad" style={{ flex: 1, overflow: "auto" }}>
-        {error ? <div className="err">{error}</div> : <div className="log" style={{ maxHeight: "none" }}>{log ?? "Loading…"}</div>}
+        {error ? <div className="err">{error}</div> : <div className="log" style={{ maxHeight: "none" }}>{log ?? t("Loading…")}</div>}
       </div>
     </div>
   );

@@ -13,16 +13,17 @@ import {
 import { lintGutter, setDiagnostics } from "@codemirror/lint";
 import { format as formatSqlText } from "sql-formatter";
 import { searchKeymap, highlightSelectionMatches } from "@codemirror/search";
-import { tags as t } from "@lezer/highlight";
+import { tags } from "@lezer/highlight";
 import { showMinimap } from "@replit/codemirror-minimap";
 import { getPrefs, usePrefs } from "../prefs";
+import { N_, t } from "../i18n";
 
 /** Configurable editor actions and their default key bindings (CodeMirror key syntax). */
 export const EDITOR_ACTIONS: Array<{ id: string; label: string; keys: string[] }> = [
-  { id: "execute", label: "Execute", keys: ["Mod-Enter", "F5"] },
-  { id: "explain", label: "Explain plan", keys: ["F7"] },
-  { id: "format", label: "Format SQL", keys: ["Shift-Alt-f"] },
-  { id: "comment", label: "Toggle comment", keys: ["Mod-/"] },
+  { id: "execute", label: N_("Execute"), keys: ["Mod-Enter", "F5"] },
+  { id: "explain", label: N_("Explain plan"), keys: ["F7"] },
+  { id: "format", label: N_("Format SQL"), keys: ["Shift-Alt-f"] },
+  { id: "comment", label: N_("Toggle comment"), keys: ["Mod-/"] },
 ];
 
 /** Key specs for an action, from preferences (comma separated) or the defaults. */
@@ -78,12 +79,12 @@ export const firebirdDialect = SQLDialect.define({
 });
 
 const highlight = HighlightStyle.define([
-  { tag: t.keyword, color: "var(--accent)", fontWeight: "600" },
-  { tag: t.typeName, color: "#0e7490" },
-  { tag: t.string, color: "#15803d" },
-  { tag: t.number, color: "#7c3aed" },
-  { tag: t.comment, color: "var(--muted)", fontStyle: "italic" },
-  { tag: t.standard(t.name), color: "#2563eb" },
+  { tag: tags.keyword, color: "var(--accent)", fontWeight: "600" },
+  { tag: tags.typeName, color: "#0e7490" },
+  { tag: tags.string, color: "#15803d" },
+  { tag: tags.number, color: "#7c3aed" },
+  { tag: tags.comment, color: "var(--muted)", fontStyle: "italic" },
+  { tag: tags.standard(tags.name), color: "#2563eb" },
 ]);
 
 const baseTheme = EditorView.theme({
@@ -151,11 +152,11 @@ export function clearErrors(view: EditorView) {
 
 function extraSource(extra?: ExtraCompletions) {
   const opts: CmCompletion[] = [];
-  for (const p of extra?.procedures ?? []) opts.push({ label: p, type: "function", detail: "procedure" });
-  for (const f of extra?.functions ?? []) opts.push({ label: f, type: "function", detail: "function" });
+  for (const p of extra?.procedures ?? []) opts.push({ label: p, type: "function", detail: t("procedure") });
+  for (const f of extra?.functions ?? []) opts.push({ label: f, type: "function", detail: t("function") });
   for (const [pkg, members] of Object.entries(extra?.packages ?? {})) {
-    opts.push({ label: pkg, type: "namespace", detail: "package" });
-    for (const m of members) opts.push({ label: `${pkg}.${m}`, type: "function", detail: "package member" });
+    opts.push({ label: pkg, type: "namespace", detail: t("package") });
+    for (const m of members) opts.push({ label: `${pkg}.${m}`, type: "function", detail: t("package member") });
   }
   return completeFromList(opts);
 }
