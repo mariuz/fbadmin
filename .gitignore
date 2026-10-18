@@ -11,3 +11,4 @@ backend/fbadmin/static/
 *.fbk
 .env
 build/
+.claude/worktrees/
