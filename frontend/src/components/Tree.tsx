@@ -8,6 +8,7 @@ import {
 import { ContextMenu, type MenuItem } from "./ContextMenu";
 import { buildMenu } from "./menus";
 import { getTreeNodes } from "../registry";
+import { t } from "../i18n";
 
 export interface NodeSpec {
   key: string;
@@ -104,7 +105,7 @@ function TreeNode(props: {
         <div className="tree-error" style={{ paddingLeft: 26 + props.depth * 16 }}>{error}</div>
       )}
       {open && children && children.length === 0 && !error && (
-        <div className="tree-empty" style={{ paddingLeft: 26 + (props.depth + 1) * 16 }}>No items</div>
+        <div className="tree-empty" style={{ paddingLeft: 26 + (props.depth + 1) * 16 }}>{t("No items")}</div>
       )}
       {open && children?.map((c) => <TreeNode key={c.key} spec={c} depth={props.depth + 1} onContext={props.onContext} />)}
     </>
@@ -140,7 +141,7 @@ function objectNodes(sid: string, dbid: string, otype: string, items: Array<Reco
             return (o.columns ?? []).map((c: any) => ({
               key: keys.object(sid, dbid, otype, it.name) + ":" + c.name,
               label: c.name,
-              sub: c.computed ? "computed" : c.data_type + (c.not_null ? " not null" : ""),
+              sub: c.computed ? t("computed") : c.data_type + (c.not_null ? " not null" : ""),
               icon: c.primary_key ? IconKey : IconColumn,
               selection: { kind: "column", serverId: sid, dbId: dbid, otype, name: it.name, column: c.name, schema },
             }));
@@ -154,14 +155,14 @@ function objectNodes(sid: string, dbid: string, otype: string, items: Array<Reco
 const GLOBAL_TYPES = new Set(["users", "roles", "shadows", "blob_filters"]);
 
 export function databaseFolders(sid: string, dbid: string, counts: Record<string, number>, schema?: string): NodeSpec[] {
-  return OBJECT_TYPES.filter((t) => !schema || schema === "PUBLIC" || !GLOBAL_TYPES.has(t.type)).map((t) => ({
+  return OBJECT_TYPES.filter((ot) => !schema || schema === "PUBLIC" || !GLOBAL_TYPES.has(ot.type)).map((ot) => ({
     // "@schema" keeps React keys unique; it is stripped when matching the selection
-    key: keys.folder(sid, dbid, t.type) + (schema ? "@" + schema : ""),
-    label: t.label,
-    count: counts[t.type],
+    key: keys.folder(sid, dbid, ot.type) + (schema ? "@" + schema : ""),
+    label: t(ot.label),
+    count: counts[ot.type],
     icon: IconFolder,
-    selection: { kind: "folder", serverId: sid, dbId: dbid, otype: t.type, schema },
-    load: async () => objectNodes(sid, dbid, t.type, await withSchema(sid, dbid, schema, () => api.objects(sid, dbid, t.type)), schema),
+    selection: { kind: "folder", serverId: sid, dbId: dbid, otype: ot.type, schema },
+    load: async () => objectNodes(sid, dbid, ot.type, await withSchema(sid, dbid, schema, () => api.objects(sid, dbid, ot.type)), schema),
   }));
 }
 
@@ -170,7 +171,7 @@ function schemaNodes(sid: string, dbid: string, schemas: Array<{ name: string; s
   return schemas.map((sc) => ({
     key: keys.db(sid, dbid) + "@" + sc.name,
     label: sc.name,
-    sub: sc.system_flag ? "system" : undefined,
+    sub: sc.system_flag ? t("system") : undefined,
     title: sc.description ?? undefined,
     icon: IconSchema,
     selection: { kind: "database", serverId: sid, dbId: dbid, schema: sc.name },
@@ -204,7 +205,7 @@ export function Tree() {
         selection: { kind: "database", serverId: srv.id, dbId: d.id },
         load: async () => {
           await api.connectDatabase(srv.id, d.id);
-          const extra = (await Promise.all(getTreeNodes("database").map((t) => t.build(srv.id, d.id).catch(() => [])))).flat();
+          const extra = (await Promise.all(getTreeNodes("database").map((p) => p.build(srv.id, d.id).catch(() => [])))).flat();
           const sc = await api.schemas(srv.id, d.id).catch(() => ({ supported: false, schemas: [] }));
           if (sc.supported) return [...schemaNodes(srv.id, d.id, sc.schemas), ...extra];
           const info = await api.databaseInfo(srv.id, d.id);
@@ -264,13 +265,13 @@ export function Tree() {
       <div className="tree">
         <div className="empty-state" style={{ height: "auto", paddingTop: 40 }}>
           <IconServer size={28} />
-          <div>No servers registered yet.</div>
+          <div>{t("No servers registered yet.")}</div>
         </div>
       </div>
     );
   }
   return (
-    <div className="tree" role="tree" aria-label="Object Explorer" onKeyDown={onTreeKey}>
+    <div className="tree" role="tree" aria-label={t("Object Explorer")} onKeyDown={onTreeKey}>
       {app.servers.map((s) => (
         <TreeNode key={s.id} spec={serverSpec(s)} depth={0} onContext={onContext} />
       ))}

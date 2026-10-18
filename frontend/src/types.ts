@@ -1,3 +1,5 @@
+import { N_ } from "./i18n";
+
 export interface DatabaseEntry {
   id: string;
   name: string;
@@ -125,23 +127,23 @@ export interface ObjectDetail {
 }
 
 export const OBJECT_TYPES: Array<{ type: string; label: string; singular: string }> = [
-  { type: "tables", label: "Tables", singular: "Table" },
-  { type: "views", label: "Views", singular: "View" },
-  { type: "procedures", label: "Procedures", singular: "Procedure" },
-  { type: "functions", label: "Functions", singular: "Function" },
-  { type: "packages", label: "Packages", singular: "Package" },
-  { type: "triggers", label: "Triggers", singular: "Trigger" },
-  { type: "sequences", label: "Sequences", singular: "Sequence" },
-  { type: "domains", label: "Domains", singular: "Domain" },
-  { type: "exceptions", label: "Exceptions", singular: "Exception" },
-  { type: "indices", label: "Indices", singular: "Index" },
-  { type: "roles", label: "Roles", singular: "Role" },
-  { type: "users", label: "Users", singular: "User" },
-  { type: "system_tables", label: "System Tables", singular: "System Table" },
-  { type: "collations", label: "Collations", singular: "Collation" },
-  { type: "charsets", label: "Character Sets", singular: "Character Set" },
-  { type: "shadows", label: "Shadows", singular: "Shadow" },
-  { type: "blob_filters", label: "BLOB Filters", singular: "BLOB Filter" },
+  { type: "tables", label: N_("Tables"), singular: N_("Table") },
+  { type: "views", label: N_("Views"), singular: N_("View") },
+  { type: "procedures", label: N_("Procedures"), singular: N_("Procedure") },
+  { type: "functions", label: N_("Functions"), singular: N_("Function") },
+  { type: "packages", label: N_("Packages"), singular: N_("Package") },
+  { type: "triggers", label: N_("Triggers"), singular: N_("Trigger") },
+  { type: "sequences", label: N_("Sequences"), singular: N_("Sequence") },
+  { type: "domains", label: N_("Domains"), singular: N_("Domain") },
+  { type: "exceptions", label: N_("Exceptions"), singular: N_("Exception") },
+  { type: "indices", label: N_("Indices"), singular: N_("Index") },
+  { type: "roles", label: N_("Roles"), singular: N_("Role") },
+  { type: "users", label: N_("Users"), singular: N_("User") },
+  { type: "system_tables", label: N_("System Tables"), singular: N_("System Table") },
+  { type: "collations", label: N_("Collations"), singular: N_("Collation") },
+  { type: "charsets", label: N_("Character Sets"), singular: N_("Character Set") },
+  { type: "shadows", label: N_("Shadows"), singular: N_("Shadow") },
+  { type: "blob_filters", label: N_("BLOB Filters"), singular: N_("BLOB Filter") },
 ];
 
 export const typeInfo = (t?: string) => OBJECT_TYPES.find((o) => o.type === t);

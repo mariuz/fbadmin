@@ -57,6 +57,7 @@ export function getTopbarItems() {
 // --- extra fixed tabs next to Dashboard / Properties / SQL / Dependencies -------
 export interface ObjectTab {
   id: string;
+  /** English title marked with N_(); translated with t() where the tab is rendered. */
   title: string;
   /** Show the tab only for selections where this returns true. */
   applies: (sel: Selection | null) => boolean;

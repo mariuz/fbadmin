@@ -3,6 +3,7 @@ import { errMsg, keys, type AppApi } from "../context";
 import { typeInfo, type Selection } from "../types";
 import type { MenuItem } from "./ContextMenu";
 import { contributedMenuItems } from "../registry";
+import { t } from "../i18n";
 import {
   ConfirmDialog, DatabaseDialog, RestoreDialog, ServerDialog, UserDialog,
 } from "./dialogs";
@@ -15,7 +16,7 @@ import {
 async function runJob(app: AppApi, p: Promise<unknown>, what: string) {
   try {
     await p;
-    app.toast(`${what} started — see Processes`, "info");
+    app.toast(t("{what} started — see Processes", { what }), "info");
     app.jobStarted();
   } catch (e) {
     app.toast(errMsg(e), "error");
@@ -35,17 +36,17 @@ function buildBaseMenu(app: AppApi, sel: Selection): MenuItem[] {
 
   if (sel.kind === "server") {
     return [
-      { label: "Register database…", icon: <IconDatabase />, onClick: () => app.showDialog(<DatabaseDialog server={srv} mode="register" />) },
-      { label: "Create database…", icon: <IconPlus />, onClick: () => app.showDialog(<DatabaseDialog server={srv} mode="create" />) },
-      { label: "Restore backup…", icon: <IconUpload />, onClick: () => app.showDialog(<RestoreDialog server={srv} />) },
+      { label: t("Register database…"), icon: <IconDatabase />, onClick: () => app.showDialog(<DatabaseDialog server={srv} mode="register" />) },
+      { label: t("Create database…"), icon: <IconPlus />, onClick: () => app.showDialog(<DatabaseDialog server={srv} mode="create" />) },
+      { label: t("Restore backup…"), icon: <IconUpload />, onClick: () => app.showDialog(<RestoreDialog server={srv} />) },
       { separator: true },
-      { label: "Server info", icon: <IconInfo />, onClick: () => app.openTab({ kind: "serverinfo", title: `${srv.name} · info`, serverId: sid }) },
-      { label: "Server log", icon: <IconLog />, onClick: () => app.openTab({ kind: "serverlog", title: `${srv.name} · log`, serverId: sid }) },
-      { label: "Refresh", icon: <IconRefresh />, onClick: () => app.invalidate(keys.server(sid)) },
+      { label: t("Server info"), icon: <IconInfo />, onClick: () => app.openTab({ kind: "serverinfo", title: t("{name} · info", { name: srv.name }), serverId: sid }) },
+      { label: t("Server log"), icon: <IconLog />, onClick: () => app.openTab({ kind: "serverlog", title: t("{name} · log", { name: srv.name }), serverId: sid }) },
+      { label: t("Refresh"), icon: <IconRefresh />, onClick: () => app.invalidate(keys.server(sid)) },
       { separator: true },
-      { label: "Edit server…", onClick: () => app.showDialog(<ServerDialog server={srv} />) },
+      { label: t("Edit server…"), onClick: () => app.showDialog(<ServerDialog server={srv} />) },
       {
-        label: "Disconnect",
+        label: t("Disconnect"),
         icon: <IconX />,
         onClick: async () => {
           await api.disconnectServer(sid);
@@ -54,15 +55,15 @@ function buildBaseMenu(app: AppApi, sel: Selection): MenuItem[] {
         },
       },
       {
-        label: "Remove server",
+        label: t("Remove server"),
         danger: true,
         icon: <IconTrash />,
         onClick: () =>
           app.showDialog(
             <ConfirmDialog
-              title="Remove server"
-              message={`Remove the registration of "${srv.name}"? Databases on the server are not touched.`}
-              action="Remove"
+              title={t("Remove server")}
+              message={t("Remove the registration of \"{name}\"? Databases on the server are not touched.", { name: srv.name })}
+              action={t("Remove")}
               onConfirm={async () => {
                 await api.deleteServer(sid);
                 app.select(null);
@@ -80,15 +81,15 @@ function buildBaseMenu(app: AppApi, sel: Selection): MenuItem[] {
 
   if (sel.kind === "database") {
     return [
-      { label: "Query Tool", icon: <IconTerminal />, onClick: () => app.openQueryTool(sid, dbid) },
-      { label: "Monitor", icon: <IconActivity />, onClick: () => app.openTab({ kind: "monitor", title: `${db.name} · monitor`, serverId: sid, dbId: dbid }) },
-      { label: "Refresh", icon: <IconRefresh />, onClick: () => app.invalidate(keys.db(sid, dbid)) },
+      { label: t("Query Tool"), icon: <IconTerminal />, onClick: () => app.openQueryTool(sid, dbid) },
+      { label: t("Monitor"), icon: <IconActivity />, onClick: () => app.openTab({ kind: "monitor", title: t("{name} · monitor", { name: db.name }), serverId: sid, dbId: dbid }) },
+      { label: t("Refresh"), icon: <IconRefresh />, onClick: () => app.invalidate(keys.db(sid, dbid)) },
       // Backup, sweep and gstat live in the maintenance feature (features/maintenance).
-      { label: "Recompute index selectivity", onClick: () => runJob(app, api.recomputeSelectivity(sid, dbid), "Index statistics") },
+      { label: t("Recompute index selectivity"), onClick: () => runJob(app, api.recomputeSelectivity(sid, dbid), t("Index statistics")) },
       { separator: true },
-      { label: "Edit registration…", onClick: () => app.showDialog(<DatabaseDialog server={srv} mode="edit" database={db} />) },
+      { label: t("Edit registration…"), onClick: () => app.showDialog(<DatabaseDialog server={srv} mode="edit" database={db} />) },
       {
-        label: "Disconnect",
+        label: t("Disconnect"),
         icon: <IconX />,
         onClick: async () => {
           await api.disconnectDatabase(sid, dbid);
@@ -96,14 +97,14 @@ function buildBaseMenu(app: AppApi, sel: Selection): MenuItem[] {
         },
       },
       {
-        label: "Unregister",
+        label: t("Unregister"),
         icon: <IconTrash />,
         onClick: () =>
           app.showDialog(
             <ConfirmDialog
-              title="Unregister database"
-              message={`Remove "${db.name}" from the tree? The database file is not deleted.`}
-              action="Unregister"
+              title={t("Unregister database")}
+              message={t("Remove \"{name}\" from the tree? The database file is not deleted.", { name: db.name })}
+              action={t("Unregister")}
               onConfirm={async () => {
                 await api.removeDatabase(sid, dbid);
                 app.select({ kind: "server", serverId: sid });
@@ -114,15 +115,15 @@ function buildBaseMenu(app: AppApi, sel: Selection): MenuItem[] {
           ),
       },
       {
-        label: "Drop database…",
+        label: t("Drop database…"),
         danger: true,
         icon: <IconTrash />,
         onClick: () =>
           app.showDialog(
             <ConfirmDialog
-              title="Drop database"
-              message={`This permanently DELETES the database file\n${db.path}\nThis cannot be undone.`}
-              action="Drop database"
+              title={t("Drop database")}
+              message={`${t("This permanently DELETES the database file")}\n${db.path}\n${t("This cannot be undone.")}`}
+              action={t("Drop database")}
               confirmText={db.name}
               onConfirm={async () => {
                 await api.dropDatabase(sid, dbid);
@@ -140,9 +141,9 @@ function buildBaseMenu(app: AppApi, sel: Selection): MenuItem[] {
   const ti = typeInfo(otype);
 
   if (sel.kind === "folder") {
-    const items: MenuItem[] = [{ label: "Refresh", icon: <IconRefresh />, onClick: () => app.invalidate(keys.folder(sid, dbid, otype)) }];
+    const items: MenuItem[] = [{ label: t("Refresh"), icon: <IconRefresh />, onClick: () => app.invalidate(keys.folder(sid, dbid, otype)) }];
     if (otype === "users") {
-      items.push({ label: "Create user…", icon: <IconPlus />, onClick: () => app.showDialog(<UserDialog serverId={sid} dbId={dbid} />) });
+      items.push({ label: t("Create user…"), icon: <IconPlus />, onClick: () => app.showDialog(<UserDialog serverId={sid} dbId={dbid} />) });
     }
     // "Create <object>…" dialogs are contributed by features/objects
     return items;
@@ -161,33 +162,33 @@ function buildBaseMenu(app: AppApi, sel: Selection): MenuItem[] {
   const items: MenuItem[] = [];
   if (otype === "tables" || otype === "views" || otype === "system_tables") {
     items.push(
-      { label: "View/Edit data", icon: <IconTable />, onClick: () => app.openTab({ kind: "data", title: name, serverId: sid, dbId: dbid, otype, name }) },
-      { label: "View filtered rows…", icon: <IconFilter />, onClick: () => app.openTab({ kind: "data", title: name, serverId: sid, dbId: dbid, otype, name, initialSql: "filter" }) },
-      { label: "Count rows", onClick: async () => {
+      { label: t("View/Edit data"), icon: <IconTable />, onClick: () => app.openTab({ kind: "data", title: name, serverId: sid, dbId: dbid, otype, name }) },
+      { label: t("View filtered rows…"), icon: <IconFilter />, onClick: () => app.openTab({ kind: "data", title: name, serverId: sid, dbId: dbid, otype, name, initialSql: "filter" }) },
+      { label: t("Count rows"), onClick: async () => {
         try {
           const { count } = await api.tableCount(sid, dbid, name);
-          app.toast(`${name}: ${count.toLocaleString()} rows`, "info");
+          app.toast(t("{name}: {count} rows", { name, count: count.toLocaleString() }), "info");
         } catch (e) { app.toast(errMsg(e), "error"); }
       } },
-      { header: "Scripts" },
-      { label: "SELECT script", onClick: scriptTo("select") },
-      { label: "INSERT script", onClick: scriptTo("insert") },
-      { label: "UPDATE script", onClick: scriptTo("update") },
-      { label: "DELETE script", onClick: scriptTo("delete") },
+      { header: t("Scripts") },
+      { label: t("SELECT script"), onClick: scriptTo("select") },
+      { label: t("INSERT script"), onClick: scriptTo("insert") },
+      { label: t("UPDATE script"), onClick: scriptTo("update") },
+      { label: t("DELETE script"), onClick: scriptTo("delete") },
     );
   } else if (otype === "procedures") {
     items.push(
-      { label: "Execute…", icon: <IconPlay />, onClick: scriptTo("execute") },
-      { label: "SELECT FROM script", onClick: scriptTo("select") },
+      { label: t("Execute…"), icon: <IconPlay />, onClick: scriptTo("execute") },
+      { label: t("SELECT FROM script"), onClick: scriptTo("select") },
     );
   } else if (otype === "functions") {
-    items.push({ label: "Call script", icon: <IconPlay />, onClick: scriptTo("select") });
+    items.push({ label: t("Call script"), icon: <IconPlay />, onClick: scriptTo("select") });
   } else if (otype === "users") {
-    items.push({ label: "Edit user…", onClick: () => app.showDialog(<UserDialog serverId={sid} dbId={dbid} name={name} />) });
+    items.push({ label: t("Edit user…"), onClick: () => app.showDialog(<UserDialog serverId={sid} dbId={dbid} name={name} />) });
   }
   if (otype === "triggers" || otype === "indices") {
     items.push({
-      label: "Activate / deactivate",
+      label: t("Activate / deactivate"),
       onClick: async () => {
         try {
           const o = await api.object(sid, dbid, otype, name);
@@ -196,7 +197,7 @@ function buildBaseMenu(app: AppApi, sel: Selection): MenuItem[] {
           const sql = otype === "triggers" ? `ALTER TRIGGER ${q} ${active ? "INACTIVE" : "ACTIVE"}` : `ALTER INDEX ${q} ${active ? "INACTIVE" : "ACTIVE"}`;
           const r = await api.execute(sid, dbid, sql);
           if (r.error) throw new Error(r.error.message);
-          app.toast(`${name} ${active ? "deactivated" : "activated"}`);
+          app.toast(active ? t("{name} deactivated", { name }) : t("{name} activated", { name }));
           app.invalidate(keys.folder(sid, dbid, otype));
           app.select({ ...sel });
         } catch (e) { app.toast(errMsg(e), "error"); }
@@ -204,15 +205,15 @@ function buildBaseMenu(app: AppApi, sel: Selection): MenuItem[] {
     });
   }
   items.push(
-    { label: "CREATE script", onClick: scriptTo("create") },
-    { label: "Query Tool", icon: <IconTerminal />, onClick: () => app.openQueryTool(sid, dbid) },
-    { label: "Refresh", icon: <IconRefresh />, onClick: () => { app.invalidate(keys.folder(sid, dbid, otype)); app.select({ ...sel }); } },
+    { label: t("CREATE script"), onClick: scriptTo("create") },
+    { label: t("Query Tool"), icon: <IconTerminal />, onClick: () => app.openQueryTool(sid, dbid) },
+    { label: t("Refresh"), icon: <IconRefresh />, onClick: () => { app.invalidate(keys.folder(sid, dbid, otype)); app.select({ ...sel }); } },
   );
   if (canDrop(otype) && sel.kind === "object") {
     items.push(
       { separator: true },
       {
-        label: `Drop ${ti?.singular.toLowerCase()}…`,
+        label: t("Drop {object}…", { object: (ti ? t(ti.singular) : "").toLowerCase() }),
         danger: true,
         icon: <IconTrash />,
         // shows what depends on the object before dropping it

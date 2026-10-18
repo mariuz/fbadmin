@@ -5,6 +5,7 @@ import { SqlEditor } from "../../components/SqlEditor";
 import { IconTerminal, IconX } from "../../components/Icons";
 import { typeInfo } from "../../types";
 import { getLookups, oapi, type DdlScript, type Dependent, type Lookups } from "./api";
+import { t } from "../../i18n";
 
 export const quote = (n: string) => (/^[A-Z][A-Z0-9_$]*$/.test(n) ? n : `"${n.replace(/"/g, '""')}"`);
 
@@ -55,7 +56,7 @@ export function useDdl(sid: string, dbid: string, kind: string, spec: unknown, o
   useEffect(() => {
     if (spec === null || spec === undefined) return;
     let cancelled = false;
-    const t = setTimeout(async () => {
+    const timer = setTimeout(async () => {
       try {
         const r = await oapi.ddl(sid, dbid, kind, spec, original);
         if (!cancelled) setRes(r);
@@ -63,7 +64,7 @@ export function useDdl(sid: string, dbid: string, kind: string, spec: unknown, o
         if (!cancelled) setRes({ sql: "", statements: [], warnings: [], error: errMsg(e) });
       }
     }, 200);
-    return () => { cancelled = true; clearTimeout(t); };
+    return () => { cancelled = true; clearTimeout(timer); };
   }, [key]);
   return res;
 }
@@ -121,11 +122,12 @@ export function ObjectDialog(props: {
       const r = await api.execute(sid, dbid, script.sql);
       if (r.error) {
         setTab("sql");
-        throw new Error(`Statement ${r.error.index + 1} failed:\n${r.error.message}`);
+        throw new Error(`${t("Statement {n} failed:", { n: r.error.index + 1 })}\n${r.error.message}`);
       }
       app.invalidate(keys.folder(sid, dbid, props.otype));
       app.invalidate(keys.db(sid, dbid));
-      app.toast(editing ? "Changes applied" : `${typeInfo(props.otype)?.singular ?? "Object"} created`);
+      const ti = typeInfo(props.otype);
+      app.toast(editing ? t("Changes applied") : t("{object} created", { object: ti ? t(ti.singular) : t("Object") }));
       if (props.selectName) {
         app.select({ kind: "object", serverId: sid, dbId: dbid, otype: props.otype, name: props.selectName });
       } else if (app.selection) app.select({ ...app.selection });
@@ -138,7 +140,7 @@ export function ObjectDialog(props: {
     }
   };
 
-  const tabs = [...props.tabs, { id: "sql", title: "SQL", render: () => <SqlTab ddl={ddl} /> }];
+  const tabs = [...props.tabs, { id: "sql", title: t("SQL"), render: () => <SqlTab ddl={ddl} /> }];
   const nothing = !!ddl && !ddl.error && !ddl.sql.trim();
   return (
     <DlgModal
@@ -150,32 +152,34 @@ export function ObjectDialog(props: {
           {error && <span className="err">{error}</span>}
           {!error && confirmDeps && (
             <span className="warn" style={{ marginRight: "auto" }}>
-              {deps.length} object(s) depend on this one ({deps.slice(0, 4).map((d) => d.name).join(", ")}
-              {deps.length > 4 ? ", …" : ""}). Altering it may fail or invalidate them. Click again to continue.
+              {t("{count} object(s) depend on this one ({names}). Altering it may fail or invalidate them. Click again to continue.", {
+                count: deps.length,
+                names: deps.slice(0, 4).map((d) => d.name).join(", ") + (deps.length > 4 ? ", …" : ""),
+              })}
             </span>
           )}
           {props.extraButtons}
           <button className="btn" disabled={!ddl?.sql} onClick={() => { app.openQueryTool(sid, dbid, ddl?.sql); close(); }}>
-            <IconTerminal /> Query Tool
+            <IconTerminal /> {t("Query Tool")}
           </button>
-          <button className="btn" onClick={close}>Cancel</button>
+          <button className="btn" onClick={close}>{t("Cancel")}</button>
           <button className="btn primary" disabled={busy || props.spec === null || !!ddl?.error || nothing || !!props.disabledReason} onClick={save}
-            title={props.disabledReason ?? (nothing ? "Nothing changed" : undefined)}>
-            {confirmDeps ? "Save anyway" : editing ? "Save" : "Create"}
+            title={props.disabledReason ?? (nothing ? t("Nothing changed") : undefined)}>
+            {confirmDeps ? t("Save anyway") : editing ? t("Save") : t("Create")}
           </button>
         </>
       }
     >
-      {props.loadError ? <div className="err">{props.loadError}</div> : props.spec === null ? <div className="muted">Loading…</div> : (
+      {props.loadError ? <div className="err">{props.loadError}</div> : props.spec === null ? <div className="muted">{t("Loading…")}</div> : (
         <>
           <div className="subtabs">
-            {tabs.map((t) => (
-              <button key={t.id} className={tab === t.id ? "active" : ""} onClick={() => setTab(t.id)}>
-                {t.title}{t.id === "sql" && ddl?.warnings.length ? " ⚠" : ""}
+            {tabs.map((tb) => (
+              <button key={tb.id} className={tab === tb.id ? "active" : ""} onClick={() => setTab(tb.id)}>
+                {tb.title}{tb.id === "sql" && ddl?.warnings.length ? " ⚠" : ""}
               </button>
             ))}
           </div>
-          <div className="objdlg-body">{tabs.find((t) => t.id === tab)?.render()}</div>
+          <div className="objdlg-body">{tabs.find((tb) => tb.id === tab)?.render()}</div>
         </>
       )}
     </DlgModal>
@@ -184,12 +188,12 @@ export function ObjectDialog(props: {
 
 export function SqlTab(props: { ddl: (DdlScript & { error?: string }) | null }) {
   const { ddl } = props;
-  if (!ddl) return <div className="muted">Generating…</div>;
+  if (!ddl) return <div className="muted">{t("Generating…")}</div>;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       {ddl.error && <div className="err" style={{ whiteSpace: "pre-wrap" }}>{ddl.error}</div>}
       {ddl.warnings.map((w, i) => <div key={i} className="warn-box">⚠ {w}</div>)}
-      {!ddl.error && !ddl.sql.trim() && <div className="muted">No changes — nothing to run.</div>}
+      {!ddl.error && !ddl.sql.trim() && <div className="muted">{t("No changes — nothing to run.")}</div>}
       <div className="sql-preview"><SqlEditor value={ddl.sql} readOnly /></div>
     </div>
   );
@@ -254,7 +258,7 @@ export function SecuritySelect(props: { value: string | null | undefined; onChan
   return (
     <Select value={props.value ?? ""} disabled={props.engine < 4}
       onChange={(v) => props.onChange(v || null)}
-      empty={props.engine < 4 ? "(Firebird 4+ only)" : "(default)"} options={["DEFINER", "INVOKER"]} />
+      empty={props.engine < 4 ? t("(Firebird 4+ only)") : t("(default)")} options={["DEFINER", "INVOKER"]} />
   );
 }
 
@@ -268,8 +272,8 @@ const FB4_TYPES = new Set(["INT128", "DECFLOAT", "TIME WITH TIME ZONE", "TIMESTA
 
 interface ParsedType { base: string; size: string; charset: string; custom: boolean }
 
-export function parseType(t: string | null | undefined): ParsedType {
-  const s = (t ?? "").trim().toUpperCase();
+export function parseType(type: string | null | undefined): ParsedType {
+  const s = (type ?? "").trim().toUpperCase();
   if (!s) return { base: "INTEGER", size: "", charset: "", custom: false };
   const m = /^(.+?)(?:\s*\(([\d\s,]+)\))?(?:\s+CHARACTER SET\s+(\w+))?$/.exec(s);
   if (m && BASE_TYPES.includes(m[1].trim())) return { base: m[1].trim(), size: (m[2] ?? "").replace(/\s/g, ""), charset: m[3] ?? "", custom: false };
@@ -296,21 +300,21 @@ export function TypePicker(props: { value: string | null | undefined; onChange: 
         if (v === "__custom") set({ custom: true, base: formatType(p) });
         else set({ base: v, custom: false, size: SIZED.has(v) ? (v === "VARCHAR" || v === "CHAR" ? p.size || "50" : p.size) : "" });
       }}>
-        {BASE_TYPES.map((t) => <option key={t} value={t} disabled={engine < 4 && FB4_TYPES.has(t)}>{t}</option>)}
-        <option value="__custom">custom…</option>
+        {BASE_TYPES.map((ty) => <option key={ty} value={ty} disabled={engine < 4 && FB4_TYPES.has(ty)}>{ty}</option>)}
+        <option value="__custom">{t("custom…")}</option>
       </select>
       {p.custom ? (
-        <input className="text mono" value={p.base} placeholder="e.g. VARCHAR(20) CHARACTER SET WIN1252"
+        <input className="text mono" value={p.base} placeholder={t("e.g. VARCHAR(20) CHARACTER SET WIN1252")}
           onChange={(e) => props.onChange(e.target.value.toUpperCase())} />
       ) : (
         <>
           {SIZED.has(p.base) && (
-            <input className="text" style={{ width: 64 }} value={p.size} title="length or precision,scale"
-              placeholder={p.base === "NUMERIC" || p.base === "DECIMAL" ? "18,2" : "size"} onChange={(e) => set({ size: e.target.value })} />
+            <input className="text" style={{ width: 64 }} value={p.size} title={t("length or precision,scale")}
+              placeholder={p.base === "NUMERIC" || p.base === "DECIMAL" ? "18,2" : t("size")} onChange={(e) => set({ size: e.target.value })} />
           )}
           {CHARSET_TYPES.has(p.base) && !props.compact && (
-            <select className="text" value={p.charset} onChange={(e) => set({ charset: e.target.value })} title="character set">
-              <option value="">(db default{props.lk ? `: ${props.lk.default_charset}` : ""})</option>
+            <select className="text" value={p.charset} onChange={(e) => set({ charset: e.target.value })} title={t("character set")}>
+              <option value="">{props.lk ? t("(db default: {charset})", { charset: props.lk.default_charset }) : t("(db default)")}</option>
               {(props.lk?.charsets ?? []).map((c) => <option key={c}>{c}</option>)}
             </select>
           )}
@@ -324,7 +328,7 @@ export function CollationSelect(props: { value: string | null | undefined; onCha
   lk: Lookups | null; charset?: string | null }) {
   const cs = props.charset || props.lk?.default_charset;
   const opts = (props.lk?.collations ?? []).filter((c) => !cs || c.charset === cs).map((c) => c.name);
-  return <Select value={props.value ?? ""} onChange={(v) => props.onChange(v || null)} empty="(default)" options={opts} />;
+  return <Select value={props.value ?? ""} onChange={(v) => props.onChange(v || null)} empty={t("(default)")} options={opts} />;
 }
 
 /** Ordered multi-column picker (key columns, index segments, ...). */
@@ -335,12 +339,12 @@ export function ColumnsPicker(props: { value: string[]; onChange: (v: string[]) 
       {props.value.map((c, i) => (
         <span key={c} className="chip">
           {c}
-          {i > 0 && <button title="Move left" onClick={() => { const v = [...props.value]; [v[i - 1], v[i]] = [v[i], v[i - 1]]; props.onChange(v); }}>‹</button>}
-          <button title="Remove" onClick={() => props.onChange(props.value.filter((x) => x !== c))}><IconX size={10} /></button>
+          {i > 0 && <button title={t("Move left")} onClick={() => { const v = [...props.value]; [v[i - 1], v[i]] = [v[i], v[i - 1]]; props.onChange(v); }}>‹</button>}
+          <button title={t("Remove")} onClick={() => props.onChange(props.value.filter((x) => x !== c))}><IconX size={10} /></button>
         </span>
       ))}
       <select className="text" value="" onChange={(e) => e.target.value && props.onChange([...props.value, e.target.value])}>
-        <option value="">{props.placeholder ?? "+ column"}</option>
+        <option value="">{props.placeholder ?? t("+ column")}</option>
         {rest.map((c) => <option key={c}>{c}</option>)}
       </select>
     </div>
@@ -360,9 +364,12 @@ export function useDependents(sid: string, dbid: string, otype: string, name?: s
 }
 
 export function DependentsNote(props: { deps: Dependent[] }) {
-  const names = useMemo(() => Array.from(new Set(props.deps.map((d) => `${d.name} (${typeInfo(d.type)?.singular.toLowerCase() ?? d.type})`))), [props.deps]);
+  const names = useMemo(() => Array.from(new Set(props.deps.map((d) => {
+    const ti = typeInfo(d.type);
+    return `${d.name} (${ti ? t(ti.singular).toLowerCase() : d.type})`;
+  }))), [props.deps]);
   if (!names.length) return null;
-  return <div className="warn-box">⚠ Used by {names.length} object(s): {names.slice(0, 8).join(", ")}{names.length > 8 ? ", …" : ""}. Changing the signature or result columns may fail or invalidate them.</div>;
+  return <div className="warn-box">⚠ {t("Used by {count} object(s): {names}. Changing the signature or result columns may fail or invalidate them.", { count: names.length, names: names.slice(0, 8).join(", ") + (names.length > 8 ? ", …" : "") })}</div>;
 }
 
 export const move = <T,>(arr: T[], i: number, d: number): T[] => {
