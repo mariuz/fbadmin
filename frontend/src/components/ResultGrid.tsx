@@ -1,9 +1,21 @@
 import { useMemo, useRef, useState } from "react";
 import type { ColumnInfo } from "../types";
+import { buildXlsx } from "../lib/xlsx";
+import { getPrefs } from "../prefs";
 import { IconCopy, IconDownload, IconFilter, IconSpinner, IconX } from "./Icons";
 
 const ROW_H = 25;
 const NUMERIC = /INT|NUMERIC|DOUBLE|FLOAT|DECFLOAT|SMALLINT|BIGINT/;
+
+/** Text shown in grid cells: honours the date format preference. */
+export function displayValue(v: unknown, type: string): string {
+  const s = cellText(v);
+  if (getPrefs().dateFormat === "locale" && typeof v === "string" && /TIMESTAMP|DATE|TIME/.test(type)) {
+    const d = /^\d{4}-\d{2}-\d{2}/.test(s) ? new Date(s.length === 10 ? s + "T00:00:00" : s) : null;
+    if (d && !isNaN(d.getTime())) return type.startsWith("DATE") ? d.toLocaleDateString() : d.toLocaleString();
+  }
+  return s.replace("T", /TIMESTAMP/.test(type) ? " " : "T");
+}
 
 export function cellText(v: unknown): string {
   if (v === null || v === undefined) return "";
@@ -49,7 +61,7 @@ export function toMarkdown(cols: ColumnInfo[], rows: unknown[][]): string {
   ].join("\n") + "\n";
 }
 
-export function download(name: string, text: string, type = "text/csv") {
+export function download(name: string, text: string | Uint8Array<ArrayBuffer>, type = "text/csv") {
   const url = URL.createObjectURL(new Blob([text], { type }));
   const a = document.createElement("a");
   a.href = url;
@@ -146,6 +158,21 @@ export function ResultGrid(props: {
   const [showFilter, setShowFilter] = useState(false);
   const [viewer, setViewer] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const [widths, setWidths] = useState<Record<number, number>>({});
+  const [freeze, setFreeze] = useState(false);
+
+  const startResize = (e: React.MouseEvent, ci: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const th = (e.target as HTMLElement).parentElement as HTMLElement;
+    const x0 = e.clientX, w0 = th.getBoundingClientRect().width;
+    const move = (ev: MouseEvent) => setWidths((w) => ({ ...w, [ci]: Math.max(40, w0 + ev.clientX - x0) }));
+    const up = () => { window.removeEventListener("mousemove", move); window.removeEventListener("mouseup", up); };
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
+  };
+  const colStyle = (ci: number): React.CSSProperties | undefined =>
+    widths[ci] ? { width: widths[ci], minWidth: widths[ci], maxWidth: widths[ci] } : undefined;
 
   const sorted = useMemo(() => {
     let out = rows.map((r, i) => ({ r, i }));
@@ -174,6 +201,7 @@ export function ResultGrid(props: {
     ["JSON", () => download(`${base}.json`, JSON.stringify(shownRows().map((r) => Object.fromEntries(columns.map((c, i) => [c.name, r[i]]))), null, 2), "application/json")],
     ["SQL INSERT", () => download(`${base}.sql`, toInserts(props.name && /^[A-Z_][A-Z0-9_$]*$/i.test(props.name) ? props.name : "TABLE_NAME", columns, shownRows()), "text/sql")],
     ["Markdown", () => download(`${base}.md`, toMarkdown(columns, shownRows()), "text/markdown")],
+    ["Excel (XLSX)", () => download(`${base}.xlsx`, buildXlsx(columns, shownRows(), base) as Uint8Array<ArrayBuffer>, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")],
   ];
 
   return (
@@ -190,6 +218,7 @@ export function ResultGrid(props: {
         <span className="grow" />
         <button className={"btn small" + (showFilter ? " on" : "")} onClick={() => setShowFilter(!showFilter)} title="Filter rows"><IconFilter size={13} /></button>
         {showFilter && <input className="text" autoFocus placeholder="filter rows…" value={filter} onChange={(e) => setFilter(e.target.value)} style={{ width: 180, padding: "2px 6px" }} />}
+        <button className={"btn small" + (freeze ? " on" : "")} onClick={() => setFreeze(!freeze)} title="Keep the first column visible while scrolling sideways">Freeze 1st</button>
         <button className={"btn small" + (viewer ? " on" : "")} onClick={() => setViewer(!viewer)} title="Show the selected cell in full (text, JSON, hex, image)">Cell viewer</button>
         <button className="btn small" title="Copy rows as TSV (paste into a spreadsheet)" onClick={() => navigator.clipboard?.writeText(toDelimited(columns, shownRows(), "\t"))}><IconCopy size={13} /> Copy</button>
         <div style={{ position: "relative" }}>
@@ -225,14 +254,17 @@ export function ResultGrid(props: {
             }
           }}
         >
-          <table className="grid">
+          <table className={"grid" + (freeze ? " freeze1" : "")}>
             <thead>
               <tr>
                 <th className="rn">#</th>
                 {columns.map((c, i) => (
-                  <th key={i} style={{ cursor: "pointer" }} title="Click to sort" onClick={() => setSort(sort?.col === i ? (sort.desc ? null : { col: i, desc: true }) : { col: i, desc: false })}>
+                  <th key={i} style={{ cursor: "pointer", position: "sticky", ...colStyle(i) }} title="Click to sort, drag the right edge to resize"
+                    onClick={() => setSort(sort?.col === i ? (sort.desc ? null : { col: i, desc: true }) : { col: i, desc: false })}>
                     {c.name} {sort?.col === i ? (sort.desc ? "▼" : "▲") : ""}
                     <span className="ty">{c.type.toLowerCase()}</span>
+                    <span className="col-resizer" onMouseDown={(e) => startResize(e, i)} onClick={(e) => e.stopPropagation()}
+                      onDoubleClick={(e) => { e.stopPropagation(); setWidths((w) => { const n = { ...w }; delete n[i]; return n; }); }} />
                   </th>
                 ))}
               </tr>
@@ -248,9 +280,9 @@ export function ResultGrid(props: {
                       const isNull = v === null || v === undefined;
                       const cls = [isNull ? "null" : "", NUMERIC.test(columns[ci]?.type ?? "") ? "num" : "", sel && sel[0] === ri && sel[1] === ci ? "sel" : ""].join(" ");
                       return (
-                        <td key={ci} className={cls} title={isNull ? "NULL" : cellText(v).slice(0, 500)}
+                        <td key={ci} className={cls} style={colStyle(ci)} title={isNull ? "NULL" : cellText(v).slice(0, 500)}
                           onClick={() => setSel([ri, ci])} onDoubleClick={() => { setSel([ri, ci]); setViewer(true); }}>
-                          {isNull ? "null" : cellText(v).slice(0, 1000)}
+                          {isNull ? getPrefs().nullDisplay : displayValue(v, columns[ci]?.type ?? "").slice(0, 1000)}
                         </td>
                       );
                     })}

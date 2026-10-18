@@ -14,6 +14,29 @@ import { lintGutter, setDiagnostics } from "@codemirror/lint";
 import { format as formatSqlText } from "sql-formatter";
 import { searchKeymap, highlightSelectionMatches } from "@codemirror/search";
 import { tags as t } from "@lezer/highlight";
+import { showMinimap } from "@replit/codemirror-minimap";
+import { getPrefs, usePrefs } from "../prefs";
+
+/** Configurable editor actions and their default key bindings (CodeMirror key syntax). */
+export const EDITOR_ACTIONS: Array<{ id: string; label: string; keys: string[] }> = [
+  { id: "execute", label: "Execute", keys: ["Mod-Enter", "F5"] },
+  { id: "explain", label: "Explain plan", keys: ["F7"] },
+  { id: "format", label: "Format SQL", keys: ["Shift-Alt-f"] },
+  { id: "comment", label: "Toggle comment", keys: ["Mod-/"] },
+];
+
+/** Key specs for an action, from preferences (comma separated) or the defaults. */
+export function actionKeys(id: string): string[] {
+  const custom = getPrefs().keys[id];
+  if (custom && custom.trim()) return custom.split(",").map((k) => k.trim()).filter(Boolean);
+  return EDITOR_ACTIONS.find((a) => a.id === id)?.keys ?? [];
+}
+
+const minimapExt = showMinimap.compute(["doc"], () => ({
+  create: () => ({ dom: document.createElement("div") }),
+  displayText: "blocks" as const,
+  showOverlay: "always" as const,
+}));
 
 const FB_KEYWORDS =
   "absolute action active add admin after all alter always and any as asc ascending at auto autonomous avg " +
@@ -153,6 +176,10 @@ export interface SqlEditorProps {
   onFormatError?: (msg: string) => void;
   /** Ctrl/Cmd+Enter or F5 */
   onExecute?: (selectionOrAll: string) => void;
+  /** F7 by default */
+  onExplain?: () => void;
+  /** Ctrl/Cmd+1..9: run the macro bound to that key */
+  onMacro?: (key: string) => void;
   placeholder?: string;
   editorRef?: (view: EditorView | null) => void;
 }
@@ -167,6 +194,8 @@ export function SqlEditor(props: SqlEditorProps) {
   const host = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView | null>(null);
   const langComp = useRef(new Compartment());
+  const miniComp = useRef(new Compartment());
+  const prefs = usePrefs();
   const cbs = useRef(props);
   cbs.current = props;
 
@@ -194,13 +223,14 @@ export function SqlEditor(props: SqlEditorProps) {
         syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
         baseTheme,
         langComp.current.of(sqlExtensions(props.schema, props.extra)),
+        miniComp.current.of(getPrefs().minimap && !props.readOnly ? minimapExt : []),
         keymap.of([
-          { key: "Mod-Enter", run: exec },
-          { key: "F5", run: exec },
-          { key: "Mod-/", run: toggleComment },
-          {
-            key: "Shift-Alt-f",
-            run: (v) => {
+          ...actionKeys("execute").map((key) => ({ key, run: exec })),
+          ...actionKeys("explain").map((key) => ({ key, run: () => { cbs.current.onExplain?.(); return !!cbs.current.onExplain; } })),
+          ...actionKeys("comment").map((key) => ({ key, run: toggleComment })),
+          ...actionKeys("format").map((key) => ({
+            key,
+            run: (v: EditorView) => {
               try {
                 formatEditor(v);
               } catch (e) {
@@ -208,7 +238,15 @@ export function SqlEditor(props: SqlEditorProps) {
               }
               return true;
             },
-          },
+          })),
+          ...["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((n) => ({
+            key: `Mod-${n}`,
+            run: () => {
+              if (!cbs.current.onMacro || !getPrefs().macros.some((m) => m.key === n)) return false;
+              cbs.current.onMacro(n);
+              return true;
+            },
+          })),
           ...closeBracketsKeymap,
           ...defaultKeymap,
           ...searchKeymap,
@@ -234,6 +272,10 @@ export function SqlEditor(props: SqlEditorProps) {
     };
   }, []);
 
+  useEffect(() => {
+    view.current?.dispatch({ effects: miniComp.current.reconfigure(prefs.minimap && !props.readOnly ? minimapExt : []) });
+  }, [prefs.minimap]);
+
   // external value changes (e.g. read-only DDL view or "open file")
   useEffect(() => {
     const v = view.current;
@@ -246,5 +288,5 @@ export function SqlEditor(props: SqlEditorProps) {
     view.current?.dispatch({ effects: langComp.current.reconfigure(sqlExtensions(props.schema, props.extra)) });
   }, [props.schema, props.extra]);
 
-  return <div className="cm-host" ref={host} />;
+  return <div className="cm-host" ref={host} style={{ ["--editor-font" as string]: `${prefs.editorFontSize}px` }} />;
 }

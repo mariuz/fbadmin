@@ -196,3 +196,16 @@ def test_jobs(client, server, database):
         time.sleep(0.1)
     assert j["status"] == "finished", j
     assert any("Database header" in line or "Attributes" in line or "Page size" in line for line in j["log"])
+
+
+def test_blob_upload(client, database):
+    sid, dbid = database
+    b = base(sid, dbid)
+    client.post(b + "/execute", json={"sql": "create table files (id int primary key, data blob sub_type binary, txt blob sub_type text)"})
+    png = bytes.fromhex("89504E470D0A1A0A") + bytes(range(256)) * 40
+    r = client.post(b + "/tables/FILES/data", json={"inserts": [{"values": {"ID": 1, "DATA": {"$hex": png.hex()}, "TXT": "héllo\nworld"}}]})
+    assert r.status_code == 200, r.text
+    row = client.get(b + "/tables/FILES/data").json()["rows"][0]
+    assert row[1] == "0x" + png.hex().upper() and row[2] == "héllo\nworld"
+    client.post(b + "/tables/FILES/data", json={"updates": [{"key": {"ID": 1}, "values": {"DATA": {"$hex": "00ff"}}}]})
+    assert client.get(b + "/tables/FILES/data").json()["rows"][0][1] == "0x00FF"

@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
 import { errMsg, useApp } from "../context";
-import { cellText, download, toDelimited } from "./ResultGrid";
+import { cellText, displayValue, download, toDelimited } from "./ResultGrid";
+import { getPrefs } from "../prefs";
+import { Modal } from "./Modal";
 import { IconDownload, IconFilter, IconPlus, IconRefresh, IconSave, IconTrash } from "./Icons";
 
 type Row = { values: unknown[]; orig?: unknown[]; status: "clean" | "changed" | "new" | "deleted" };
@@ -23,6 +25,7 @@ export function DataView(props: { serverId: string; dbId: string; otype: string;
   const [edit, setEdit] = useState<[number, number] | null>(null);
   const [sel, setSel] = useState<number | null>(null);
   const editable = props.otype === "tables";
+  const [big, setBig] = useState<{ ri: number; ci: number; name: string; blob: boolean; text: boolean } | null>(null);
 
   const load = async (off = offset) => {
     setLoading(true);
@@ -169,13 +172,17 @@ export function DataView(props: { serverId: string; dbId: string; otype: string;
                             onBlur={(e) => { if (e.target.value !== (v === undefined || v === null ? "" : cellText(v))) setCell(ri, i, e.target.value); setEdit(null); }}
                           />
                           <button className="btn small" title="Set NULL" onMouseDown={(e) => { e.preventDefault(); setCell(ri, i, null); setEdit(null); }}>∅</button>
+                          <button className="btn small" title="Edit in a larger editor / upload a file" onMouseDown={(e) => { e.preventDefault(); setEdit(null); setBig({ ri, ci: i, name: c.name, blob: m?.field_type === 261, text: m?.field_sub_type === 1 }); }}>…</button>
                         </div>
                       </td>
                     );
                   }
                   return (
                     <td key={c.name} className={cls} onDoubleClick={() => !readOnly && setEdit([ri, i])} title={readOnly ? undefined : "Double-click to edit"}>
-                      {v === undefined ? <span className="muted">{m?.identity || m?.default ? "default" : ""}</span> : isNull ? "null" : cellText(v)}
+                      {v === undefined ? <span className="muted">{m?.identity || m?.default ? "default" : ""}</span>
+                        : isNull ? getPrefs().nullDisplay
+                        : isBinary(v) ? <span className="muted">{blobLabel(v as string)}</span>
+                        : displayValue(v, c.type).slice(0, 500)}
                     </td>
                   );
                 })}
@@ -186,6 +193,66 @@ export function DataView(props: { serverId: string; dbId: string; otype: string;
         {data && rows.length === 0 && <div className="pad muted">No rows.</div>}
       </div>
       {data && <div className="status"><span className="mono" title={data.sql}>{data.sql.length > 160 ? data.sql.slice(0, 160) + "…" : data.sql}</span></div>}
+      {big && (
+        <BigEditor
+          title={big.name}
+          value={rows[big.ri]?.values[big.ci]}
+          binary={big.blob && !big.text}
+          onClose={() => setBig(null)}
+          onSave={(v) => { setCell(big.ri, big.ci, v); setBig(null); }}
+        />
+      )}
     </div>
+  );
+}
+
+const isBinary = (v: unknown) => typeof v === "string" && (/^0x[0-9A-F]+$/.test(v) || v.startsWith("<BINARY"));
+const blobLabel = (v: string) => (v.startsWith("<BINARY") ? v.split(">")[0] + ">" : `<${(v.length - 2) / 2} bytes>`);
+
+/** Multi-line text editor, and file upload/download for BLOB columns. */
+function BigEditor(props: {
+  title: string; value: unknown; binary: boolean; onClose: () => void; onSave: (v: unknown) => void;
+}) {
+  const initial = props.value === null || props.value === undefined ? "" : typeof props.value === "object" ? "" : cellText(props.value);
+  const [text, setText] = useState(props.binary ? "" : initial);
+  const [file, setFile] = useState<{ name: string; hex: string; size: number } | null>(null);
+  const pick = () => {
+    const inp = document.createElement("input");
+    inp.type = "file";
+    inp.onchange = async () => {
+      const f = inp.files?.[0];
+      if (!f) return;
+      const bytes = new Uint8Array(await f.arrayBuffer());
+      let hex = "";
+      for (const b of bytes) hex += b.toString(16).padStart(2, "0");
+      if (props.binary) setFile({ name: f.name, hex, size: bytes.length });
+      else setText(new TextDecoder().decode(bytes));
+    };
+    inp.click();
+  };
+  const hexValue = typeof props.value === "string" && /^0x[0-9A-F]+$/.test(props.value) ? props.value.slice(2) : null;
+  return (
+    <Modal wide title={`Edit ${props.title}`} onClose={props.onClose} footer={<>
+      <button className="btn" onClick={pick} style={{ marginRight: "auto" }}>Load from file…</button>
+      {hexValue && <button className="btn" onClick={() => {
+        const bytes = new Uint8Array(new ArrayBuffer(hexValue.length / 2));
+        for (let i = 0; i < bytes.length; i++) bytes[i] = parseInt(hexValue.substr(i * 2, 2), 16);
+        const url = URL.createObjectURL(new Blob([bytes]));
+        const a = document.createElement("a"); a.href = url; a.download = props.title + ".bin"; a.click();
+      }}>Download current</button>}
+      <button className="btn" onClick={() => props.onSave(null)}>Set NULL</button>
+      <button className="btn" onClick={props.onClose}>Cancel</button>
+      <button className="btn primary" disabled={props.binary && !file}
+        onClick={() => props.onSave(props.binary ? { $hex: file!.hex } : text)}>OK</button>
+    </>}>
+      {props.binary ? (
+        <div className="pad">
+          {file ? <p>Selected <b>{file.name}</b> ({file.size.toLocaleString()} bytes). Click OK, then Save in the grid.</p>
+            : <p className="muted">Binary BLOB: load a file to replace the value{hexValue ? ` (current: ${hexValue.length / 2} bytes)` : ""}.</p>}
+        </div>
+      ) : (
+        <textarea className="text mono" style={{ width: "100%", height: "50vh" }} value={text} onChange={(e) => setText(e.target.value)} autoFocus />
+      )}
+    </Modal>
   );
 }

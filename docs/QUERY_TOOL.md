@@ -46,3 +46,45 @@ With **Stats** ticked, each statement shows the change in its attachment's count
 sequential and indexed record reads, inserts, updates, deletes, backouts, purges and
 expunges. These are a quick way to spot full table scans: compare *Seq. reads* with
 *Index reads*.
+
+## Plans
+
+**Explain** (or **F7**) shows the classic plan plus the detailed plan.
+- **Diagram** draws the detailed plan as a tree, colour-coded by node type: red for full table scans, blue for table access, green for index access, amber for sort/aggregate/hash.
+- **Text** shows the raw plan text.
+- **Pin plan**, then change the query and Explain again. **Compare with pinned** then shows a line diff of the two plans, which is handy for checking that a new index is actually used.
+
+## Results
+
+- Drag a column header's right edge to resize the column; double-click the edge to reset it.
+- **Freeze 1st** keeps the first column visible while you scroll sideways.
+- Export to CSV, TSV, JSON, SQL `INSERT`, Markdown or **Excel (XLSX)**.
+
+## BLOBs in the data editor
+
+While editing a cell, the **…** button opens a larger editor. Text BLOBs are edited as multi-line text. Binary BLOBs can be replaced by uploading a file (**Load from file…**) or downloaded. Changes are saved together with the other grid edits.
+
+## Preferences, shortcuts and macros
+
+The ⚙ button in the top bar opens Preferences:
+- **General**: theme (auto, light, dark or high contrast), language, NULL display text, date format, confirm before drop.
+- **Editor**: font size and minimap.
+- **Keyboard**: rebind Execute, Explain, Format and Toggle comment, using CodeMirror key names such as `Mod-Enter`, `F5` or `Shift-Alt-f`.
+- **Macros**: bind SQL to **Ctrl/Cmd+1…9**. `$SELECTION$` is replaced by the selected text. For example, `SELECT COUNT(*) FROM $SELECTION$` counts the rows of the selected table name.
+
+## AI assistant (opt-in)
+
+The assistant is off by default. To enable it, set `FBADMIN_AI_PROVIDER=anthropic` and install the extra with `pip install 'fbadmin[ai]'`. The Anthropic SDK then picks up your credentials, for example `ANTHROPIC_API_KEY`.
+- `FBADMIN_AI_MODEL` changes the model (default `claude-opus-5-5`).
+- `FBADMIN_AI_EFFORT` changes the effort level (default `high`).
+
+The Query Tool then gets an **✦ Assistant** menu with five tasks:
+- Explain the plan
+- Suggest indices
+- Convert SQL from another dialect
+- Explain the last error
+- Ask a free question
+
+Only the SQL text, its plan and the definitions of the tables it uses are sent to the provider. Table data is never sent. Code blocks in the answer have an **Insert into editor** button.
+
+Other providers can be plugged in. Subclass `fbadmin.ai.AIProvider`, then register it with `fbadmin.ai.register_provider(name, cls)` or under the `fbadmin.ai_providers` entry point group, and select it with `FBADMIN_AI_PROVIDER=<name>`.

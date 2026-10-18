@@ -10,6 +10,9 @@ import { DataView } from "./components/DataView";
 import { Monitor } from "./components/Monitor";
 import { JobsPanel, ServerLog } from "./components/Jobs";
 import { getObjectTabs, getTabKind, getTopbarItems } from "./registry";
+import { setPrefs, usePrefs } from "./prefs";
+import { currentLanguage } from "./i18n";
+import { PreferencesDialog } from "./components/Preferences";
 import { Flame, IconActivity, IconMoon, IconPlus, IconRefresh, IconSun, IconTable, IconTerminal, IconX } from "./components/Icons";
 
 const FIXED_TABS = [
@@ -32,18 +35,19 @@ export default function App() {
   const [detail, setDetail] = useState<ObjectDetail | null>(null);
   const [detailError, setDetailError] = useState<string | null>(null);
   const [runningJobs, setRunningJobs] = useState(0);
-  const [theme, setTheme] = useState<string>(() => {
-    try { return localStorage.getItem("fbadmin.theme") || ""; } catch { return ""; }
-  });
   const [sidebarW, setSidebarW] = useState(300);
   const serversRef = useRef(servers);
   serversRef.current = servers;
-
+  const prefs = usePrefs();
+  const theme = prefs.theme;
+  const setTheme = (th: string) => setPrefs({ theme: th as typeof prefs.theme });
   useEffect(() => {
     if (theme) document.documentElement.dataset.theme = theme;
     else delete document.documentElement.dataset.theme;
-    try { localStorage.setItem("fbadmin.theme", theme); } catch { /* ignore */ }
   }, [theme]);
+  useEffect(() => {
+    document.documentElement.lang = currentLanguage();
+  }, [prefs.language]);
 
   const toast = useCallback((msg: string, kind: "ok" | "error" | "info" = "ok") => {
     const id = Date.now() + Math.random();
@@ -191,8 +195,9 @@ export default function App() {
           <button className="tb" onClick={() => openTab({ kind: "jobs", title: "Processes" })}>
             <IconActivity /> Processes {runningJobs > 0 && <span className="badge">{runningJobs}</span>}
           </button>
-          <button className="tb" title="Toggle theme" onClick={() => setTheme(theme === "dark" ? "light" : theme === "light" ? "" : "dark")}>
-            {theme === "dark" ? <IconMoon /> : theme === "light" ? <IconSun /> : <><IconSun /><span style={{ fontSize: 11 }}>auto</span></>}
+          <button className="tb" title="Preferences" aria-label="Preferences" onClick={() => setDialog(<PreferencesDialog />)}>⚙</button>
+          <button className="tb" title="Toggle theme" aria-label="Toggle theme" onClick={() => setTheme(theme === "dark" ? "light" : theme === "light" ? "contrast" : theme === "contrast" ? "" : "dark")}>
+            {theme === "dark" ? <IconMoon /> : theme === "light" ? <IconSun /> : theme === "contrast" ? <span style={{ fontWeight: 700 }}>◐</span> : <><IconSun /><span style={{ fontSize: 11 }}>auto</span></>}
           </button>
         </div>
         <div className="main">

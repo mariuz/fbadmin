@@ -173,6 +173,13 @@ def table_count(server_id: str, db_id: str, name: str):
         return {"count": cur.fetchone()[0]}
 
 
+def _param(v):
+    """Grid values: {"$hex": "..."} is binary data (file upload); everything else is passed as-is."""
+    if isinstance(v, dict) and "$hex" in v:
+        return bytes.fromhex(str(v["$hex"]))
+    return v
+
+
 @router.post("/tables/{name}/data")
 def save_table_data(server_id: str, db_id: str, name: str, body: DataChanges):
     """Apply grid edits in one transaction. Rows are identified by primary key (or DB_KEY)."""
@@ -202,13 +209,13 @@ def save_table_data(server_id: str, db_id: str, name: str, body: DataChanges):
             continue
         w, p = where(u.key or {})
         sets = ", ".join(f"{quote_ident(k)} = ?" for k in u.values)
-        statements.append((f"UPDATE {qn} SET {sets} WHERE {w}", list(u.values.values()) + p))
+        statements.append((f"UPDATE {qn} SET {sets} WHERE {w}", [_param(x) for x in u.values.values()] + p))
     for i in body.inserts:
         vals = i.values or {}
         if vals:
             cols = ", ".join(quote_ident(k) for k in vals)
             marks = ", ".join("?" for _ in vals)
-            statements.append((f"INSERT INTO {qn} ({cols}) VALUES ({marks})", list(vals.values())))
+            statements.append((f"INSERT INTO {qn} ({cols}) VALUES ({marks})", [_param(x) for x in vals.values()]))
         else:
             statements.append((f"INSERT INTO {qn} DEFAULT VALUES", []))
 

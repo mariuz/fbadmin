@@ -4,6 +4,9 @@ import { api } from "../api";
 import { errMsg, keys, useApp } from "../context";
 import type { ScriptResult, SessionOptions, StatementResult } from "../types";
 import { Modal } from "./Modal";
+import { PlanDiff, PlanGraph } from "./PlanGraph";
+import { getPrefs } from "../prefs";
+import { AI_TASKS, AssistantPane, askAi, useAiStatus } from "./Assistant";
 import { ResultGrid, download } from "./ResultGrid";
 import {
   SqlEditor, clearErrors, formatEditor, lineColToOffset, selectionOrAll, showError, type ExtraCompletions,
@@ -181,7 +184,9 @@ export function QueryTool(props: { serverId: string; dbId: string; initialSql?: 
   const [withStats, setWithStats] = useState(false);
   const [pane, setPane] = useState<string>("data");
   const [activeResult, setActiveResult] = useState(0);
-  const [plan, setPlan] = useState<{ plan: string | null; detailed: string | null } | null>(null);
+  const [plan, setPlan] = useState<{ plan: string | null; detailed: string | null; sql?: string } | null>(null);
+  const [pinned, setPinned] = useState<{ plan: string | null; detailed: string | null; sql?: string } | null>(null);
+  const [planView, setPlanView] = useState<"graph" | "text" | "diff">("graph");
   const [history, setHistory] = useState<HistoryEntry[]>(() => load(HISTORY_KEY, []));
   const [snippets, setSnippets] = useState<Snippet[]>(() => load(SNIPPETS_KEY, DEFAULT_SNIPPETS));
   const [schema, setSchema] = useState<Record<string, string[]>>({});
@@ -191,6 +196,9 @@ export function QueryTool(props: { serverId: string; dbId: string; initialSql?: 
   const [paramReq, setParamReq] = useState<{ names: string[]; resolve: (v: Record<string, unknown> | null) => void } | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [elapsed, setElapsed] = useState(0);
+  const aiStatus = useAiStatus();
+  const [ai, setAi] = useState<{ loading: boolean; task?: string; answer?: string; error?: string } | null>(null);
+  const [aiMenu, setAiMenu] = useState(false);
   const view = useRef<EditorView | null>(null);
   const sessionRef = useRef<string | null>(null);
 
@@ -335,7 +343,7 @@ export function QueryTool(props: { serverId: string; dbId: string; initialSql?: 
       const sid = await ensureSession();
       const r = await api.explain(sid, q);
       setResult((x) => (x ? { ...x, cursor_open: false } : x)); // explain closes the open cursor
-      setPlan(r.plan || r.detailed ? r : { plan: "(no plan — the statement does not read tables)", detailed: null });
+      setPlan(r.plan || r.detailed ? { ...r, sql: q } : { plan: "(no plan — the statement does not read tables)", detailed: null });
       setPane("plan");
     } catch (e) {
       setPlan({ plan: "Error: " + errMsg(e), detailed: null });
@@ -356,6 +364,34 @@ export function QueryTool(props: { serverId: string; dbId: string; initialSql?: 
     }
   };
 
+  const runAi = async (task: string) => {
+    setAiMenu(false);
+    const q = view.current ? selectionOrAll(view.current) : sql;
+    const body: Record<string, unknown> = { task, sql: q, server_id: props.serverId, database_id: props.dbId };
+    if (task === "convert_sql") {
+      const d = window.prompt("Convert from which SQL dialect?", "MySQL");
+      if (!d) return;
+      body.dialect = d;
+    }
+    if (task === "ask") {
+      const qn = window.prompt("Your question about this SQL / database:");
+      if (!qn) return;
+      body.question = qn;
+    }
+    if (task === "explain_error") {
+      if (!result?.error) { app.toast("No error to explain — run a query first", "info"); return; }
+      body.error = result.error.message;
+      body.sql = result.error.sql;
+    }
+    setPane("assistant");
+    setAi({ loading: true, task });
+    try {
+      setAi({ loading: false, task, answer: await askAi(body) });
+    } catch (e) {
+      setAi({ loading: false, task, error: errMsg(e) });
+    }
+  };
+
   const format = () => {
     if (!view.current) return;
     try {
@@ -369,7 +405,9 @@ export function QueryTool(props: { serverId: string; dbId: string; initialSql?: 
     const v = view.current;
     if (!v) return setSql(sql + text);
     const sel = v.state.selection.main;
-    v.dispatch({ changes: { from: sel.from, to: sel.to, insert: text }, selection: { anchor: sel.from + text.length } });
+    const line = v.state.doc.lineAt(sel.from);
+    const prefix = sel.from > line.from && line.text.trim() ? "\n" : "";
+    v.dispatch({ changes: { from: sel.from, to: sel.to, insert: prefix + text }, selection: { anchor: sel.from + prefix.length + text.length } });
     v.focus();
   };
 
@@ -444,6 +482,16 @@ export function QueryTool(props: { serverId: string; dbId: string; initialSql?: 
         <label className="check" title="Fetch the PLAN of every executed statement"><input type="checkbox" checked={withPlan} onChange={(e) => setWithPlan(e.target.checked)} /> Plans</label>
         <label className="check" title="Measure page and record I/O of every statement (from MON$ tables)"><input type="checkbox" checked={withStats} onChange={(e) => setWithStats(e.target.checked)} /> Stats</label>
         <span className="grow" />
+        {aiStatus?.enabled && (
+          <div style={{ position: "relative" }}>
+            <button className={"btn small" + (aiMenu ? " on" : "")} onClick={() => setAiMenu(!aiMenu)} title={`AI assistant (${aiStatus.provider})`}>✦ Assistant ▾</button>
+            {aiMenu && (
+              <div className="ctx" style={{ position: "absolute", right: 0, top: "100%" }} onMouseLeave={() => setAiMenu(false)}>
+                {AI_TASKS.map(([k, label]) => <button key={k} onClick={() => runAi(k)}>{label}</button>)}
+              </div>
+            )}
+          </div>
+        )}
         <button className="btn small" title="Format SQL (Shift+Alt+F)" onClick={format}>Format</button>
         <button className="btn icon" title="Save selection as snippet" onClick={saveSnippet}><IconPlus /></button>
         <button className="btn icon" title="Open .sql file" onClick={openFile}><IconUpload /></button>
@@ -454,6 +502,15 @@ export function QueryTool(props: { serverId: string; dbId: string; initialSql?: 
           value={sql}
           onChange={setSql}
           onExecute={(t) => run(t)}
+          onExplain={() => explain()}
+          onMacro={(key) => {
+            const m = getPrefs().macros.find((x) => x.key === key);
+            const v = view.current;
+            if (!m || !v) return;
+            const sel = v.state.selection.main;
+            const selected = sel.empty ? "" : v.state.sliceDoc(sel.from, sel.to);
+            run(m.sql.split("$SELECTION$").join(selected));
+          }}
           schema={schema}
           extra={extra}
           onFormatError={(m) => app.toast("Cannot format: " + m, "error")}
@@ -471,6 +528,7 @@ export function QueryTool(props: { serverId: string; dbId: string; initialSql?: 
           <button className={pane === "plan" ? "active" : ""} onClick={() => setPane("plan")}>Plan</button>
           <button className={pane === "history" ? "active" : ""} onClick={() => setPane("history")}>History</button>
           <button className={pane === "snippets" ? "active" : ""} onClick={() => setPane("snippets")}>Snippets</button>
+          {aiStatus?.enabled && <button className={pane === "assistant" ? "active" : ""} onClick={() => setPane("assistant")}>Assistant</button>}
         </div>
         <div className="qt-out">
           {pane === "data" && (
@@ -515,8 +573,27 @@ export function QueryTool(props: { serverId: string; dbId: string; initialSql?: 
           {pane === "plan" && (
             plan ? (
               <div>
-                {plan.plan && <><h3 style={{ margin: "12px 12px 0" }}>Plan</h3><pre className="plan mono">{plan.plan}</pre></>}
-                {plan.detailed && <><h3 style={{ margin: "12px 12px 0" }}>Detailed plan</h3><PlanTree text={plan.detailed} /></>}
+                <div className="toolbar">
+                  <div className="seg">
+                    <button className={planView === "graph" ? "on" : ""} onClick={() => setPlanView("graph")} disabled={!plan.detailed}>Diagram</button>
+                    <button className={planView === "text" ? "on" : ""} onClick={() => setPlanView("text")}>Text</button>
+                    <button className={planView === "diff" ? "on" : ""} onClick={() => setPlanView("diff")} disabled={!pinned}>Compare with pinned</button>
+                  </div>
+                  <span className="grow" />
+                  <button className="btn small" onClick={() => { setPinned(plan); app.toast("Plan pinned — change the query, Explain again and compare", "info"); }}>Pin plan</button>
+                  {pinned && <button className="btn small" onClick={() => { setPinned(null); setPlanView("graph"); }}>Unpin</button>}
+                </div>
+                {planView === "diff" && pinned ? (
+                  <PlanDiff left={pinned.detailed ?? pinned.plan ?? ""} right={plan.detailed ?? plan.plan ?? ""}
+                    leftTitle={"Pinned: " + (pinned.sql ?? "").slice(0, 80)} rightTitle={"Current: " + (plan.sql ?? "").slice(0, 80)} />
+                ) : planView === "graph" && plan.detailed ? (
+                  <>{plan.plan && <pre className="plan mono">{plan.plan}</pre>}<PlanGraph text={plan.detailed} /></>
+                ) : (
+                  <>
+                    {plan.plan && <><h3 style={{ margin: "12px 12px 0" }}>Plan</h3><pre className="plan mono">{plan.plan}</pre></>}
+                    {plan.detailed && <><h3 style={{ margin: "12px 12px 0" }}>Detailed plan</h3><PlanTree text={plan.detailed} /></>}
+                  </>
+                )}
               </div>
             ) : <div className="empty-state">Click Explain, or enable Plans and execute.</div>
           )}
@@ -535,6 +612,7 @@ export function QueryTool(props: { serverId: string; dbId: string; initialSql?: 
               ))}
             </div>
           )}
+          {pane === "assistant" && <AssistantPane state={ai} status={aiStatus} onInsert={insertText} />}
           {pane === "snippets" && (
             <div>
               <div className="toolbar">

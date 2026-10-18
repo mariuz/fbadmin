@@ -2,11 +2,12 @@
 
 from fastapi import APIRouter
 
-from . import databases, jobs, query, servers
+from . import ai, databases, jobs, query, servers
 
 ROUTERS: list[APIRouter] = [
     servers.router,
     databases.router,
     query.router,
     jobs.router,
+    ai.router,
 ]
