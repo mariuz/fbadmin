@@ -93,18 +93,24 @@ helm install fbadmin deploy/helm/fbadmin \
 
 ## With a Firebird Kubernetes operator
 
-fbadmin needs only a Firebird endpoint and credentials, so it works with any way of running
-Firebird on Kubernetes: the StatefulSet above, a Helm chart, or an operator such as the
-community [Kuberbird](https://groups.google.com/g/firebird-general/c/goDYu1cN1tU)
-operator. Deploy the instance with the operator, then:
+`deploy/k8s-operator` runs fbadmin next to a cluster managed by
+[cloudnative-firebird](https://github.com/mariuz/cloudnative-firebird). A `FirebirdCluster`
+resource creates the cluster, and fbadmin registers its primary Service from a ConfigMap,
+taking the password from the cluster's superuser Secret. A CI workflow
+(`.github/workflows/k8s-operator.yml`) runs it end to end on kind. See
+[the example's README](https://github.com/mariuz/fbadmin/tree/main/deploy/k8s-operator).
+
+Any other way of running Firebird on Kubernetes works the same way, because fbadmin only
+needs an endpoint and credentials. This includes the StatefulSet above, a Helm chart, or
+another operator such as [kubebird](https://github.com/henryx/kubebird):
 
 1. In `firebirdServers` (Helm) or the `servers.yaml` ConfigMap (kustomize), set `host` to
-   the Service the operator created for the instance (`<service>.<namespace>.svc`).
-2. Set `passwordSecret` / `password_env` to the Secret that holds the SYSDBA (or admin user)
+   the Service of the instance (`<service>.<namespace>.svc`).
+2. Point `passwordSecret` / `password_env` at the Secret that holds the SYSDBA (or admin user)
    password.
-3. List the databases the operator manages under `databases`.
-4. If the operator's namespace restricts ingress, add a NetworkPolicy that lets the fbadmin
-   pods reach port 3050, like the one in `deploy/k8s/fbadmin.yaml`.
+3. List the databases under `databases`.
+4. If the database namespace restricts ingress, add a NetworkPolicy that lets the fbadmin pods
+   reach port 3050, like the one in `deploy/k8s/fbadmin.yaml`.
 
 Backups that the operator schedules (gbak/nbackup) and backups you start from fbadmin's
 maintenance tools are independent of each other. Coordinate their schedules so they don't

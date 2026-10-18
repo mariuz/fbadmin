@@ -1,0 +1,97 @@
+# End-to-end: deploy/k8s-operator on a kind cluster with the cloudnative-firebird operator.
+# The operator creates the Firebird cluster; fbadmin registers it from its ConfigMap
+# (FBADMIN_SERVERS_FILE) and is checked through its REST API: connect, DDL, data.
+name: Kubernetes operator example
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - deploy/k8s-operator/**
+      - backend/fbadmin/preconfig.py
+      - Dockerfile
+      - .github/workflows/k8s-operator.yml
+  schedule:
+    - cron: "17 4 * * 1"   # weekly: catches operator changes
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  # the operator release this example was validated with (bump deliberately)
+  OPERATOR_REF: 7d192d0aec6acffe0244af79eecab38f0d0d5384
+
+jobs:
+  kind:
+    name: fbadmin + cloudnative-firebird on kind
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: mariuz/cloudnative-firebird
+          ref: ${{ env.OPERATOR_REF }}
+          path: operator-src
+      - name: Create kind cluster
+        uses: helm/kind-action@v1
+        with:
+          cluster_name: fbadmin-e2e
+      - name: Build and load the images (operator, fbadmin, Firebird)
+        run: |
+          docker build -t cloudnative-firebird:ci operator-src/operator
+          docker build -t fbadmin:ci .
+          docker pull firebirdsql/firebird:5
+          for i in cloudnative-firebird:ci fbadmin:ci firebirdsql/firebird:5; do kind load docker-image "$i" --name fbadmin-e2e; done
+      - name: Install the operator
+        working-directory: operator-src
+        run: |
+          kubectl apply --server-side -f config/crds/
+          kubectl wait --for=condition=Established crd --all --timeout=60s
+          kubectl apply -f config/deploy/namespace.yaml -f config/deploy/serviceaccount.yaml -f config/deploy/rbac.yaml -f config/deploy/webhook.yaml
+          sed 's|image: ghcr.io/mariuz/cloudnative-firebird:latest|image: cloudnative-firebird:ci|;s|imagePullPolicy: Always|imagePullPolicy: Never|' \
+            config/deploy/deployment.yaml | kubectl apply -f -
+          kubectl -n cloudnative-firebird-system rollout status deployment/cloudnative-firebird-operator --timeout=180s
+      - name: Apply the example (with the images built above)
+        run: |
+          mkdir -p ci-overlay
+          cat > ci-overlay/kustomization.yaml <<'YAML'
+          resources: ["../deploy/k8s-operator"]
+          images:
+            - { name: ghcr.io/mariuz/fbadmin, newName: fbadmin, newTag: ci }  # loaded into kind above
+          YAML
+          kubectl apply -k ci-overlay
+          for _ in $(seq 1 60); do kubectl -n fbadmin-demo get pod fbcluster-0 >/dev/null 2>&1 && break; sleep 5; done
+          kubectl -n fbadmin-demo wait pod/fbcluster-0 --for=condition=Ready --timeout=300s
+          kubectl -n fbadmin-demo rollout status deployment/fbadmin --timeout=180s
+      - name: fbadmin manages the operator's cluster
+        run: |
+          kubectl -n fbadmin-demo port-forward svc/fbadmin 5050:80 >/dev/null 2>&1 &
+          for _ in $(seq 1 30); do curl -fsS http://127.0.0.1:5050/api/health && break; sleep 1; done
+          python3 - <<'PY'
+          import json, time, urllib.request
+          B = "http://127.0.0.1:5050"
+          def req(m, p, body=None):
+              r = urllib.request.Request(B + p, method=m, data=json.dumps(body).encode() if body is not None else None,
+                                         headers={"Content-Type": "application/json"})
+              with urllib.request.urlopen(r, timeout=60) as f:
+                  return json.loads(f.read() or b"null")
+          srv = req("GET", "/api/servers")[0]
+          assert srv["id"] == "cfg-fbcluster-primary" and srv["password_known"], srv
+          print("connect:", req("POST", f"/api/servers/{srv['id']}/connect", {}))
+          base = f"/api/servers/{srv['id']}/databases/{srv['databases'][0]['id']}"
+          r = req("POST", base + "/execute", {"sql": "CREATE TABLE K8S_DEMO (ID INTEGER PRIMARY KEY, NOTE VARCHAR(40));"
+                                                     " INSERT INTO K8S_DEMO VALUES (1, 'managed by the operator');"})
+          assert r["error"] is None, r["error"]
+          rows = req("GET", base + "/tables/K8S_DEMO/data")["rows"]
+          assert rows == [[1, "managed by the operator"]], rows
+          print("ok:", rows)
+          PY
+      - name: Diagnostics
+        if: failure()
+        run: |
+          kubectl get all -A
+          kubectl -n fbadmin-demo describe pods
+          kubectl -n fbadmin-demo logs deployment/fbadmin --tail=100 || true
+          kubectl -n cloudnative-firebird-system logs deployment --all-containers --tail=200 || true

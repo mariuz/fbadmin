@@ -1,0 +1,19 @@
+# A Firebird 5 cluster managed by the cloudnative-firebird operator
+# (https://github.com/mariuz/cloudnative-firebird). The operator creates a StatefulSet, the
+# primary Service "fbcluster" (port 3050) and "fbcluster-replica", and the database
+# /var/lib/firebird/data/demo.fdb on the instance's volume.
+apiVersion: firebird.cloudnative-firebird.io/v1
+kind: FirebirdCluster
+metadata:
+  name: fbcluster
+spec:
+  instances: 1
+  imageName: firebirdsql/firebird:5
+  superuserSecret:
+    name: fbcluster-superuser
+  databaseName: demo.fdb
+  storage:
+    size: 1Gi
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits: { memory: 512Mi }

@@ -1,0 +1,11 @@
+# fbadmin + a Firebird cluster managed by the cloudnative-firebird operator.
+# Install the operator first (its CRDs and Deployment), see README.md, then:
+#   kubectl apply -k deploy/k8s-operator
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: fbadmin-demo
+resources:
+  - namespace.yaml
+  - firebird-secret.yaml
+  - firebirdcluster.yaml
+  - fbadmin.yaml
