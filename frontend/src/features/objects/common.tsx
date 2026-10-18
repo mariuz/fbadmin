@@ -126,6 +126,10 @@ export function ObjectDialog(props: {
       }
       app.invalidate(keys.folder(sid, dbid, props.otype));
       app.invalidate(keys.db(sid, dbid));
+      // the object's own node too (e.g. a table's column list in the tree), under its old and new name
+      for (const n of new Set([props.original?.name, props.spec?.name, props.selectName].filter(Boolean) as string[])) {
+        app.invalidate(keys.object(sid, dbid, props.otype, n));
+      }
       const ti = typeInfo(props.otype);
       app.toast(editing ? t("Changes applied") : t("{object} created", { object: ti ? t(ti.singular) : t("Object") }));
       if (props.selectName) {

@@ -132,7 +132,7 @@ jobs:
       - name: Mount the dmg and run the app (macOS)
         if: matrix.kind == 'macos'
         run: |
-          dmg=$(ls dist/packages/*.dmg | head -1)
+          set -- dist/packages/*.dmg; dmg=$1
           hdiutil attach "$dmg" -mountpoint /Volumes/fbadmin -nobrowse
           FBADMIN_DATA_DIR="$RUNNER_TEMP/fbdmg" BROWSER=true /Volumes/fbadmin/fbadmin.app/Contents/MacOS/fbadmin --browser --port 5107 &
           for _ in $(seq 1 90); do curl -fsS http://127.0.0.1:5107/api/health && break; sleep 1; done
@@ -147,7 +147,7 @@ jobs:
           for _ in $(seq 1 60); do curl -fsS http://127.0.0.1:5107/api/health && break; sleep 1; done
           curl -fsS http://127.0.0.1:5107/ | grep -q 'id="root"'
           kill %1 || true
-          app=$(ls dist/packages/*.AppImage | head -1); chmod +x "$app"
+          set -- dist/packages/*.AppImage; app=$1; chmod +x "$app"
           FBADMIN_DATA_DIR="$RUNNER_TEMP/fbai" BROWSER=true APPIMAGE_EXTRACT_AND_RUN=1 "$app" --browser --port 5108 &
           for _ in $(seq 1 60); do curl -fsS http://127.0.0.1:5108/api/health && break; sleep 1; done
           curl -fsS http://127.0.0.1:5108/api/version | grep -q '"version"'

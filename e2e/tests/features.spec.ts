@@ -58,14 +58,16 @@ const pane = () => page.locator(".tab-pane:not(.hidden)");
 
 test("table dialogs: add a column through the object dialog", async () => {
   await expand(page, "Tables");
+  await expand(page, "CUSTOMER");
+  await expect(treeRow(page, "BALANCE")).toBeVisible();
   await menu("CUSTOMER", "Add column…");
   const dlg = page.locator(".modal");
   await expect(dlg).toBeVisible();
   await field(dlg, "Name").locator("input").first().fill("EMAIL");
   await dlg.locator("button.btn.primary", { hasText: /^(Save|Create)$/ }).click();
   await expect(dlg).toBeHidden();
-  await treeRow(page, "CUSTOMER").locator(".twisty").click(); // collapse
-  await treeRow(page, "CUSTOMER").locator(".twisty").click(); // expand again
+  await expect(treeRow(page, "CUSTOMER")).toHaveAttribute("data-open", "1"); // expanded before the dialog
+  // the open table node refreshes its columns after saving, without collapsing it
   await expect(treeRow(page, "EMAIL")).toBeVisible();
 });
 

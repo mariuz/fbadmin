@@ -207,10 +207,13 @@ def test_history_store_and_sampler(client, database):
     time.sleep(0.05)
     client.post(m + "/history/sample").raise_for_status()
     r = client.get(m + "/history", params={"hours": 1}).json()
-    assert len(r["samples"]) == 2
-    s1, s2 = r["samples"]
+    # the explicit sample plus the one taken when tracking started (the background sampler may
+    # add one more on a slow server)
+    samples = r["samples"]
+    assert len(samples) >= 2
+    s1, s2 = samples[0], samples[-1]
     assert s2["ts"] > s1["ts"] and s2["inserts"] >= s1["inserts"] + 1
-    assert s1["rates"]["inserts"] is None and s2["rates"]["inserts"] > 0
+    assert s1["rates"]["inserts"] is None and any((x["rates"]["inserts"] or 0) > 0 for x in samples[1:])
     assert r["tracking"]["last_error"] is None
 
     # settings + background sampler thread
