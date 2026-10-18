@@ -257,3 +257,6 @@ table.grid.freeze1 th:nth-child(2) { z-index: 3; background: var(--panel-2); }
 .ai-code { border: 1px solid var(--border); border-radius: var(--radius); background: var(--panel-2); }
 .ai-code pre { margin: 0; padding: 10px; white-space: pre-wrap; }
 .ai-code .btn { margin: 0 0 8px 10px; }
+.ctx { max-height: calc(100vh - 16px); overflow-y: auto; }
+.ctx-sub { position: relative; }
+.ctx-arrow { margin-left: auto; color: var(--muted); padding-left: 16px; }

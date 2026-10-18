@@ -33,7 +33,10 @@ export function contributedMenuItems(app: AppApi, sel: Selection): MenuItem[] {
   const out: MenuItem[] = [];
   for (const fn of menuContributors) {
     try {
-      out.push(...fn(app, sel));
+      const items = fn(app, sel);
+      // a separator between contributors ends the previous contributor's titled section
+      if (items.length && out.length) out.push({ separator: true });
+      out.push(...items);
     } catch (e) {
       console.error("menu contributor failed", e);
     }

@@ -4,11 +4,11 @@ import { typeInfo, type Selection } from "../types";
 import type { MenuItem } from "./ContextMenu";
 import { contributedMenuItems } from "../registry";
 import {
-  BackupDialog, ConfirmDialog, DatabaseDialog, RestoreDialog, ServerDialog, UserDialog,
+  ConfirmDialog, DatabaseDialog, RestoreDialog, ServerDialog, UserDialog,
 } from "./dialogs";
 import { DropDialog, canDrop } from "../features/objects/manage";
 import {
-  IconActivity, IconDatabase, IconDownload, IconFilter, IconInfo, IconLog, IconPlay, IconPlus, IconRefresh,
+  IconActivity, IconDatabase, IconFilter, IconInfo, IconLog, IconPlay, IconPlus, IconRefresh,
   IconTable, IconTerminal, IconTrash, IconUpload, IconX,
 } from "./Icons";
 
@@ -83,10 +83,7 @@ function buildBaseMenu(app: AppApi, sel: Selection): MenuItem[] {
       { label: "Query Tool", icon: <IconTerminal />, onClick: () => app.openQueryTool(sid, dbid) },
       { label: "Monitor", icon: <IconActivity />, onClick: () => app.openTab({ kind: "monitor", title: `${db.name} · monitor`, serverId: sid, dbId: dbid }) },
       { label: "Refresh", icon: <IconRefresh />, onClick: () => app.invalidate(keys.db(sid, dbid)) },
-      { header: "Maintenance" },
-      { label: "Backup…", icon: <IconDownload />, onClick: () => app.showDialog(<BackupDialog server={srv} dbId={dbid} />) },
-      { label: "Sweep", onClick: () => runJob(app, api.sweep(sid, dbid), "Sweep") },
-      { label: "Database statistics (gstat)", onClick: () => runJob(app, api.statistics(sid, dbid), "Statistics") },
+      // Backup, sweep and gstat live in the maintenance feature (features/maintenance).
       { label: "Recompute index selectivity", onClick: () => runJob(app, api.recomputeSelectivity(sid, dbid), "Index statistics") },
       { separator: true },
       { label: "Edit registration…", onClick: () => app.showDialog(<DatabaseDialog server={srv} mode="edit" database={db} />) },
