@@ -14,6 +14,7 @@ by a lock.
 
 from __future__ import annotations
 
+import os
 import threading
 import time
 import uuid
@@ -23,8 +24,13 @@ from contextlib import contextmanager
 import firebirdsql
 from firebirdsql import services
 
+from .native import connect_native, native_enabled
 from .query import QuerySession, apply_tpb, end_transaction
 from .store import DatabaseEntry, ServerEntry, ServerStore
+
+
+# Extra (non-primary) metadata connections idle for longer than this are closed.
+META_EXTRA_IDLE = 120
 
 
 class PasswordRequired(Exception):
@@ -73,7 +79,8 @@ class ConnectionManager:
     def __init__(self, store: ServerStore):
         self.store = store
         self._lock = threading.RLock()
-        self._meta: dict[tuple[str, str], FbConnection] = {}
+        self._meta: dict[tuple[str, str], list[FbConnection]] = {}
+        self.meta_pool_size = max(1, int(os.environ.get("FBADMIN_META_POOL_SIZE", "3")))
         self._sessions: dict[str, QuerySession] = {}
 
     # --- helpers -------------------------------------------------------
@@ -88,16 +95,56 @@ class ConnectionManager:
         db: DatabaseEntry = self.store.get_database(server_id, db_id)
         return FbConnection(connect(srv, db.path, self._password(server_id)))
 
+    def _open_meta(self, key: tuple[str, str]) -> FbConnection:
+        """Metadata connections may use the optional native driver (FBADMIN_DRIVER=native)."""
+        if not native_enabled():
+            return self._open(*key)
+        srv = self.store.get(key[0])
+        db: DatabaseEntry = self.store.get_database(*key)
+        return FbConnection(connect_native(host=srv.host, port=srv.port, database=db.path, user=srv.user,
+                                           password=self._password(key[0]), role=srv.role,
+                                           charset=srv.charset or "UTF8"))
+
     # --- metadata connections -----------------------------------------
+    # Each database has a small pool of metadata connections (FBADMIN_META_POOL_SIZE,
+    # default 3) so one slow request (a big DDL extraction, a long MON$ query) does not
+    # block the object explorer. The first ("primary") connection is always preferred;
+    # extra connections are only opened while it is busy and are closed again by
+    # reap_idle() after META_EXTRA_IDLE seconds, so sequential use behaves exactly like
+    # the original single shared connection.
+    def _acquire_meta(self, key: tuple[str, str]) -> FbConnection:
+        """Return a pooled connection for ``key`` with its lock held by the caller."""
+        while True:
+            with self._lock:
+                pool = self._meta.get(key)
+                if not pool:
+                    fbc = self._open_meta(key)
+                    fbc.lock.acquire()
+                    self._meta[key] = [fbc]
+                    return fbc
+                for fbc in pool:  # primary first; RLock => nested use in one thread reuses it
+                    if fbc.lock.acquire(blocking=False):
+                        return fbc
+                if len(pool) < self.meta_pool_size:
+                    fbc = self._open_meta(key)
+                    fbc.lock.acquire()
+                    pool.append(fbc)
+                    return fbc
+            time.sleep(0.01)  # all busy and the pool is full: wait for one to be released
+
+    def _drop_meta(self, key: tuple[str, str], fbc: FbConnection) -> None:
+        with self._lock:
+            pool = self._meta.get(key)
+            if pool and fbc in pool:
+                pool.remove(fbc)
+                if not pool:
+                    self._meta.pop(key, None)
+
     @contextmanager
     def meta(self, server_id: str, db_id: str) -> Iterator[firebirdsql.Connection]:
         key = (server_id, db_id)
-        with self._lock:
-            fbc = self._meta.get(key)
-            if fbc is None:
-                fbc = self._open(server_id, db_id)
-                self._meta[key] = fbc
-        with fbc.lock:
+        fbc = self._acquire_meta(key)
+        try:
             fbc.last_used = time.time()
             try:
                 yield fbc.conn
@@ -105,8 +152,7 @@ class ConnectionManager:
             except (firebirdsql.OperationalError, OSError, ConnectionError, BrokenPipeError) as exc:
                 # Connection may be dead (server restart, attachment killed): drop it.
                 if _is_connection_lost(exc):
-                    with self._lock:
-                        self._meta.pop(key, None)
+                    self._drop_meta(key, fbc)
                     fbc.close()
                 else:
                     _safe_rollback(fbc.conn)
@@ -114,15 +160,19 @@ class ConnectionManager:
             except Exception:
                 _safe_rollback(fbc.conn)
                 raise
+        finally:
+            fbc.last_used = time.time()
+            fbc.lock.release()
 
     def is_connected(self, server_id: str, db_id: str) -> bool:
-        return (server_id, db_id) in self._meta
+        return bool(self._meta.get((server_id, db_id)))
 
     def disconnect(self, server_id: str, db_id: str | None = None) -> None:
         with self._lock:
             keys = [k for k in self._meta if k[0] == server_id and (db_id is None or k[1] == db_id)]
             for k in keys:
-                self._meta.pop(k).close()
+                for fbc in self._meta.pop(k):
+                    fbc.close()
             for sid in [s for s, v in self._sessions.items()
                         if v.server_id == server_id and (db_id is None or v.db_id == db_id)]:
                 _close_quietly(self._sessions.pop(sid).conn)
@@ -187,7 +237,21 @@ class ConnectionManager:
             stale = [s for s, v in self._sessions.items() if now - v.last_used > max_idle and not v.lock._is_owned()]
         for sid in stale:
             self.close_session(sid)
+        self._reap_meta_extras(META_EXTRA_IDLE)
         return len(stale)
+
+    def _reap_meta_extras(self, max_idle: float) -> None:
+        """Close idle non-primary metadata connections (they hold metadata locks)."""
+        now = time.time()
+        with self._lock:
+            for pool in self._meta.values():
+                for fbc in pool[1:]:
+                    if now - fbc.last_used > max_idle and fbc.lock.acquire(blocking=False):
+                        try:
+                            pool.remove(fbc)
+                            fbc.close()
+                        finally:
+                            fbc.lock.release()
 
     def attachment_stats(self, server_id: str, db_id: str, attachment_id: int) -> dict | None:
         """Cumulative I/O and record counters of one attachment (read from MON$ via the metadata connection)."""
@@ -220,8 +284,9 @@ class ConnectionManager:
 
     def close_all(self) -> None:
         with self._lock:
-            for fbc in self._meta.values():
-                fbc.close()
+            for pool in self._meta.values():
+                for fbc in pool:
+                    fbc.close()
             for v in self._sessions.values():
                 _close_quietly(v.conn)
             self._meta.clear()

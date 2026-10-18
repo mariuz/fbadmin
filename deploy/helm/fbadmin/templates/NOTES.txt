@@ -1,0 +1,23 @@
+fbadmin {{ .Chart.AppVersion }} is deployed as {{ include "fbadmin.fullname" . }}.
+
+{{- if .Values.ingress.enabled }}
+Open:
+{{- range .Values.ingress.hosts }}
+  http{{ if $.Values.ingress.tls }}s{{ end }}://{{ .host }}/
+{{- end }}
+{{- else }}
+Open it with a port-forward:
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "fbadmin.fullname" . }} 5050:{{ .Values.service.port }}
+  then browse to http://127.0.0.1:5050/
+{{- end }}
+
+{{- if .Values.serverMode.enabled }}
+
+Server mode is on. Log in as "{{ .Values.serverMode.adminUser }}"; the password is in the Secret:
+  kubectl -n {{ .Release.Namespace }} get secret {{ include "fbadmin.secretName" . }} \
+    -o jsonpath='{.data.{{ .Values.serverMode.secretKeys.adminPassword }}}' | base64 -d; echo
+{{- else }}
+
+WARNING: server mode is off, so there is no login screen. Do not expose this service
+outside a trusted network (set serverMode.enabled=true for multi-user deployments).
+{{- end }}

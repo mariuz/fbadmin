@@ -1,0 +1,100 @@
+# fbadmin next to the Firebird StatefulSet (firebird.yaml). After `kubectl apply -k deploy/k8s`:
+#   kubectl -n fbadmin port-forward svc/fbadmin 5050:80   ->  http://127.0.0.1:5050
+#   Add server: host "firebird", port 3050, user SYSDBA, the password from firebird-secret,
+#   first database /var/lib/firebird/data/demo.fdb
+# For a multi-user installation with a login screen, use the Helm chart (deploy/helm/fbadmin)
+# with serverMode.enabled=true instead.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: fbadmin-data
+  labels: { app.kubernetes.io/name: fbadmin, app.kubernetes.io/part-of: fbadmin-example }
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fbadmin
+  labels: { app.kubernetes.io/name: fbadmin, app.kubernetes.io/part-of: fbadmin-example }
+spec:
+  replicas: 1
+  strategy: { type: Recreate }
+  selector:
+    matchLabels: { app.kubernetes.io/name: fbadmin }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: fbadmin, app.kubernetes.io/part-of: fbadmin-example }
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: fbadmin
+          image: ghcr.io/mariuz/fbadmin:latest
+          command: ["fbadmin"]
+          args: ["--no-browser", "--log-format", "json"]
+          env:
+            - { name: FBADMIN_HOST, value: "0.0.0.0" }
+            - { name: FBADMIN_PORT, value: "5050" }
+            - { name: FBADMIN_DATA_DIR, value: /data }
+            - { name: FBADMIN_UPDATE_CHECK, value: "off" }
+          ports:
+            - name: http
+              containerPort: 5050
+          readinessProbe:
+            httpGet: { path: /api/health, port: http }
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /api/health, port: http }
+            periodSeconds: 30
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { memory: 512Mi }
+          volumeMounts:
+            - { name: data, mountPath: /data }
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: data
+          persistentVolumeClaim: { claimName: fbadmin-data }
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fbadmin
+  labels: { app.kubernetes.io/name: fbadmin, app.kubernetes.io/part-of: fbadmin-example }
+spec:
+  selector: { app.kubernetes.io/name: fbadmin }
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+---
+# Only fbadmin (and Firebird itself) may talk to Firebird inside the namespace.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: firebird-from-fbadmin
+  labels: { app.kubernetes.io/part-of: fbadmin-example }
+spec:
+  podSelector:
+    matchLabels: { app.kubernetes.io/name: firebird }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: { app.kubernetes.io/name: fbadmin }
+      ports:
+        - port: 3050

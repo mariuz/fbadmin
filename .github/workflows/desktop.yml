@@ -1,0 +1,128 @@
+# Desktop app (pywebview shell + PyInstaller) for Windows, macOS and Linux.
+#   Windows: zipped one-folder build + MSI (WiX)
+#   macOS:   fbadmin.app in a .dmg (arm64 and x86_64)
+#   Linux:   AppImage, .deb and .rpm (fpm)
+# Runs on release tags (artifacts are attached to the GitHub Release) and by hand.
+# The builds are not code-signed; see docs/PACKAGING.md.
+name: Desktop app
+
+on:
+  push:
+    tags: ["v*"]
+  pull_request:
+    paths:
+      - packaging/**
+      - backend/fbadmin/desktop.py
+      - .github/workflows/desktop.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: Windows x64, os: windows-latest, kind: windows }
+          - { name: macOS arm64, os: macos-14, kind: macos, arch: arm64 }
+          - { name: macOS x86_64, os: macos-13, kind: macos, arch: x86_64 }
+          # 22.04 keeps the glibc baseline low so the AppImage runs on older distributions.
+          - { name: Linux x86_64, os: ubuntu-22.04, kind: linux }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Version
+        id: v
+        shell: bash
+        run: echo "version=$(python -c "import re; print(re.search(r'__version__ = \"([^\"]+)\"', open('backend/fbadmin/__init__.py').read()).group(1))")" >> "$GITHUB_OUTPUT"
+      - name: Build the web UI
+        working-directory: frontend
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+
+      - name: Linux build dependencies (WebKitGTK, PyGObject, fpm, rpm)
+        if: matrix.kind == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgirepository1.0-dev libcairo2-dev pkg-config gir1.2-webkit2-4.1 \
+            libwebkit2gtk-4.1-0 rpm ruby-dev build-essential
+          sudo gem install --no-document fpm
+          pip install "PyGObject<3.51" pycairo
+      - name: Install fbadmin and PyInstaller
+        run: pip install "./backend[desktop]" pyinstaller pillow
+      - name: PyInstaller
+        run: pyinstaller packaging/pyinstaller/fbadmin.spec --noconfirm
+
+      # --- Windows: zip + MSI ---------------------------------------------------
+      - name: Zip (Windows)
+        if: matrix.kind == 'windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist/packages | Out-Null
+          Compress-Archive -Path dist/fbadmin -DestinationPath "dist/packages/fbadmin-${{ steps.v.outputs.version }}-windows-x64.zip"
+      - name: MSI (Windows, WiX)
+        if: matrix.kind == 'windows'
+        continue-on-error: true   # the zip above is the primary artifact
+        shell: pwsh
+        run: |
+          dotnet tool install --global wix --version 5.0.2
+          wix build packaging/windows/fbadmin.wxs -arch x64 -d SourceDir=dist\fbadmin `
+            -d Version=${{ steps.v.outputs.version }} -o "dist/packages/fbadmin-${{ steps.v.outputs.version }}-x64.msi"
+
+      # --- macOS: dmg -------------------------------------------------------------
+      - name: DMG (macOS)
+        if: matrix.kind == 'macos'
+        run: |
+          mkdir -p dist/packages dmg
+          cp -R dist/fbadmin.app dmg/
+          ln -s /Applications dmg/Applications
+          hdiutil create -volname fbadmin -srcfolder dmg -ov -format UDZO \
+            "dist/packages/fbadmin-${{ steps.v.outputs.version }}-macos-${{ matrix.arch }}.dmg"
+
+      # --- Linux: AppImage, deb, rpm ---------------------------------------------
+      - name: AppImage, deb, rpm (Linux)
+        if: matrix.kind == 'linux'
+        run: packaging/linux/build-packages.sh "${{ steps.v.outputs.version }}" appimage deb rpm
+
+      - name: Smoke test (frozen app serves the UI)
+        if: matrix.kind != 'macos'
+        shell: bash
+        run: |
+          exe=dist/fbadmin/fbadmin; [ -f dist/fbadmin/fbadmin.exe ] && exe=dist/fbadmin/fbadmin.exe
+          FBADMIN_DATA_DIR="$RUNNER_TEMP/fbadmin" BROWSER=true "$exe" --browser --port 5106 &
+          for i in $(seq 1 60); do curl -fsS http://127.0.0.1:5106/api/health && break; sleep 1; done
+          curl -fsS http://127.0.0.1:5106/ | grep -q 'id="root"'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.kind }}-${{ matrix.arch || 'x64' }}
+          path: dist/packages/*
+          if-no-files-found: error
+
+  attach:
+    name: Attach to the GitHub Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: desktop-*
+          path: packages
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: packages/*

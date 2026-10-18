@@ -20,6 +20,7 @@ from .maintenance import scheduler
 from .metadata import OBJECT_TYPES
 from .plugins import load_plugins
 from .monitoring.history import start_sampler
+from .middleware import install_middleware
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -47,6 +48,8 @@ async def lifespan(app: FastAPI):
 
 def create_app() -> FastAPI:
     app = FastAPI(title="fbadmin", version=__version__, lifespan=lifespan)
+    # Request logging, rate limiting and request-size limits (see middleware.py; all configurable).
+    install_middleware(app)
 
     @app.exception_handler(PasswordRequired)
     async def _pw(request: Request, exc: PasswordRequired):

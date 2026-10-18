@@ -1,14 +1,16 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { api, setPasswordHandler } from "./api";
 import { AppCtx, errMsg, selectionKey, type AppApi, type WorkTab } from "./context";
 import type { ObjectDetail, Selection, Server } from "./types";
 import { Tree } from "./components/Tree";
 import { PasswordDialog, ServerDialog } from "./components/dialogs";
 import { Dashboard, DependenciesPanel, FolderList, PropertiesPanel, SqlPanel } from "./components/ObjectPanels";
-import { QueryTool } from "./components/QueryTool";
-import { DataView } from "./components/DataView";
-import { Monitor } from "./components/Monitor";
-import { JobsPanel, ServerLog } from "./components/Jobs";
+// Code-split: these views load on first use (see vite.config.ts for the vendor chunks).
+const QueryTool = lazy(() => import("./components/QueryTool").then((m) => ({ default: m.QueryTool })));
+const DataView = lazy(() => import("./components/DataView").then((m) => ({ default: m.DataView })));
+const Monitor = lazy(() => import("./components/Monitor").then((m) => ({ default: m.Monitor })));
+const JobsPanel = lazy(() => import("./components/Jobs").then((m) => ({ default: m.JobsPanel })));
+const ServerLog = lazy(() => import("./components/Jobs").then((m) => ({ default: m.ServerLog })));
 import { getObjectTabs, getTabKind, getTopbarItems } from "./registry";
 import { setPrefs, usePrefs } from "./prefs";
 import { currentLanguage } from "./i18n";
@@ -242,6 +244,7 @@ export default function App() {
               ))}
               {tabs.map((t) => (
                 <div key={t.id} className={"tab-pane" + (active === t.id ? "" : " hidden")} style={{ overflow: "hidden" }}>
+                  <Suspense fallback={<div className="empty">Loading…</div>}>
                   {t.kind === "query" && <QueryTool serverId={t.serverId!} dbId={t.dbId!} initialSql={t.initialSql} autorun={t.autorun} visible={active === t.id} />}
                   {t.kind === "data" && <DataView serverId={t.serverId!} dbId={t.dbId!} otype={t.otype!} name={t.name!} showFilter={t.initialSql === "filter"} />}
                   {t.kind === "monitor" && <Monitor serverId={t.serverId!} dbId={t.dbId!} visible={active === t.id} />}
@@ -249,6 +252,7 @@ export default function App() {
                   {t.kind === "serverlog" && <ServerLog serverId={t.serverId!} />}
                   {t.kind === "serverinfo" && <Dashboard sel={{ kind: "server", serverId: t.serverId! }} />}
                   {getTabKind(t.kind)?.render(t, active === t.id)}
+                  </Suspense>
                 </div>
               ))}
             </div>

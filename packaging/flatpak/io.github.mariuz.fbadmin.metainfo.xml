@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.mariuz.fbadmin</id>
+  <name>fbadmin</name>
+  <summary>Administration and development tool for Firebird SQL</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <url type="homepage">https://github.com/mariuz/fbadmin</url>
+  <url type="bugtracker">https://github.com/mariuz/fbadmin/issues</url>
+  <description>
+    <p>
+      fbadmin is a pgAdmin-style administration tool for Firebird 3, 4 and 5: an object
+      explorer, DDL extraction, a query tool with plans and transactions, an editable data
+      grid, live monitoring and backup/restore.
+    </p>
+    <p>fbadmin sends no telemetry. The update check is off unless you turn it on.</p>
+  </description>
+  <launchable type="desktop-id">io.github.mariuz.fbadmin.desktop</launchable>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="0.2.0" date="2026-10-18"/>
+  </releases>
+</component>

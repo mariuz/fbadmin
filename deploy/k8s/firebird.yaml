@@ -1,0 +1,75 @@
+# Firebird 5 server as a StatefulSet (official image firebirdsql/firebird), reachable inside
+# the namespace as firebird:3050. A demo database /var/lib/firebird/data/demo.fdb is created
+# on first start. Change the password in firebird-secret before applying.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: firebird-secret
+  labels: { app.kubernetes.io/name: firebird, app.kubernetes.io/part-of: fbadmin-example }
+type: Opaque
+stringData:
+  root-password: change-me-firebird
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: firebird
+  labels: { app.kubernetes.io/name: firebird, app.kubernetes.io/part-of: fbadmin-example }
+spec:
+  clusterIP: None   # headless: stable DNS name firebird-0.firebird for the StatefulSet pod
+  selector: { app.kubernetes.io/name: firebird }
+  ports:
+    - name: firebird
+      port: 3050
+      targetPort: firebird
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: firebird
+  labels: { app.kubernetes.io/name: firebird, app.kubernetes.io/part-of: fbadmin-example }
+spec:
+  serviceName: firebird
+  replicas: 1
+  selector:
+    matchLabels: { app.kubernetes.io/name: firebird }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: firebird, app.kubernetes.io/part-of: fbadmin-example }
+    spec:
+      terminationGracePeriodSeconds: 60
+      containers:
+        - name: firebird
+          image: firebirdsql/firebird:5
+          env:
+            - name: FIREBIRD_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: firebird-secret, key: root-password }
+            - name: FIREBIRD_DATABASE
+              value: demo.fdb
+            - name: FIREBIRD_DATABASE_DEFAULT_CHARSET
+              value: UTF8
+          ports:
+            - name: firebird
+              containerPort: 3050
+          readinessProbe:
+            tcpSocket: { port: firebird }
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket: { port: firebird }
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { memory: 1Gi }
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/firebird/data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: 5Gi

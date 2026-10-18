@@ -29,7 +29,16 @@ jobs:
       - run: ruff check backend
       - name: Wait for Firebird
         run: for i in $(seq 1 30); do (echo > /dev/tcp/127.0.0.1/3050) 2>/dev/null && break; sleep 1; done
+      # includes the hypothesis fuzz tests of the SQL splitter and the generated-schema DDL round trips
       - run: pytest -q backend/tests
+        env:
+          FBADMIN_TEST_DIR: /var/lib/firebird/data
+      - name: Native driver adapter (firebird-driver + libfbclient)
+        if: matrix.firebird == '5'
+        run: |
+          sudo apt-get update && sudo apt-get install -y libfbclient2
+          pip install -e "backend[native]"
+          pytest -q backend/tests/test_native_driver.py -rs
         env:
           FBADMIN_TEST_DIR: /var/lib/firebird/data
 
@@ -47,6 +56,111 @@ jobs:
         working-directory: frontend
       - run: npm run build
         working-directory: frontend
+
+  api-types:
+    name: API types up to date
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: pip install -e backend
+      - run: npm ci
+        working-directory: frontend
+      - run: scripts/gen-api-types.sh --check
+        env:
+          PYTHON: python
+
+  wheel:
+    name: Wheel with bundled UI
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: pip install build
+      - run: scripts/build-dist.sh
+      - run: scripts/smoke-wheel.sh dist/fbadmin-*.whl 5106
+      - uses: actions/upload-artifact@v4
+        with:
+          name: python-dist
+          path: dist/
+
+  e2e:
+    name: End-to-end (Playwright, Firebird 5)
+    runs-on: ubuntu-latest
+    services:
+      firebird:
+        image: firebirdsql/firebird:5
+        env:
+          FIREBIRD_ROOT_PASSWORD: masterkey
+        ports:
+          - 3050:3050
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: |
+            frontend/package-lock.json
+            e2e/package-lock.json
+      - run: pip install -e backend
+      - name: Build the UI
+        working-directory: frontend
+        run: npm ci && npm run build
+      - name: Install Playwright
+        working-directory: e2e
+        run: npm ci && npx playwright install --with-deps chromium
+      - name: Wait for Firebird
+        run: for i in $(seq 1 30); do (echo > /dev/tcp/127.0.0.1/3050) 2>/dev/null && break; sleep 1; done
+      - name: Run the e2e tests
+        working-directory: e2e
+        run: npx playwright test
+        env:
+          FBADMIN_PYTHON: python
+          FB_DB_DIR: /var/lib/firebird/data
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            e2e/playwright-report/
+            e2e/test-results/
+
+  workflows:
+    name: Lint workflows
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: actionlint
+        run: |
+          bash <(curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/v1.7.7/scripts/download-actionlint.bash) 1.7.7
+          ./actionlint -color
+
+  helm:
+    name: Helm chart
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+      - run: helm lint deploy/helm/fbadmin
+      - run: helm template t deploy/helm/fbadmin --set serverMode.enabled=true --set ingress.enabled=true > /dev/null
 
   docker:
     name: Docker image

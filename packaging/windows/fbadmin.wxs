@@ -1,0 +1,33 @@
+<!--
+  MSI installer for the fbadmin desktop app (WiX Toolset v5+: `dotnet tool install -g wix`).
+
+    wix build packaging/windows/fbadmin.wxs -arch x64 ^
+        -d SourceDir=dist\fbadmin -d Version=0.2.0 -o dist\fbadmin-0.2.0-x64.msi
+
+  SourceDir is the PyInstaller one-folder build. The installer is per-machine, installs
+  into Program Files\fbadmin and adds a Start menu shortcut. It is not code-signed.
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package Name="fbadmin" Manufacturer="fbadmin contributors" Version="$(Version)"
+           UpgradeCode="6f1c3c8e-4d2a-4b8f-9a8e-2f1a7c5d9b10" Scope="perMachine">
+    <MajorUpgrade DowngradeErrorMessage="A newer version of fbadmin is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+    <Icon Id="fbadmin.ico" SourceFile="packaging\icons\fbadmin.ico" />
+    <Property Id="ARPPRODUCTICON" Value="fbadmin.ico" />
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/mariuz/fbadmin" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="fbadmin">
+        <Files Include="$(SourceDir)\**" />
+      </Directory>
+    </StandardDirectory>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Component Id="StartMenuShortcut">
+        <Shortcut Id="fbadminShortcut" Name="fbadmin" Description="Firebird administration"
+                  Target="[INSTALLFOLDER]fbadmin.exe" WorkingDirectory="INSTALLFOLDER" Icon="fbadmin.ico" />
+        <RegistryValue Root="HKLM" Key="Software\fbadmin" Name="installed" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </StandardDirectory>
+  </Package>
+</Wix>

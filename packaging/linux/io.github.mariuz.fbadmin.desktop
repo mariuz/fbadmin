@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=fbadmin
+GenericName=Firebird Administration
+Comment=Administration and development tool for Firebird SQL
+Exec=fbadmin-desktop
+Icon=io.github.mariuz.fbadmin
+Terminal=false
+Categories=Development;Database;
+Keywords=firebird;database;sql;admin;
+StartupWMClass=fbadmin

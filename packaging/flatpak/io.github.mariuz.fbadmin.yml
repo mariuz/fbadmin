@@ -1,0 +1,50 @@
+# Flatpak manifest for the fbadmin desktop app.
+#
+# Build (from the repository root, after `scripts/build-dist.sh` produced dist/*.whl):
+#   flatpak-builder --user --install --force-clean \
+#       --install-deps-from=flathub build-flatpak packaging/flatpak/io.github.mariuz.fbadmin.yml
+#   flatpak run io.github.mariuz.fbadmin
+#
+# The wheel and its pure-Python/manylinux dependencies are installed with pip during the
+# build, which needs network access (build-args: --share=network). That is fine for
+# self-built bundles; a Flathub submission must vendor the dependencies instead
+# (generate a module with flatpak-pip-generator from backend/pyproject.toml).
+#
+# The window: the GNOME runtime ships PyGObject and WebKitGTK, so pywebview's GTK backend
+# opens a native window; if that fails, fbadmin-desktop opens the system browser through
+# the OpenURI portal.
+app-id: io.github.mariuz.fbadmin
+runtime: org.gnome.Platform
+runtime-version: "47"
+sdk: org.gnome.Sdk
+command: fbadmin-desktop
+finish-args:
+  - --share=network        # talk to Firebird servers (and serve the UI on 127.0.0.1)
+  - --share=ipc
+  - --socket=fallback-x11
+  - --socket=wayland
+  - --device=dri
+  - --persist=.fbadmin     # registered servers (FBADMIN_DATA_DIR default)
+modules:
+  - name: fbadmin
+    buildsystem: simple
+    build-options:
+      build-args:
+        - --share=network
+    build-commands:
+      - pip3 install --no-cache-dir --prefix=/app "$(ls fbadmin-*.whl)[desktop]"
+      - install -Dm644 io.github.mariuz.fbadmin.desktop /app/share/applications/io.github.mariuz.fbadmin.desktop
+      - install -Dm644 fbadmin.svg /app/share/icons/hicolor/scalable/apps/io.github.mariuz.fbadmin.svg
+      - install -Dm644 fbadmin.png /app/share/icons/hicolor/512x512/apps/io.github.mariuz.fbadmin.png
+      - install -Dm644 io.github.mariuz.fbadmin.metainfo.xml /app/share/metainfo/io.github.mariuz.fbadmin.metainfo.xml
+    sources:
+      - type: dir
+        path: ../../dist
+      - type: file
+        path: ../linux/io.github.mariuz.fbadmin.desktop
+      - type: file
+        path: ../icons/fbadmin.svg
+      - type: file
+        path: ../icons/fbadmin.png
+      - type: file
+        path: io.github.mariuz.fbadmin.metainfo.xml

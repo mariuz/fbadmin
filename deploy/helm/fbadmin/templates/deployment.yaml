@@ -1,0 +1,130 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "fbadmin.fullname" . }}
+  labels:
+    {{- include "fbadmin.labels" . | nindent 4 }}
+spec:
+  # Single replica: state lives in the data volume and in-process query sessions.
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "fbadmin.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        {{- if and .Values.serverMode.enabled (not .Values.serverMode.existingSecret) }}
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+        {{- end }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "fbadmin.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "fbadmin.serviceAccountName" . }}
+      automountServiceAccountToken: false
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: fbadmin
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          command: ["fbadmin"]
+          args: ["--no-browser", "--log-level", {{ .Values.config.logLevel | quote }}, "--log-format", {{ .Values.config.logFormat | quote }}]
+          env:
+            - name: FBADMIN_HOST
+              value: "0.0.0.0"
+            - name: FBADMIN_PORT
+              value: "5050"
+            - name: FBADMIN_DATA_DIR
+              value: /data
+            - name: FBADMIN_MAX_ROWS
+              value: {{ .Values.config.maxRows | quote }}
+            - name: FBADMIN_SESSION_IDLE_TIMEOUT
+              value: {{ .Values.config.sessionIdleTimeout | quote }}
+            - name: FBADMIN_RATE_LIMIT
+              value: {{ .Values.config.rateLimit | quote }}
+            - name: FBADMIN_RATE_LIMIT_TRUST_PROXY
+              value: {{ ternary "1" "0" .Values.config.trustProxy | quote }}
+            - name: FBADMIN_MAX_REQUEST_BYTES
+              value: {{ .Values.config.maxRequestBytes | int64 | quote }}
+            - name: FBADMIN_UPDATE_CHECK
+              value: {{ .Values.config.updateCheck | quote }}
+            - name: FBADMIN_DRIVER
+              value: {{ .Values.config.driver | quote }}
+            {{- if .Values.serverMode.enabled }}
+            - name: {{ .Values.serverMode.env.enabled }}
+              value: "1"
+            - name: {{ .Values.serverMode.env.adminUser }}
+              value: {{ .Values.serverMode.adminUser | quote }}
+            - name: {{ .Values.serverMode.env.adminPassword }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "fbadmin.secretName" . }}
+                  key: {{ .Values.serverMode.secretKeys.adminPassword }}
+            - name: {{ .Values.serverMode.env.masterPassword }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "fbadmin.secretName" . }}
+                  key: {{ .Values.serverMode.secretKeys.masterPassword }}
+            {{- end }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          ports:
+            - name: http
+              containerPort: 5050
+              protocol: TCP
+          startupProbe:
+            httpGet: { path: /api/health, port: http }
+            periodSeconds: 2
+            failureThreshold: 30
+          livenessProbe:
+            httpGet: { path: /api/health, port: http }
+            periodSeconds: 30
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet: { path: /api/health, port: http }
+            periodSeconds: 10
+            timeoutSeconds: 5
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: data
+          {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "fbadmin.claimName" . }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        - name: tmp
+          emptyDir: {}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

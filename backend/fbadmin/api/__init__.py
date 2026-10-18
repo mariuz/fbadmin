@@ -13,6 +13,7 @@ from . import trace
 from . import metrics
 from . import monitoring
 from . import replication
+from . import version as version_api
 
 ROUTERS: list[APIRouter] = [
     servers.router,
@@ -28,4 +29,5 @@ ROUTERS: list[APIRouter] = [
     metrics.router,
     replication.router,
     replication.conf_router,
+    version_api.router,
 ]

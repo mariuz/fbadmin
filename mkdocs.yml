@@ -1,0 +1,82 @@
+# Documentation site: https://mariuz.github.io/fbadmin/
+#   pip install -r requirements-docs.txt
+#   mkdocs serve            # live preview on http://127.0.0.1:8000
+#   mkdocs build --strict   # what CI runs (.github/workflows/docs.yml)
+#
+# Adding a page: put it under docs/ and add it to `nav` below. Feature guides written next
+# to the code (docs/SECURITY.md, MAINTENANCE.md, SCHEMA_TOOLS.md, MONITORING.md,
+# REPLICATION.md, OBJECT_DIALOGS.md, ...) belong in "User guide" or "Administration";
+# a page that is not in the nav still builds (and is reported at info level only).
+site_name: fbadmin
+site_description: pgAdmin-style web administration and development tool for Firebird SQL
+site_url: https://mariuz.github.io/fbadmin/
+repo_url: https://github.com/mariuz/fbadmin
+repo_name: mariuz/fbadmin
+edit_uri: edit/main/docs/
+copyright: fbadmin is MIT licensed. No telemetry, ever.
+
+theme:
+  name: material
+  logo: assets/fbadmin.svg
+  favicon: assets/fbadmin.svg
+  features:
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - content.code.copy
+    - search.suggest
+    - search.highlight
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: deep orange
+      accent: amber
+      toggle: { icon: material/weather-night, name: Dark mode }
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: deep orange
+      accent: amber
+      toggle: { icon: material/weather-sunny, name: Light mode }
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+
+validation:
+  nav:
+    omitted_files: info       # feature docs may land before they are added to the nav
+    not_found: warn
+  links:
+    not_found: warn
+    anchors: info
+    unrecognized_links: info
+
+nav:
+  - Home: index.md
+  - Getting started: getting-started.md
+  - User guide:
+      - Overview: user-guide/index.md
+      - Object explorer: user-guide/object-explorer.md
+      - Query Tool: QUERY_TOOL.md
+      - Data grid: user-guide/data-grid.md
+      - Monitoring and maintenance: user-guide/monitoring.md
+  - Administration:
+      - Overview: admin/index.md
+      - Configuration: admin/configuration.md
+      - Deployment (Docker, Kubernetes): admin/deployment.md
+      - Privacy: PRIVACY.md
+  - Development:
+      - Architecture: ARCHITECTURE.md
+      - Development and testing: DEVELOPMENT.md
+      - Packaging and releases: PACKAGING.md

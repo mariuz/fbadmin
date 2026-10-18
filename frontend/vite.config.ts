@@ -12,6 +12,21 @@ export default defineConfig({
   build: {
     outDir: "../backend/fbadmin/static",
     emptyOutDir: true,
-    chunkSizeWarningLimit: 1500,
+    chunkSizeWarningLimit: 600,
+    rollupOptions: {
+      output: {
+        // Long-lived vendor chunks: they change rarely, so browsers keep them cached across
+        // fbadmin upgrades, and the app chunk stays small. Views that are not needed at
+        // start-up (Query Tool, data grid, monitor, processes) are lazy-loaded in App.tsx.
+        manualChunks(id: string) {
+          if (!id.includes("node_modules")) return undefined;
+          if (id.includes("sql-formatter")) return "sql-formatter";
+          if (id.includes("@codemirror") || id.includes("@lezer") || id.includes("crelt")
+            || id.includes("style-mod") || id.includes("w3c-keyname")) return "codemirror";
+          if (/node_modules\/(react|react-dom|scheduler)\//.test(id)) return "react";
+          return "vendor";
+        },
+      },
+    },
   },
 });

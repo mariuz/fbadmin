@@ -1,0 +1,68 @@
+# -*- mode: python ; coding: utf-8 -*-
+# PyInstaller spec for the fbadmin desktop app (one-folder build).
+#
+#   pip install ./backend[desktop] pyinstaller pillow
+#   (cd frontend && npm ci && npm run build)       # the UI must be built first
+#   pyinstaller packaging/pyinstaller/fbadmin.spec --noconfirm
+#
+# Output: dist/fbadmin/ (Windows/Linux, run fbadmin[.exe]) and dist/fbadmin.app (macOS).
+# The packaging steps (zip/MSI, dmg, AppImage/deb/rpm) are in .github/workflows/desktop.yml.
+import sys
+from pathlib import Path
+
+from PyInstaller.utils.hooks import collect_submodules
+
+here = Path(SPECPATH).resolve()  # noqa: F821 - provided by PyInstaller
+root = here.parents[1]
+backend = root / "backend"
+static = backend / "fbadmin" / "static"
+if not (static / "index.html").is_file():
+    raise SystemExit("backend/fbadmin/static/index.html is missing: build the frontend first")
+
+sys.path.insert(0, str(backend))
+from fbadmin import __version__  # noqa: E402
+
+icons = root / "packaging" / "icons"
+icon = {"win32": icons / "fbadmin.ico", "darwin": icons / "fbadmin.png"}.get(sys.platform, icons / "fbadmin.png")
+
+hidden = (
+    collect_submodules("fbadmin")
+    + collect_submodules("uvicorn")
+    + collect_submodules("firebirdsql")
+    + ["webview"]
+)
+
+a = Analysis(  # noqa: F821
+    [str(here / "launcher.py")],
+    pathex=[str(backend)],
+    datas=[(str(static), "fbadmin/static")],
+    hiddenimports=hidden,
+    excludes=["tkinter", "pytest", "hypothesis", "IPython"],
+    noarchive=False,
+)
+pyz = PYZ(a.pure)  # noqa: F821
+exe = EXE(  # noqa: F821
+    pyz,
+    a.scripts,
+    [],
+    exclude_binaries=True,
+    name="fbadmin",
+    console=False,
+    icon=str(icon),
+)
+coll = COLLECT(exe, a.binaries, a.datas, name="fbadmin")  # noqa: F821
+
+if sys.platform == "darwin":
+    app = BUNDLE(  # noqa: F821
+        coll,
+        name="fbadmin.app",
+        icon=str(icon),
+        bundle_identifier="io.github.mariuz.fbadmin",
+        version=__version__,
+        info_plist={
+            "CFBundleName": "fbadmin",
+            "CFBundleDisplayName": "fbadmin",
+            "NSHighResolutionCapable": True,
+            "LSMinimumSystemVersion": "11.0",
+        },
+    )
