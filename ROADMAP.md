@@ -11,9 +11,9 @@ Supported Firebird versions: **3.0, 4.0, 5.0** (tested in CI) and the **6.0 snap
 scope.
 
 **Status:** every milestone below is implemented. Items marked *(unverified)* exist in the code
-and are covered by unit or mock tests, but they depend on something this project's CI cannot
-exercise yet: a first tagged release, signing certificates, a real LDAP/OIDC provider or a crypt
-plugin. Those are the next things to check before calling it 1.0.
+and are tested, but they also depend on something only the repository owner can provide: a first
+tagged release (PyPI trusted publisher), code-signing certificates, or GitHub Pages enabled in
+the repository settings.
 
 ---
 
@@ -97,7 +97,7 @@ exact DDL before it runs, like pgAdmin.
 
 - ✅ **Server mode:** fbadmin user accounts with a login page, sessions, CSRF protection and secure cookies
 - ✅ **Master password:** encrypt saved Firebird passwords (Argon2id key derivation plus AES-GCM), like pgAdmin's master password
-- ✅ Authentication backends: internal, LDAP, OAuth2/OIDC (Google, GitHub, Keycloak, Entra ID), reverse-proxy header *(unverified: tested against LDAP and OIDC mocks)*
+- ✅ Authentication backends: internal, LDAP, OAuth2/OIDC (Google, GitHub, Keycloak, Entra ID), reverse-proxy header (verified against real services in CI: OpenLDAP `slapd` for search+bind, simple bind and the admin group; Dex for the OIDC authorization-code flow with PKCE, admin mapping, domain restriction and forged state)
 - ✅ Per-fbadmin-user server lists; shared server groups
 - ✅ Audit log of executed DDL and DML (who, when, what, on which database)
 - ✅ Read-only mode per server registration ("production safety")
@@ -117,7 +117,7 @@ exact DDL before it runs, like pgAdmin.
 - ✅ Database properties editor: set linger, set default charset, set replication, page buffers
 - ✅ **gstat parsed into charts:** table and index fill distribution, record versions, fragments, index depth, "tables needing attention"
 - ✅ **Trace API UI:** create a trace from a template (slow queries, errors, connections, PSQL), live streaming view, filter and search, save to file
-- ✅ Encryption: `ALTER DATABASE ENCRYPT/DECRYPT` with progress (`MON$CRYPT_STATE`) *(unverified: needs a crypt plugin on the server; the test servers have none)*
+- ✅ Encryption: `ALTER DATABASE ENCRYPT/DECRYPT` with progress (`MON$CRYPT_STATE`) (verified with Firebird's sample crypt plugin, `fbSampleDbCrypt`, in CI: encrypt, progress, header and MON$ state, data still readable, decrypt)
 - ✅ Scheduled jobs: backups and sweeps on a cron schedule, with retention (pgAgent-like)
 - ✅ `firebird.conf` and `databases.conf` viewer (read-only, via `RDB$CONFIG` in Firebird 4+) (effective values from `RDB$CONFIG`)
 
@@ -160,7 +160,7 @@ exact DDL before it runs, like pgAdmin.
 ## Milestone 1.0 — Packaging and polish ✅
 
 - ✅ `pip install fbadmin` on PyPI, with the prebuilt UI bundled in the wheel *(unverified: the release workflow is ready; the first release isn't tagged yet)*
-- ✅ Official multi-arch Docker image (amd64 and arm64), Helm chart, Kubernetes example with the Firebird operator (k8s example as a StatefulSet; with an operator such as Kuberbird, fbadmin connects through preconfigured servers: `FBADMIN_SERVERS_FILE` / Helm `firebirdServers`)
+- ✅ Official multi-arch Docker image (amd64 and arm64), Helm chart, Kubernetes example with the Firebird operator (`deploy/k8s`: StatefulSet. `deploy/k8s-operator`: a `FirebirdCluster` from the [cloudnative-firebird](https://github.com/mariuz/cloudnative-firebird) operator, with fbadmin registered from a ConfigMap; a kind workflow runs it end to end. Helm `firebirdServers` for preconfigured servers)
 - ✅ **Desktop app:** pywebview or Tauri shell with auto-update, for Windows (MSI), macOS (dmg) and Linux (AppImage, deb, rpm, Flatpak) *(unverified: `desktop.yml` builds MSI, dmg, AppImage, deb, rpm and Flatpak but hasn't run on a tag yet; builds are unsigned)*. Self-update downloads the package, verifies it against `SHA256SUMS`, then runs the MSI, replaces the AppImage or opens the dmg.
 - ✅ Preferences dialog: editor font, keymap, grid NULL display, date formats, confirmations
 - ✅ Internationalisation (i18n): English, Romanian, Portuguese (Brazil), Spanish, Russian, German, French and Czech (1750 strings in each language; CI checks that every catalog is complete)
