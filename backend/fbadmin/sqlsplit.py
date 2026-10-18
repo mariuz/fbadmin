@@ -40,7 +40,7 @@ def split_sql(script: str) -> list[Statement]:
     # PSQL module tracking: after "AS" in CREATE PROCEDURE/... a DECLARE section
     # may contain ";" before the BEGIN, so wait until the body block was seen.
     lead: list[str] = []
-    flags = {"as": False, "begin": False, "external": False}
+    flags: dict = {"as": False, "begin": False, "external": False}
 
     def is_psql() -> bool:
         if lead[:2] == ["EXECUTE", "BLOCK"]:
@@ -60,7 +60,10 @@ def split_sql(script: str) -> list[Statement]:
         word.clear()
         if len(lead) < 5:
             lead.append(w)
-        if w in ("BEGIN", "CASE"):
+        prev, flags["prev"] = flags.get("prev"), w
+        if w in ("SENSITIVE", "INSENSITIVE") and prev == "CASE" and depth > 0:
+            depth -= 1  # CREATE COLLATION ... CASE [IN]SENSITIVE is not a CASE expression
+        elif w in ("BEGIN", "CASE"):
             depth += 1
             if w == "BEGIN":
                 flags["begin"] = True
