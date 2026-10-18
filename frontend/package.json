@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "i18n": "node scripts-i18n.mjs",
+    "i18n:check": "node scripts-i18n.mjs --check"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.18.0",
