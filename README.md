@@ -9,25 +9,27 @@ as a container next to your server.
 
 ![Query Tool](docs/screenshots/query-tool.png)
 
-> **Status:** early development (v0.2). See the [ROADMAP](ROADMAP.md) for where it is going.
-> Tested against Firebird **3.0, 4.0 and 5.0**.
+> **Status:** every milestone of the [ROADMAP](ROADMAP.md) up to 1.0 is implemented.
+> Not released yet: the current version is 0.2.0, there is no tag, and nothing is on PyPI.
+> Tested against Firebird **3.0, 4.0, 5.0 and the 6.0 snapshots**. The UI is available in
+> English, Romanian, Portuguese (Brazil), Spanish, Russian, German, French and Czech.
 
 ## Features
 
-| Area | What works today |
+| Area | What it does |
 |---|---|
-| **Object Explorer** | Servers → databases → tables, views, procedures, functions, packages, triggers, sequences, domains, exceptions, indices, roles, users and system tables. Columns are shown under each table. Objects load lazily. |
-| **Properties** | Columns (domain, identity, computed, collation), constraints (PK/UK/FK/CHECK with rules), indices (selectivity, expression, partial), triggers, parameters, comments. |
-| **SQL (DDL)** | Re-creatable DDL for every object type. A round-trip test checks it on every CI run: extract, recreate in an empty database, compare. |
-| **Dependencies** | "Depends on" and "Used by" from `RDB$DEPENDENCIES`, with click-through navigation. |
-| **Query Tool** | CodeMirror editor with Firebird keywords and column-aware autocompletion. Runs a selection or a whole script: `SET TERM`, and PSQL blocks without `SET TERM`, are both split correctly. **Cancel** running statements. `:name` and `?` **parameter prompts**. **Detailed plans**. Per-statement **I/O and record stats**. Transaction settings: isolation, read-only, lock wait/timeout, and statement timeout on Firebird 4+. Auto-commit or manual commit/rollback. "Load more" from an open cursor. Errors underlined at their line and column. Formatter, comment toggle, snippets, history, and CSV/TSV/JSON/SQL/Markdown export. A cell viewer shows JSON, hex and images. |
-| **Data view** | Paged table data with sort and `WHERE` filters. Edit inside the grid: add, update and delete rows, all saved in one transaction. Rows are keyed by primary key, or by `RDB$DB_KEY` when the table has none. |
-| **Dashboard** | Database header info (ODS, page size, size, dialect, charset, forced writes, sweep interval, replica mode) and transaction counters (OIT/OAT/OST, with a gap warning). Object counts per type. |
-| **Monitor** | Live `MON$` view of attachments, running statements and transactions, plus I/O stats. Disconnect an attachment or cancel a running statement. |
-| **Maintenance** | Backup and restore through the Services API, plus sweep, `gstat` statistics and index selectivity recompute. These run as background **Processes** with live logs. |
-| **Server** | Server version and architecture, attached databases, security database, `firebird.log` viewer. Create, register and drop databases. |
-| **Security** | User management (`SEC$USERS`) with a create/edit dialog and SQL preview. Roles with their members. |
-| **UI** | Resizable panes, context menus everywhere, light, dark and auto themes, a Create Table dialog with SQL preview. |
+| **Object Explorer** | Servers → databases → (Firebird 6: schemas →) tables, views, procedures, functions, packages, triggers, sequences, domains, exceptions, indices, roles, users, system tables, collations, shadows and BLOB filters. Objects load lazily, and every node has a context menu. |
+| **Object dialogs** | pgAdmin-style create/alter dialogs with SQL preview: a table designer (columns, constraints, indices, triggers), columns, constraints, indices (partial, expression), views, sequences, domains, exceptions and roles. A PSQL editor maps compile errors to lines. Also a grants editor, comments, renames, and drop with a preview of what depends on the object. |
+| **SQL (DDL)** | Re-creatable DDL for every object, and a full database extract (like `isql -x`) ordered by dependencies. Round-trip tests run on every CI run. |
+| **Query Tool** | CodeMirror editor with column-aware autocompletion, minimap, macros and configurable shortcuts. Splits scripts with `SET TERM`. Cancel, parameter prompts, detailed plans with a plan diagram and plan diff, I/O and record stats per statement, and transaction settings. Export results to CSV, TSV, JSON, SQL, Markdown or XLSX. Optional AI assistant (opt-in). |
+| **Data grid** | Paged, sorted and filtered table data. In-grid edits are saved in one transaction. BLOB viewer and upload. Resizable and frozen columns. |
+| **Schema tools** | Schema diff with a migration script (database ↔ database or DDL script), ERD viewer and designer, import/export wizard (CSV, JSON, XLSX), copy data between databases, object search, test data generator, and a report of unused or invalid objects. |
+| **Monitoring** | Live dashboard charts, table statistics, compiled statement cache, OIT/OAT alerts, lock waits, history in SQLite, the Firebird 5 profiler with a PSQL hot-spot tree, an index advisor, and a Prometheus `/metrics` exporter. |
+| **Maintenance** | Backup and restore streamed through the browser, nbackup, validate/mend/sweep/limbo transactions, shutdown and online, database properties, gstat charts, the Trace API with live streaming, encryption, scheduled jobs and `RDB$CONFIG`. |
+| **Replication** | Publications and published tables, replica mode, lag between primary and replica, journal tracking, and a `replication.conf` helper (Firebird 4+). |
+| **Security** | Server mode with logins, CSRF protection, a master password (Argon2id + AES-GCM), LDAP/OIDC/proxy-header authentication, per-user and shared servers, an audit log, read-only servers, wire encryption and compression, Firebird users, mappings and system privileges. |
+| **Deployment** | pip, Docker (multi-arch), a Helm chart, a Kubernetes example, servers preconfigured from a file and Secrets, and desktop builds (MSI, dmg, AppImage, deb, rpm, Flatpak) with verified self-update. |
+| **UI** | Light, dark and high-contrast themes, 8 languages, keyboard navigation and ARIA (audited with axe-core in CI), and a plugin API for tree nodes, menus, tabs and dashboard panels. No telemetry. |
 
 <table>
 <tr><td><img src="docs/screenshots/properties.png" alt="Properties"></td><td><img src="docs/screenshots/ddl.png" alt="DDL"></td></tr>
@@ -68,12 +70,14 @@ Command-line options: `fbadmin --host 0.0.0.0 --port 5050 --no-browser`.
 | `FBADMIN_HOST` / `FBADMIN_PORT` | `127.0.0.1` / `5050` | Bind address |
 | `FBADMIN_MAX_ROWS` | `1000` | Default row limit per query result |
 | `FBADMIN_SESSION_IDLE_TIMEOUT` | `3600` | Seconds before an idle Query Tool connection is closed |
+| `FBADMIN_SERVERS_FILE` | unset | Firebird servers to register at startup (YAML/JSON; passwords from environment variables) |
 
-> ⚠️ **Security:** v0.1 has **no login screen**. It is meant for local use (it binds to
-> 127.0.0.1 by default), like pgAdmin's desktop mode. Saved passwords are stored in
-> plain text in `servers.json` (file mode 0600). Multi-user "server mode" with
-> authentication and encrypted credentials is the first item of the roadmap's
-> security milestone.
+All options are listed in [docs/admin/configuration.md](docs/admin/configuration.md).
+
+> **Security:** by default fbadmin binds to 127.0.0.1 and has no login, like pgAdmin's
+> desktop mode. For shared deployments, enable **server mode**: logins, sessions, CSRF
+> protection and per-user server lists. A master password encrypts saved Firebird
+> passwords. See [docs/SECURITY.md](docs/SECURITY.md).
 
 ## Development
 
