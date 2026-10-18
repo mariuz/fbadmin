@@ -1,0 +1,48 @@
+/* Security feature: login page, user menu, audit log, Firebird security panels. */
+.auth-page { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--bg, var(--panel-2)); padding: 16px; }
+.auth-card { width: 380px; max-width: 100%; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 26px 26px 20px; box-shadow: 0 18px 50px rgba(0, 0, 0, .12); display: flex; flex-direction: column; gap: 12px; }
+.auth-card h2 { margin: 4px 0 2px; font-size: 18px; }
+.auth-card label { display: flex; flex-direction: column; gap: 5px; font-size: 12px; color: var(--muted); }
+.auth-card .text { width: 100%; padding: 8px 10px; font-size: 14px; }
+.auth-card .btn.primary { justify-content: center; padding: 8px 12px; font-size: 14px; }
+.auth-card p { margin: 0; }
+.auth-brand { display: flex; align-items: center; gap: 10px; }
+.auth-brand b { display: block; font-size: 18px; }
+.auth-brand small { color: var(--muted); }
+.auth-or { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
+.auth-or::before, .auth-or::after { content: ""; flex: 1; border-top: 1px solid var(--border); }
+.auth-sso { justify-content: center; text-decoration: none; color: inherit; padding: 8px 12px; }
+
+.user-menu { position: relative; }
+.user-menu .badge { margin-left: 4px; background: var(--warn, #b45309); }
+.user-menu .ctx.user-menu-pop { position: absolute; right: 0; top: calc(100% + 4px); left: auto; }
+.user-menu .ctx .sub-h { text-transform: none; font-size: 12px; }
+
+.vault-form { display: flex; flex-direction: column; gap: 10px; }
+.vault-form p { margin: 0; }
+.vault-field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
+.vault-links { display: flex; gap: 14px; font-size: 12px; }
+.vault-links a { color: var(--accent-2); cursor: pointer; }
+
+.audit-grid { width: 100%; }
+.audit-row { cursor: pointer; }
+.audit-row.failed td { background: color-mix(in srgb, var(--danger) 7%, transparent); }
+.audit-sql { font-family: var(--mono); font-size: 12px; max-width: 520px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.audit-detail td { background: var(--panel-2); }
+.audit-detail pre { margin: 4px 0; max-height: 240px; }
+.small { font-size: 11px; }
+.pill.cat-DDL { color: #7c3aed; border-color: #7c3aed; }
+.pill.cat-DML { color: #0369a1; border-color: #0369a1; }
+.pill.cat-ACTION { color: #b45309; border-color: #b45309; }
+
+.sec-panel h3 { margin: 14px 0 6px; font-size: 14px; }
+.sec-bar { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
+.sec-checks { display: flex; gap: 14px; flex-wrap: wrap; }
+.sec-tags { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+.sec-tag-row { display: flex; gap: 4px; align-items: center; }
+.sec-tag-row .text { width: 140px; }
+.pill.tag { margin: 1px 3px 1px 0; }
+.pill .x { margin-left: 4px; cursor: pointer; color: var(--danger); }
+.sec-privs .pill { margin: 1px 3px 1px 0; font-size: 10.5px; }
+.sec-priv-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 4px 12px; font-size: 12px; }
+.sec-sql { margin-top: 12px; }

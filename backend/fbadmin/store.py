@@ -36,6 +36,11 @@ class ServerEntry(BaseModel):
     role: str | None = None
     charset: str = "UTF8"
     wire_crypt: bool = True
+    # --- security options (milestone 0.4)
+    wire_compress: bool = False
+    auth_plugin: str | None = None  # Srp256 | Srp | Legacy_Auth (None = driver default)
+    read_only: bool = False  # block everything but SELECT on this server
+    shared: bool = False  # server mode: visible to every fbadmin user, managed by admins
     group: str = "Servers"
     databases: list[DatabaseEntry] = Field(default_factory=list)
 

@@ -28,11 +28,15 @@ dependencies = [
   "pydantic>=2.5",
   "firebirdsql>=1.4.5",
   "openpyxl>=3.1",
+  "cryptography>=42",
+  "argon2-cffi>=23.1",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "httpx>=0.27", "ruff>=0.5", "hypothesis>=6.100"]
+dev = ["pytest>=8", "httpx>=0.27", "ruff>=0.5", "hypothesis>=6.100", "ldap3>=2.9"]
 ai = ["anthropic>=1.0"]
+ldap = ["ldap3>=2.9"]
+legacy-auth = ["passlib>=1.7"]
 # Optional native driver for metadata connections (FBADMIN_DRIVER=native, needs libfbclient).
 native = ["firebird-driver>=1.10"]
 # Native desktop window for fbadmin-desktop (falls back to the web browser without it).

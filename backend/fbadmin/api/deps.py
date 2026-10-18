@@ -13,6 +13,9 @@ class State:
         self.store = ServerStore(settings.servers_file)
         self.manager = ConnectionManager(self.store)
         self.jobs = JobManager()
+        from ..security import attach  # master password, server mode (per-user registries)
+
+        attach(self)
 
 
 _state: State | None = None

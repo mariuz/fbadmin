@@ -84,6 +84,10 @@ def create_app() -> FastAPI:
     def object_types():
         return [{"type": k, **v} for k, v in OBJECT_TYPES.items()]
 
+    from .security import install as install_security  # auth, CSRF, limits, read-only, audit
+
+    install_security(app)
+
     for router in ROUTERS:
         app.include_router(router)
 

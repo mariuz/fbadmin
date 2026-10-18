@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextvars
 import threading
 import time
 import traceback
@@ -61,7 +62,8 @@ class JobManager:
             finally:
                 job.finished_at = time.time()
 
-        threading.Thread(target=run, name=f"job-{job.id}", daemon=True).start()
+        ctx = contextvars.copy_context()  # keeps the request's fbadmin user (server mode)
+        threading.Thread(target=ctx.run, args=(run,), name=f"job-{job.id}", daemon=True).start()
         return job
 
     def list(self) -> list[Job]:

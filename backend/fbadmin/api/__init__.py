@@ -16,6 +16,9 @@ from . import replication
 from . import version as version_api
 from . import object_dialogs
 from . import schema
+from . import admin
+from . import auth
+from . import fbsecurity
 
 ROUTERS: list[APIRouter] = [
     servers.router,
@@ -34,4 +37,7 @@ ROUTERS: list[APIRouter] = [
     version_api.router,
     object_dialogs.router,
     schema.router,
+    auth.router,
+    admin.router,
+    fbsecurity.router,
 ]

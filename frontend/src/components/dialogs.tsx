@@ -5,6 +5,7 @@ import type { DatabaseEntry, Server } from "../types";
 import { Modal } from "./Modal";
 import { SqlEditor } from "./SqlEditor";
 import { IconPlus, IconTrash } from "./Icons";
+import { canShareServers } from "../features/security/state";
 
 function useSubmit() {
   const [busy, setBusy] = useState(false);
@@ -40,6 +41,10 @@ export function ServerDialog(props: { server?: Server }) {
     role: s?.role ?? "",
     charset: s?.charset ?? "UTF8",
     wire_crypt: s?.wire_crypt ?? true,
+    wire_compress: s?.wire_compress ?? false,
+    auth_plugin: s?.auth_plugin ?? "",
+    read_only: s?.read_only ?? false,
+    shared: s?.shared ?? false,
     database: "",
   });
   const set = (k: string, v: unknown) => setF((o) => ({ ...o, [k]: v }));
@@ -47,7 +52,7 @@ export function ServerDialog(props: { server?: Server }) {
   const close = () => app.showDialog(null);
   const submit = () =>
     run(async () => {
-      const body: Record<string, unknown> = { ...f, name: f.name || f.host, role: f.role || null };
+      const body: Record<string, unknown> = { ...f, name: f.name || f.host, role: f.role || null, auth_plugin: f.auth_plugin || null };
       delete body.database;
       if (s) {
         await api.updateServer(s.id, body);
@@ -98,6 +103,22 @@ export function ServerDialog(props: { server?: Server }) {
         </select>
         <span />
         <label className="check"><input type="checkbox" checked={f.wire_crypt} onChange={(e) => set("wire_crypt", e.target.checked)} /> Wire encryption</label>
+        <span />
+        <label className="check" title="zlib compression of the wire protocol (Firebird 3+); helps on slow links">
+          <input type="checkbox" checked={f.wire_compress} onChange={(e) => set("wire_compress", e.target.checked)} /> Wire compression</label>
+        <label className="l">Authentication plugin</label>
+        <select className="text" value={f.auth_plugin} onChange={(e) => set("auth_plugin", e.target.value)}>
+          <option value="">default (Srp256)</option>
+          {["Srp256", "Srp", "Legacy_Auth"].map((p) => <option key={p} value={p}>{p}</option>)}
+        </select>
+        <span />
+        <label className="check" title="Production safety: only queries are allowed; data edits, DDL and other changes are refused">
+          <input type="checkbox" checked={f.read_only} onChange={(e) => set("read_only", e.target.checked)} /> Read-only (block everything but SELECT)</label>
+        {(canShareServers() || s?.shared) && <>
+          <span />
+          <label className="check" title="Visible to every fbadmin user; each user enters their own Firebird password">
+            <input type="checkbox" checked={f.shared} disabled={!canShareServers()} onChange={(e) => set("shared", e.target.checked)} /> Shared with all fbadmin users</label>
+        </>}
         {!s && (
           <>
             <label className="l">First database</label>

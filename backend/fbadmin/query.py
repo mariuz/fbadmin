@@ -82,6 +82,7 @@ class QuerySession:
     dirty: bool = False  # transaction has uncommitted work
     tx: TxOptions = field(default_factory=TxOptions)
     statement_timeout: int = 0  # milliseconds, Firebird 4+
+    force_read_only: bool = False  # server registered as read-only
     # result set left open so the client can fetch more rows
     cursor: Any = None
     cursor_columns: int = 0
@@ -104,6 +105,8 @@ class QuerySession:
     def set_options(self, tx: TxOptions, statement_timeout: int | None) -> None:
         if self.dirty:
             raise ValueError("Commit or roll back the open transaction before changing transaction options")
+        if self.force_read_only and not tx.read_only:
+            raise ValueError("This server is registered as read-only: transactions must be read-only")
         if ISOLATIONS[tx.isolation][1] > self.engine_major:
             raise ValueError(f"{tx.isolation} needs Firebird {ISOLATIONS[tx.isolation][1]} or newer")
         self.close_cursor()
