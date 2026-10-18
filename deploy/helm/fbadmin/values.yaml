@@ -103,6 +103,19 @@ config:
   # firebirdsql (pure Python, default) or native (needs libfbclient in the image).
   driver: firebirdsql
 
+# Firebird servers registered at startup (FBADMIN_SERVERS_FILE), e.g. the Service of a
+# Firebird StatefulSet or of an instance managed by a Firebird operator. Passwords are read
+# from existing Secrets and never stored by fbadmin. In server mode they are shared servers.
+firebirdServers: []
+#  - name: Production
+#    host: firebird.databases.svc.cluster.local
+#    port: 3050
+#    user: SYSDBA
+#    passwordSecret: { name: firebird-secret, key: root-password }
+#    read_only: false       # true blocks everything but SELECT
+#    databases:
+#      - { name: main, path: /var/lib/firebird/data/main.fdb }
+
 # Extra environment variables for the container.
 extraEnv: []
 #  - name: FBADMIN_META_POOL_SIZE

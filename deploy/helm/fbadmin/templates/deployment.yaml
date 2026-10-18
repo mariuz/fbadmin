@@ -18,6 +18,9 @@ spec:
         {{- if and .Values.serverMode.enabled (not .Values.serverMode.existingSecret) }}
         checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
         {{- end }}
+        {{- if .Values.firebirdServers }}
+        checksum/servers: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- end }}
         {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -75,6 +78,19 @@ spec:
                   name: {{ include "fbadmin.secretName" . }}
                   key: {{ .Values.serverMode.secretKeys.adminPassword }}
             {{- end }}
+            {{- if .Values.firebirdServers }}
+            - name: FBADMIN_SERVERS_FILE
+              value: /config/servers.yaml
+            {{- range $i, $s := .Values.firebirdServers }}
+            {{- with $s.passwordSecret }}
+            - name: FBADMIN_FB_PASSWORD_{{ $i }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .name }}
+                  key: {{ .key | default "password" }}
+            {{- end }}
+            {{- end }}
+            {{- end }}
             {{- with .Values.extraEnv }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
@@ -101,6 +117,11 @@ spec:
               mountPath: /data
             - name: tmp
               mountPath: /tmp
+            {{- if .Values.firebirdServers }}
+            - name: servers
+              mountPath: /config
+              readOnly: true
+            {{- end }}
       volumes:
         - name: data
           {{- if .Values.persistence.enabled }}
@@ -111,6 +132,11 @@ spec:
           {{- end }}
         - name: tmp
           emptyDir: {}
+        {{- if .Values.firebirdServers }}
+        - name: servers
+          configMap:
+            name: {{ include "fbadmin.fullname" . }}-servers
+        {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

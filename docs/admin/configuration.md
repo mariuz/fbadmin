@@ -28,6 +28,7 @@ fbadmin-desktop [--port PORT] [--browser] [--log-level LEVEL]
 | `FBADMIN_DRIVER` | `firebirdsql` | `native` to use `firebird-driver` + libfbclient for metadata connections |
 | `FBADMIN_FBCLIENT` | | Path of `libfbclient` for the native driver |
 | `FBADMIN_UPDATE_CHECK` | `ask` | `off` forbids the opt-in update check (see [Privacy](../PRIVACY.md)) |
+| `FBADMIN_SERVERS_FILE` | unset | YAML/JSON file of Firebird servers to register at startup; see [Deployment](deployment.md#preconfigured-servers) |
 
 ## Logging
 

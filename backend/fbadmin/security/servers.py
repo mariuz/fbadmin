@@ -22,7 +22,7 @@ from typing import Any
 
 from ..connections import ConnectionManager
 from ..jobs import JobManager
-from ..store import DatabaseEntry, ServerEntry, ServerStore
+from ..store import DatabaseEntry, ServerEntry, ServerStore, _configured_password
 from .crypto import decrypt, encrypt, is_token
 from .errors import AccessDenied, LoginRequired, MasterPasswordRequired
 from .sessions import Principal, current_principal
@@ -167,7 +167,8 @@ class EncryptedServerStore(ServerStore):
     def password_for(self, server_id: str) -> str | None:
         with self._lock:
             srv = self.get(server_id)
-            return self._reveal(srv.password, srv.id) or self._session_passwords.get(server_id)
+            return (self._reveal(srv.password, srv.id) or self._session_passwords.get(server_id)
+                    or _configured_password(server_id))
 
     def needs_unlock(self, server_id: str) -> bool:
         with self._lock:
@@ -320,7 +321,7 @@ class UserScopedStore:
         if own:
             return own.password_for(server_id)
         self.shared.get(server_id)  # KeyError if unknown
-        return self.user_store().shared_password_for(server_id)
+        return self.user_store().shared_password_for(server_id) or _configured_password(server_id)
 
     def needs_unlock(self, server_id: str) -> bool:
         return self.user_store().needs_unlock(server_id)

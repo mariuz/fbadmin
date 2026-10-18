@@ -15,6 +15,13 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 
 
+def _configured_password(server_id: str) -> str | None:
+    """Password of a server from FBADMIN_SERVERS_FILE (read from its environment variable)."""
+    from .preconfig import password_for
+
+    return password_for(server_id)
+
+
 def _new_id() -> str:
     return uuid.uuid4().hex[:12]
 
@@ -122,7 +129,7 @@ class ServerStore:
     def password_for(self, server_id: str) -> str | None:
         with self._lock:
             srv = self.get(server_id)
-            return srv.password or self._session_passwords.get(server_id)
+            return srv.password or self._session_passwords.get(server_id) or _configured_password(server_id)
 
     def remember_password(self, server_id: str, password: str) -> None:
         with self._lock:

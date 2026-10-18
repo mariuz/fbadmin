@@ -1,7 +1,24 @@
+# Firebird servers fbadmin registers at startup. With a Firebird operator, point "host" at the
+# Service the operator created for the instance and the password at its Secret.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fbadmin-servers
+data:
+  servers.yaml: |
+    servers:
+      - name: Firebird (cluster)
+        host: firebird
+        port: 3050
+        user: SYSDBA
+        password_env: FIREBIRD_PASSWORD
+        databases:
+          - { name: demo, path: /var/lib/firebird/data/demo.fdb }
+---
 # fbadmin next to the Firebird StatefulSet (firebird.yaml). After `kubectl apply -k deploy/k8s`:
 #   kubectl -n fbadmin port-forward svc/fbadmin 5050:80   ->  http://127.0.0.1:5050
-#   Add server: host "firebird", port 3050, user SYSDBA, the password from firebird-secret,
-#   first database /var/lib/firebird/data/demo.fdb
+#   The server "Firebird (cluster)" with the demo database is already registered
+#   (fbadmin-servers ConfigMap above; the password comes from firebird-secret).
 # For a multi-user installation with a login screen, use the Helm chart (deploy/helm/fbadmin)
 # with serverMode.enabled=true instead.
 apiVersion: v1
@@ -45,6 +62,11 @@ spec:
             - { name: FBADMIN_PORT, value: "5050" }
             - { name: FBADMIN_DATA_DIR, value: /data }
             - { name: FBADMIN_UPDATE_CHECK, value: "off" }
+            # the Firebird server below is registered at startup (servers.yaml from the ConfigMap)
+            - { name: FBADMIN_SERVERS_FILE, value: /config/servers.yaml }
+            - name: FIREBIRD_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: firebird-secret, key: root-password }
           ports:
             - name: http
               containerPort: 5050
@@ -64,11 +86,14 @@ spec:
           volumeMounts:
             - { name: data, mountPath: /data }
             - { name: tmp, mountPath: /tmp }
+            - { name: servers, mountPath: /config, readOnly: true }
       volumes:
         - name: data
           persistentVolumeClaim: { claimName: fbadmin-data }
         - name: tmp
           emptyDir: {}
+        - name: servers
+          configMap: { name: fbadmin-servers }
 ---
 apiVersion: v1
 kind: Service

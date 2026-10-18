@@ -16,6 +16,9 @@ class State:
         from ..security import attach  # master password, server mode (per-user registries)
 
         attach(self)
+        from ..preconfig import apply_from_env  # FBADMIN_SERVERS_FILE (deployments)
+
+        apply_from_env(self)
 
 
 _state: State | None = None
