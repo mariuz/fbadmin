@@ -12,3 +12,6 @@ backend/fbadmin/static/
 .env
 build/
 dist/
+e2e/test-results/
+e2e/playwright-report/
+site/
