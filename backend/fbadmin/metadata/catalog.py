@@ -9,6 +9,7 @@ from __future__ import annotations
 from functools import cached_property
 from typing import Any
 
+from .catalog_extras import CatalogExtras, sql_security_clause
 from .types import format_type, quote_ident, sql_string
 
 # Object types shown in the object explorer, in display order.
@@ -26,6 +27,10 @@ OBJECT_TYPES: dict[str, dict[str, str]] = {
     "roles": {"label": "Roles", "singular": "Role"},
     "users": {"label": "Users", "singular": "User"},
     "system_tables": {"label": "System Tables", "singular": "System Table"},
+    "collations": {"label": "Collations", "singular": "Collation"},
+    "charsets": {"label": "Character Sets", "singular": "Character Set"},
+    "shadows": {"label": "Shadows", "singular": "Shadow"},
+    "blob_filters": {"label": "BLOB Filters", "singular": "BLOB Filter"},
 }
 
 # RDB$DEPENDENCIES object type codes.
@@ -92,7 +97,7 @@ def _is_auto_name(name: str | None) -> bool:
     return not name or name.startswith("INTEG_") or name.startswith("RDB$")
 
 
-class Catalog:
+class Catalog(CatalogExtras):
     """Metadata reader bound to a single open connection."""
 
     def __init__(self, conn):
@@ -453,7 +458,8 @@ class Catalog:
             "t.RDB$TRIGGER_TYPE AS trigger_type, t.RDB$TRIGGER_SEQUENCE AS pos, "
             "t.RDB$TRIGGER_INACTIVE AS inactive, t.RDB$TRIGGER_SOURCE AS source, "
             "TRIM(t.RDB$ENGINE_NAME) AS engine, TRIM(t.RDB$ENTRYPOINT) AS entrypoint, "
-            "t.RDB$DESCRIPTION AS description FROM RDB$TRIGGERS t WHERE " + where +
+            "t.RDB$DESCRIPTION AS description" + self.sql_security_col("RDB$TRIGGERS", "t.") +
+            " FROM RDB$TRIGGERS t WHERE " + where +
             " AND COALESCE(t.RDB$SYSTEM_FLAG, 0) = 0 AND NOT EXISTS (SELECT 1 FROM RDB$CHECK_CONSTRAINTS cc "
             "WHERE cc.RDB$TRIGGER_NAME = t.RDB$TRIGGER_NAME) ORDER BY t.RDB$TRIGGER_SEQUENCE, t.RDB$TRIGGER_NAME",
             (relation or name,),
@@ -469,6 +475,7 @@ class Catalog:
         if t["relation"]:
             s += f" FOR {quote_ident(t['relation'])}"
         s += f"\n{'INACTIVE' if t['inactive'] else 'ACTIVE'} {t['event']} POSITION {t['position'] or 0}\n"
+        s += sql_security_clause(t.get("sql_security"), "", "\n")
         s += _routine_body(t["source"], t.get("engine"), t.get("entrypoint"), source_has_as=True)
         return s
 
@@ -556,6 +563,7 @@ class Catalog:
             raise LookupError(f"{OBJECT_TYPES.get(otype, {}).get('singular', otype)} {name!r} not found")
         obj.setdefault("type", otype)
         obj.setdefault("name", name)
+        self.extra_properties(otype, name, obj)
         if otype not in ("users",):
             obj["dependencies"] = self.dependencies(name)
         return obj
@@ -564,7 +572,8 @@ class Catalog:
         r = self.one(
             "SELECT TRIM(RDB$RELATION_NAME) AS name, RDB$RELATION_TYPE AS relation_type, "
             "TRIM(RDB$OWNER_NAME) AS owner, RDB$EXTERNAL_FILE AS external_file, RDB$DESCRIPTION AS description, "
-            "RDB$SYSTEM_FLAG AS system_flag FROM RDB$RELATIONS WHERE RDB$RELATION_NAME = ? AND RDB$VIEW_BLR IS NULL",
+            "RDB$SYSTEM_FLAG AS system_flag" + self.sql_security_col("RDB$RELATIONS") + " FROM RDB$RELATIONS "
+            "WHERE RDB$RELATION_NAME = ? AND RDB$VIEW_BLR IS NULL",
             (name,),
         )
         if not r:
@@ -582,6 +591,7 @@ class Catalog:
             "External file": (r["external_file"] or "").strip() or None,
             "Comment": r["description"],
         }
+        self.add_security_property(props, r)
         obj = {"properties": props, "columns": cols, "constraints": cons, "indices": idx, "triggers": trg}
         obj["ddl"] = self._table_ddl(r, cols, cons, idx, trg)
         return obj
@@ -626,6 +636,7 @@ class Catalog:
             out += " ON COMMIT PRESERVE ROWS"
         elif rtype == 5:
             out += " ON COMMIT DELETE ROWS"
+        out += sql_security_clause(t.get("sql_security"), " ")
         out += ";\n"
         for c in cons:
             if c["type"] in ("FOREIGN KEY", "CHECK"):
@@ -678,7 +689,8 @@ class Catalog:
         r = self.one(
             "SELECT TRIM(RDB$PROCEDURE_NAME) AS name, RDB$PROCEDURE_TYPE AS ptype, RDB$PROCEDURE_SOURCE AS source, "
             "RDB$VALID_BLR AS valid, TRIM(RDB$OWNER_NAME) AS owner, TRIM(RDB$ENGINE_NAME) AS engine, "
-            "TRIM(RDB$ENTRYPOINT) AS entrypoint, RDB$DESCRIPTION AS description FROM RDB$PROCEDURES "
+            "TRIM(RDB$ENTRYPOINT) AS entrypoint, RDB$DESCRIPTION AS description"
+            + self.sql_security_col("RDB$PROCEDURES") + " FROM RDB$PROCEDURES "
             "WHERE RDB$PROCEDURE_NAME = ? AND RDB$PACKAGE_NAME IS NULL",
             (name,),
         )
@@ -712,6 +724,7 @@ class Catalog:
             s += "\nRETURNS (\n" + ",\n".join(f"    {quote_ident(p['name'])} {p['data_type']}" for p in outs) + ")"
         if r is None:
             return s
+        s += sql_security_clause(r.get("sql_security"), "\n")
         return s + "\n" + _routine_body(r.get("source"), r.get("engine"), r.get("entrypoint"))
 
     def _get_functions(self, name: str):
@@ -719,7 +732,8 @@ class Catalog:
             "SELECT TRIM(RDB$FUNCTION_NAME) AS name, RDB$FUNCTION_SOURCE AS source, RDB$LEGACY_FLAG AS legacy, "
             "RDB$DETERMINISTIC_FLAG AS is_deterministic, RDB$VALID_BLR AS valid, RDB$RETURN_ARGUMENT AS ret, "
             "TRIM(RDB$MODULE_NAME) AS module, TRIM(RDB$ENTRYPOINT) AS entrypoint, TRIM(RDB$ENGINE_NAME) AS engine, "
-            "TRIM(RDB$OWNER_NAME) AS owner, RDB$DESCRIPTION AS description FROM RDB$FUNCTIONS "
+            "TRIM(RDB$OWNER_NAME) AS owner, RDB$DESCRIPTION AS description"
+            + self.sql_security_col("RDB$FUNCTIONS") + " FROM RDB$FUNCTIONS "
             "WHERE RDB$FUNCTION_NAME = ? AND RDB$PACKAGE_NAME IS NULL",
             (name,),
         )
@@ -760,13 +774,15 @@ class Catalog:
             return s
         if r.get("is_deterministic"):
             s += " DETERMINISTIC"
+        s += sql_security_clause(r.get("sql_security"), "\n")
         return s + "\n" + _routine_body(r.get("source"), r.get("engine"), r.get("entrypoint"))
 
     def _get_packages(self, name: str):
         r = self.one(
             "SELECT TRIM(RDB$PACKAGE_NAME) AS name, RDB$PACKAGE_HEADER_SOURCE AS header, "
             "RDB$PACKAGE_BODY_SOURCE AS body, RDB$VALID_BODY_FLAG AS valid, TRIM(RDB$OWNER_NAME) AS owner, "
-            "RDB$DESCRIPTION AS description FROM RDB$PACKAGES WHERE RDB$PACKAGE_NAME = ?",
+            "RDB$DESCRIPTION AS description" + self.sql_security_col("RDB$PACKAGES")
+            + " FROM RDB$PACKAGES WHERE RDB$PACKAGE_NAME = ?",
             (name,),
         )
         if not r:
@@ -780,7 +796,8 @@ class Catalog:
             "SELECT TRIM(RDB$FUNCTION_NAME) AS name FROM RDB$FUNCTIONS WHERE RDB$PACKAGE_NAME = ? ORDER BY 1",
             (name,),
         )
-        ddl = f"CREATE OR ALTER PACKAGE {qn}\nAS\n{(r['header'] or '').strip()};\n"
+        ddl = f"CREATE OR ALTER PACKAGE {qn}{sql_security_clause(r.get('sql_security'), chr(10))}\nAS\n"
+        ddl += f"{(r['header'] or '').strip()};\n"
         if r["body"]:
             ddl += f"\nRECREATE PACKAGE BODY {qn}\nAS\n{r['body'].strip()};\n"
         if r["description"]:
@@ -1074,6 +1091,7 @@ _DROP_KEYWORDS = {
     "tables": "TABLE", "system_tables": "TABLE", "views": "VIEW", "procedures": "PROCEDURE",
     "functions": "FUNCTION", "packages": "PACKAGE", "triggers": "TRIGGER", "sequences": "SEQUENCE",
     "domains": "DOMAIN", "exceptions": "EXCEPTION", "indices": "INDEX", "roles": "ROLE", "users": "USER",
+    "collations": "COLLATION",
 }
 
 

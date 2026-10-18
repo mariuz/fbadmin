@@ -60,7 +60,9 @@ def split_sql(script: str) -> list[Statement]:
         word.clear()
         if len(lead) < 5:
             lead.append(w)
-        if w in ("BEGIN", "CASE"):
+        if w == "CASE" and lead[1:2] == ["COLLATION"]:
+            pass  # CREATE COLLATION ... CASE [IN]SENSITIVE is not a CASE block
+        elif w in ("BEGIN", "CASE"):
             depth += 1
             if w == "BEGIN":
                 flags["begin"] = True
