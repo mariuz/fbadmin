@@ -158,7 +158,9 @@ export function Dashboard(props: { sel: Selection | null }) {
     setError(null);
     if (!sel) return;
     const p = sel.kind === "server" ? api.serverInfo(sel.serverId) : api.databaseInfo(sel.serverId, sel.dbId!);
-    p.then(setData).catch((e) => setError(errMsg(e)));
+    let stale = false;
+    p.then((d) => !stale && setData({ ...d, __scope: scope })).catch((e) => !stale && setError(errMsg(e)));
+    return () => { stale = true; };
   }, [scope]);
 
   if (!sel || !srv) {
@@ -171,7 +173,7 @@ export function Dashboard(props: { sel: Selection | null }) {
     );
   }
   if (error) return <div className="pad err" style={{ whiteSpace: "pre-wrap" }}>{error}</div>;
-  if (!data) return <div className="pad muted">Loading…</div>;
+  if (!data || data.__scope !== scope) return <div className="pad muted">Loading…</div>;
 
   if (sel.kind === "server") {
     return (

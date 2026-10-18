@@ -17,6 +17,7 @@ from .api.deps import get_state
 from .config import settings
 from .connections import PasswordRequired
 from .metadata import OBJECT_TYPES
+from .plugins import load_plugins
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -76,6 +77,12 @@ def create_app() -> FastAPI:
 
     for router in ROUTERS:
         app.include_router(router)
+
+    plugins = load_plugins(app)
+
+    @app.get("/api/plugins")
+    def list_plugins():
+        return plugins
 
     if STATIC_DIR.exists():
         app.mount("/assets", StaticFiles(directory=STATIC_DIR / "assets"), name="assets")

@@ -76,3 +76,17 @@ export function registerDashboardSection(s: DashboardSection) {
 export function getDashboardSections() {
   return dashboardSections;
 }
+
+// --- extra Object Explorer nodes ------------------------------------------------
+/** Extra child nodes under a database (after the built-in folders). */
+export interface TreeNodesProvider {
+  parent: "database";
+  build: (serverId: string, dbId: string) => Promise<import("./components/Tree").NodeSpec[]>;
+}
+const treeNodes: TreeNodesProvider[] = [];
+export function registerTreeNodes(p: TreeNodesProvider) {
+  treeNodes.push(p);
+}
+export function getTreeNodes(parent: "database") {
+  return treeNodes.filter((t) => t.parent === parent);
+}

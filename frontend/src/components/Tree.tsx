@@ -7,6 +7,7 @@ import {
 } from "./Icons";
 import { ContextMenu, type MenuItem } from "./ContextMenu";
 import { buildMenu } from "./menus";
+import { getTreeNodes } from "../registry";
 
 export interface NodeSpec {
   key: string;
@@ -68,6 +69,14 @@ function TreeNode(props: {
         className={"tree-row" + (selected ? " selected" : "") + (spec.dim ? " dim" : "")}
         style={{ paddingLeft: 6 + props.depth * 16 }}
         title={spec.title}
+        role="treeitem"
+        aria-level={props.depth + 1}
+        aria-selected={selected}
+        aria-expanded={spec.load ? open : undefined}
+        tabIndex={selected ? 0 : -1}
+        data-level={props.depth}
+        data-expandable={spec.load ? "1" : "0"}
+        data-open={open ? "1" : "0"}
         onClick={() => app.select(spec.selection)}
         onDoubleClick={toggle}
         onContextMenu={(e) => {
@@ -175,11 +184,53 @@ export function Tree() {
         load: async () => {
           await api.connectDatabase(srv.id, d.id);
           const info = await api.databaseInfo(srv.id, d.id);
-          return databaseFolders(srv.id, d.id, info.counts);
+          const extra = (await Promise.all(getTreeNodes("database").map((t) => t.build(srv.id, d.id).catch(() => [])))).flat();
+          return [...databaseFolders(srv.id, d.id, info.counts), ...extra];
         },
       }));
     },
   });
+
+  /** Keyboard navigation (WAI-ARIA tree pattern). */
+  const onTreeKey = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const rows = Array.from(e.currentTarget.querySelectorAll<HTMLElement>(".tree-row"));
+    const cur = (document.activeElement as HTMLElement)?.closest?.(".tree-row") as HTMLElement | null;
+    const i = cur ? rows.indexOf(cur) : -1;
+    const focus = (el?: HTMLElement) => {
+      if (!el) return;
+      el.focus();
+      el.click(); // selects it
+    };
+    const level = cur ? Number(cur.dataset.level) : 0;
+    switch (e.key) {
+      case "ArrowDown": focus(rows[Math.min(rows.length - 1, i + 1)]); break;
+      case "ArrowUp": focus(rows[Math.max(0, i - 1)]); break;
+      case "Home": focus(rows[0]); break;
+      case "End": focus(rows[rows.length - 1]); break;
+      case "ArrowRight":
+        if (!cur) return;
+        if (cur.dataset.expandable === "1" && cur.dataset.open !== "1") (cur.querySelector(".twisty") as HTMLElement)?.click();
+        else if (cur.dataset.open === "1") focus(rows[i + 1]);
+        break;
+      case "ArrowLeft":
+        if (!cur) return;
+        if (cur.dataset.open === "1") (cur.querySelector(".twisty") as HTMLElement)?.click();
+        else for (let j = i - 1; j >= 0; j--) if (Number(rows[j].dataset.level) < level) { focus(rows[j]); break; }
+        break;
+      case "Enter": case " ":
+        if (cur?.dataset.expandable === "1") (cur.querySelector(".twisty") as HTMLElement)?.click();
+        break;
+      case "ContextMenu": case "F10":
+        if (e.key === "F10" && !e.shiftKey) return;
+        if (cur) {
+          const r = cur.getBoundingClientRect();
+          cur.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, clientX: r.left + 40, clientY: r.bottom }));
+        }
+        break;
+      default: return;
+    }
+    e.preventDefault();
+  };
 
   const onContext = (e: React.MouseEvent, sel: Selection) => {
     setMenu({ x: e.clientX, y: e.clientY, items: buildMenu(app, sel) });
@@ -196,7 +247,7 @@ export function Tree() {
     );
   }
   return (
-    <div className="tree">
+    <div className="tree" role="tree" aria-label="Object Explorer" onKeyDown={onTreeKey}>
       {app.servers.map((s) => (
         <TreeNode key={s.id} spec={serverSpec(s)} depth={0} onContext={onContext} />
       ))}

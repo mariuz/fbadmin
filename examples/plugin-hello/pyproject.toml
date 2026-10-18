@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fbadmin-hello"
+version = "0.1.0"
+description = "Example fbadmin plugin: an API endpoint, a menu item and a workspace tab"
+dependencies = ["fbadmin"]
+
+[project.entry-points."fbadmin.plugins"]
+hello = "fbadmin_hello:plugin"
+
+[tool.setuptools.package-data]
+fbadmin_hello = ["static/*"]
