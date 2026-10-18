@@ -10,7 +10,7 @@ pgAdmin-style web admin for Firebird. Backend: Python/FastAPI in `backend/fbadmi
 - Frontend typecheck/build: `cd frontend && npm run build` (run `npm install` first in a fresh checkout)
 - Run: `.venv/bin/python -m fbadmin --no-browser --port 5050`
 
-## Test servers (local Docker containers)
+## Test servers (local Docker containers) - start/restart with `scripts/test-servers.sh`
 FB5 on 127.0.0.1:3050, FB3 on :3053, FB4 on :3054, SYSDBA/masterkey, database dir
 `/var/lib/firebird/data`. Select with `FBADMIN_TEST_PORT=3053`. All three must pass.
 
