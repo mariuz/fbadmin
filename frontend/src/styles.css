@@ -241,8 +241,6 @@ table.grid th { position: sticky; }
 table.grid th .col-resizer { position: absolute; top: 0; right: -3px; width: 7px; height: 100%; cursor: col-resize; z-index: 3; }
 table.grid th .col-resizer:hover { background: var(--accent-2); opacity: .5; }
 table.grid th.rn, table.grid td.rn { min-width: 48px; width: 48px; }
-table.grid.freeze1 th:nth-child(2), table.grid.freeze1 td:nth-child(2) { position: sticky; left: 48px; z-index: 1; background: var(--panel); box-shadow: 2px 0 0 var(--border); }
-table.grid.freeze1 th:nth-child(2) { z-index: 3; background: var(--panel-2); }
 /* high-contrast theme (accessibility) */
 :root[data-theme="contrast"] {
   --bg: #000; --panel: #000; --panel-2: #0d0d0d; --border: #fff; --text: #fff; --muted: #e0e0e0;

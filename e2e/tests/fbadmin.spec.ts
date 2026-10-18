@@ -106,6 +106,18 @@ test("runs a query in the Query Tool and shows the result grid", async () => {
   await expect(qt.locator(".messages")).toContainText("SELECT ID, NAME, CITY FROM CUSTOMER");
 });
 
+test("freezes leading result columns", async () => {
+  const qt = page.locator(".tab-pane:not(.hidden) .qt");
+  await setEditor(page, qt, "SELECT ID, NAME, CITY, BALANCE, ID AS ID2, NAME AS N2, CITY AS C2 FROM CUSTOMER");
+  await qt.locator("button", { hasText: "Execute" }).click();
+  await qt.locator("label", { hasText: "Freeze" }).locator("select").selectOption("2");
+  const second = qt.locator(".qt-out table thead th").nth(2);
+  await expect(second).toHaveCSS("position", "sticky");
+  const left = await second.evaluate((el) => parseFloat(getComputedStyle(el).left));
+  expect(left).toBeGreaterThan(40); // row-number column + first column
+  await expect(qt.locator(".qt-out table thead th").nth(3)).not.toHaveCSS("left", /\d+px/);
+});
+
 test("prompts for :named parameters", async () => {
   const qt = page.locator(".tab-pane:not(.hidden) .qt");
   await setEditor(page, qt, "SELECT NAME FROM CUSTOMER WHERE CITY = :city");

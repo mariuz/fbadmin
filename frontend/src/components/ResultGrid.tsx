@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ColumnInfo } from "../types";
 import { buildXlsx } from "../lib/xlsx";
 import { getPrefs } from "../prefs";
@@ -160,7 +160,18 @@ export function ResultGrid(props: {
   const [viewer, setViewer] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [widths, setWidths] = useState<Record<number, number>>({});
-  const [freeze, setFreeze] = useState(false);
+  // number of leading columns kept visible while scrolling sideways
+  const [frozen, setFrozen] = useState(0);
+  const headRow = useRef<HTMLTableRowElement>(null);
+  const [offsets, setOffsets] = useState<number[]>([]);
+  useLayoutEffect(() => {
+    if (!frozen || !headRow.current) { setOffsets([]); return; }
+    const cells = Array.from(headRow.current.children) as HTMLElement[]; // [row number, col 0, col 1, …]
+    const out: number[] = [];
+    let left = cells[0]?.offsetWidth ?? 0;
+    for (let i = 0; i < frozen && i + 1 < cells.length; i++) { out.push(left); left += cells[i + 1].offsetWidth; }
+    setOffsets(out);
+  }, [frozen, widths, columns]);
 
   const startResize = (e: React.MouseEvent, ci: number) => {
     e.preventDefault();
@@ -172,8 +183,16 @@ export function ResultGrid(props: {
     window.addEventListener("mousemove", move);
     window.addEventListener("mouseup", up);
   };
-  const colStyle = (ci: number): React.CSSProperties | undefined =>
-    widths[ci] ? { width: widths[ci], minWidth: widths[ci], maxWidth: widths[ci] } : undefined;
+  const colStyle = (ci: number, head = false): React.CSSProperties | undefined => {
+    const w: React.CSSProperties = widths[ci] ? { width: widths[ci], minWidth: widths[ci], maxWidth: widths[ci] } : {};
+    if (ci < frozen && offsets[ci] !== undefined) {
+      Object.assign(w, {
+        position: "sticky", left: offsets[ci], zIndex: head ? 3 : 1, background: head ? "var(--panel-2)" : "var(--panel)",
+        boxShadow: ci === frozen - 1 ? "2px 0 0 var(--border)" : undefined,
+      });
+    }
+    return Object.keys(w).length ? w : undefined;
+  };
 
   const sorted = useMemo(() => {
     let out = rows.map((r, i) => ({ r, i }));
@@ -221,7 +240,13 @@ export function ResultGrid(props: {
         <span className="grow" />
         <button className={"btn small" + (showFilter ? " on" : "")} onClick={() => setShowFilter(!showFilter)} title={t("Filter rows")}><IconFilter size={13} /></button>
         {showFilter && <input className="text" autoFocus placeholder={t("filter rows…")} value={filter} onChange={(e) => setFilter(e.target.value)} style={{ width: 180, padding: "2px 6px" }} />}
-        <button className={"btn small" + (freeze ? " on" : "")} onClick={() => setFreeze(!freeze)} title={t("Keep the first column visible while scrolling sideways")}>{t("Freeze 1st")}</button>
+        <label title={t("Keep the first columns visible while scrolling sideways")}>{t("Freeze")}{" "}
+          <select className="text" value={frozen} onChange={(e) => setFrozen(Number(e.target.value))}>
+            <option value={0}>{t("none")}</option>
+            {[1, 2, 3].filter((n) => n <= columns.length).map((n) => <option key={n} value={n}>{t("{n} columns", { n })}</option>)}
+            {sel && sel[1] + 1 > 3 && <option value={sel[1] + 1}>{t("up to {column}", { column: columns[sel[1]]?.name ?? "" })}</option>}
+          </select>
+        </label>
         <button className={"btn small" + (viewer ? " on" : "")} onClick={() => setViewer(!viewer)} title={t("Show the selected cell in full (text, JSON, hex, image)")}>{t("Cell viewer")}</button>
         <button className="btn small" title={t("Copy rows as TSV (paste into a spreadsheet)")} onClick={() => navigator.clipboard?.writeText(toDelimited(columns, shownRows(), "\t"))}><IconCopy size={13} /> {t("Copy")}</button>
         <div style={{ position: "relative" }}>
@@ -257,12 +282,12 @@ export function ResultGrid(props: {
             }
           }}
         >
-          <table className={"grid" + (freeze ? " freeze1" : "")}>
+          <table className="grid">
             <thead>
-              <tr>
+              <tr ref={headRow}>
                 <th className="rn">#</th>
                 {columns.map((c, i) => (
-                  <th key={i} style={{ cursor: "pointer", position: "sticky", ...colStyle(i) }} title={t("Click to sort, drag the right edge to resize")}
+                  <th key={i} style={{ cursor: "pointer", position: "sticky", ...colStyle(i, true) }} title={t("Click to sort, drag the right edge to resize")}
                     onClick={() => setSort(sort?.col === i ? (sort.desc ? null : { col: i, desc: true }) : { col: i, desc: false })}>
                     {c.name} {sort?.col === i ? (sort.desc ? "▼" : "▲") : ""}
                     <span className="ty">{c.type.toLowerCase()}</span>
