@@ -1,0 +1,9 @@
+# Example: Firebird 5 + fbadmin in their own namespace.
+#   kubectl apply -k deploy/k8s
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: fbadmin
+resources:
+  - namespace.yaml
+  - firebird.yaml
+  - fbadmin.yaml

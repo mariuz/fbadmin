@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import os
 import random
+import re
 import uuid
 
 import pytest
@@ -54,6 +55,14 @@ def test_splitter_matches_isql():
     for p in mismatches[:20]:
         print("  ", p)
     assert not mismatches, f"{len(mismatches)} scripts split differently, e.g. {mismatches[:5]}"
+
+
+_GEN_VALUE = re.compile(r"^SET GENERATOR \S+ TO -?\d+;\n?", re.MULTILINE)
+
+
+def _schema_only(ddl: str | None) -> str | None:
+    """Sequence values are state, not schema (database triggers in the corpus bump them on replay)."""
+    return None if ddl is None else _GEN_VALUE.sub("", ddl)
 
 
 def _base(sid, dbid):
@@ -122,7 +131,7 @@ def test_ddl_round_trip_sample(client, server):
             if not failed:
                 again = _extract_all(client, sid, dst)
                 for key, text in ddl.items():
-                    if again.get(key) != text:
+                    if _schema_only(again.get(key)) != _schema_only(text):
                         problems.append(f"{path}: {key[0]} {key[1]} differs after round trip:\n{text}\n---\n"
                                         f"{again.get(key)}")
         finally:

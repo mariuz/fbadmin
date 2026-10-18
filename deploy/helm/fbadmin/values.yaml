@@ -1,0 +1,122 @@
+# Default values for the fbadmin chart.
+#
+#   helm install fbadmin deploy/helm/fbadmin \
+#     --set serverMode.enabled=true \
+#     --set serverMode.adminPassword='change-me' \
+#     --set ingress.enabled=true --set ingress.hosts[0].host=fbadmin.example.com
+#
+# fbadmin keeps its state (registered servers, users in server mode) in the data directory,
+# so it runs as a single replica with a ReadWriteOnce volume.
+
+image:
+  repository: ghcr.io/mariuz/fbadmin
+  # Defaults to the chart's appVersion.
+  tag: ""
+  pullPolicy: IfNotPresent
+imagePullSecrets: []
+
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+podAnnotations: {}
+podLabels: {}
+
+# The image runs as the unprivileged user fbadmin (uid 1000).
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+
+service:
+  type: ClusterIP
+  port: 80
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+    # nginx.ingress.kubernetes.io/proxy-body-size: 64m
+  hosts:
+    - host: fbadmin.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+  #  - secretName: fbadmin-tls
+  #    hosts: [fbadmin.example.com]
+
+# Data directory (/data): registered servers and, in server mode, users and encrypted credentials.
+persistence:
+  enabled: true
+  # Use an existing PVC instead of creating one.
+  existingClaim: ""
+  storageClass: ""
+  accessModes: [ReadWriteOnce]
+  size: 1Gi
+  annotations: {}
+
+# Multi-user server mode (login screen, per-user server lists, encrypted saved passwords).
+# The variable names below are passed to the container; they follow docs/SECURITY.md and
+# can be changed here if needed.
+serverMode:
+  enabled: false
+  adminUser: admin
+  # Leave empty to let the chart generate a random password (kept across upgrades).
+  adminPassword: ""
+  # Key that encrypts saved Firebird passwords. Generated (and kept) when empty.
+  masterPassword: ""
+  # Use an existing Secret with the keys below instead of creating one.
+  existingSecret: ""
+  secretKeys:
+    adminPassword: admin-password
+    masterPassword: master-password
+  env:
+    enabled: FBADMIN_SERVER_MODE
+    adminUser: FBADMIN_ADMIN_USER
+    adminPassword: FBADMIN_ADMIN_PASSWORD
+    masterPassword: FBADMIN_MASTER_PASSWORD
+
+# Generic fbadmin settings (environment variables, see docs/admin/configuration.md).
+config:
+  logLevel: info
+  logFormat: json          # json | text
+  maxRows: 1000
+  sessionIdleTimeout: 3600
+  # Per-client API requests per minute (0 = off) and maximum request body size.
+  rateLimit: 600
+  maxRequestBytes: 33554432
+  # Trust X-Forwarded-For for rate limiting (only behind the ingress).
+  trustProxy: true
+  # Opt-in update check from the UI: "ask" (users may opt in) or "off".
+  updateCheck: "off"
+  # firebirdsql (pure Python, default) or native (needs libfbclient in the image).
+  driver: firebirdsql
+
+# Extra environment variables for the container.
+extraEnv: []
+#  - name: FBADMIN_META_POOL_SIZE
+#    value: "4"
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    memory: 512Mi
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

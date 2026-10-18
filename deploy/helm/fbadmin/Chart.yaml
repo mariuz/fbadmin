@@ -1,0 +1,14 @@
+apiVersion: v2
+name: fbadmin
+description: pgAdmin-style web administration tool for Firebird SQL
+type: application
+version: 0.1.0
+appVersion: "0.2.0"
+home: https://github.com/mariuz/fbadmin
+sources:
+  - https://github.com/mariuz/fbadmin
+icon: https://raw.githubusercontent.com/mariuz/fbadmin/main/packaging/icons/fbadmin.png
+keywords: [firebird, database, admin, sql]
+maintainers:
+  - name: fbadmin contributors
+    url: https://github.com/mariuz/fbadmin

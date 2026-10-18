@@ -1,0 +1,39 @@
+# Compatibility with the firebird-qa corpus (https://github.com/FirebirdSQL/firebird-qa):
+# the SQL splitter must split every isql script like isql does, and a sample of the DDL
+# scripts must survive an extract -> replay -> extract round trip. Weekly and on demand,
+# because the upstream corpus changes independently of this repository.
+name: firebird-qa compatibility
+
+on:
+  schedule:
+    - cron: "17 4 * * 1"
+  workflow_dispatch:
+    inputs:
+      sample:
+        description: "Number of DDL scripts to round-trip"
+        default: "100"
+
+jobs:
+  compat:
+    runs-on: ubuntu-latest
+    services:
+      firebird:
+        image: firebirdsql/firebird:5
+        env:
+          FIREBIRD_ROOT_PASSWORD: masterkey
+        ports:
+          - 3050:3050
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e "backend[dev]"
+      - run: git clone --depth 1 https://github.com/FirebirdSQL/firebird-qa "$RUNNER_TEMP/firebird-qa"
+      - name: Wait for Firebird
+        run: for i in $(seq 1 30); do (echo > /dev/tcp/127.0.0.1/3050) 2>/dev/null && break; sleep 1; done
+      - run: pytest -q -s backend/tests/test_firebird_qa.py
+        env:
+          FBADMIN_QA_DIR: ${{ runner.temp }}/firebird-qa
+          FBADMIN_QA_SAMPLE: ${{ inputs.sample || '100' }}
+          FBADMIN_TEST_DIR: /var/lib/firebird/data

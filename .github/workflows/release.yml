@@ -1,0 +1,89 @@
+# Release: on a tag v* build the sdist + wheel (with the web UI inside), publish them to PyPI
+# with trusted publishing and attach them to a GitHub Release.
+#
+# One-time setup (see docs/PACKAGING.md):
+#   * PyPI: add a trusted publisher for project "fbadmin": owner mariuz, repository fbadmin,
+#     workflow release.yml, environment "pypi".
+#   * GitHub: create the "pypi" environment (optionally with required reviewers).
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Publish to PyPI (otherwise only build and check)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build sdist and wheel
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Check that the tag matches fbadmin.__version__
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          version=$(python -c "import re; print(re.search(r'__version__ = \"([^\"]+)\"', open('backend/fbadmin/__init__.py').read()).group(1))")
+          tag="${GITHUB_REF_NAME#v}"
+          if [ "$version" != "$tag" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match fbadmin.__version__ $version"; exit 1
+          fi
+      - run: pip install build
+      - name: Build UI, sdist and wheel; check the UI is inside
+        run: scripts/build-dist.sh
+      - name: Install the wheel in a fresh venv and fetch the UI
+        run: scripts/smoke-wheel.sh dist/fbadmin-*.whl 5106
+      - uses: actions/upload-artifact@v4
+        with:
+          name: python-dist
+          path: dist/
+          if-no-files-found: error
+
+  pypi:
+    name: Publish to PyPI
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v') || inputs.publish
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/fbadmin/
+    permissions:
+      id-token: write   # trusted publishing (OIDC), no API token stored
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: python-dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
+
+  github-release:
+    name: GitHub Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: python-dist
+          path: dist/
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, 'rc') || contains(github.ref_name, 'a') || contains(github.ref_name, 'b') }}
