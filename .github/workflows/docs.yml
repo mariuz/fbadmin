@@ -20,7 +20,22 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: read
+    outputs:
+      pages: ${{ steps.pages.outputs.enabled }}
     steps:
+      # deploy only once GitHub Pages is enabled for the repository (Settings -> Pages ->
+      # Source: GitHub Actions); until then the site is still built and checked
+      - name: Is GitHub Pages enabled?
+        id: pages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh api "repos/${{ github.repository }}/pages" >/dev/null 2>&1; then enabled=true; else enabled=false
+            echo "::notice::GitHub Pages is not enabled for this repository: the site is built but not deployed"; fi
+          echo "enabled=$enabled" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
@@ -34,7 +49,7 @@ jobs:
 
   deploy:
     needs: build
-    if: github.event_name != 'pull_request'
+    if: github.event_name != 'pull_request' && needs.build.outputs.pages == 'true'
     runs-on: ubuntu-latest
     permissions:
       pages: write
