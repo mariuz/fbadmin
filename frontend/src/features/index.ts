@@ -6,3 +6,4 @@ import "./replication";
 import "./update-check";
 import "./objects";
 export {};
+import "./schema";

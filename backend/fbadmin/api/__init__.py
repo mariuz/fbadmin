@@ -15,6 +15,7 @@ from . import monitoring
 from . import replication
 from . import version as version_api
 from . import object_dialogs
+from . import schema
 
 ROUTERS: list[APIRouter] = [
     servers.router,
@@ -32,4 +33,5 @@ ROUTERS: list[APIRouter] = [
     replication.conf_router,
     version_api.router,
     object_dialogs.router,
+    schema.router,
 ]

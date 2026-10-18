@@ -40,7 +40,7 @@ def split_sql(script: str) -> list[Statement]:
     # PSQL module tracking: after "AS" in CREATE PROCEDURE/... a DECLARE section
     # may contain ";" before the BEGIN, so wait until the body block was seen.
     lead: list[str] = []
-    flags = {"as": False, "begin": False, "external": False}
+    flags: dict = {"as": False, "begin": False, "external": False}
 
     def is_psql() -> bool:
         if lead[:2] == ["EXECUTE", "BLOCK"]:
