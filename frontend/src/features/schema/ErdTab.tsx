@@ -4,6 +4,7 @@ import type { WorkTab } from "../../context";
 import { IconDownload, IconKey, IconPlus, IconRefresh, IconTerminal, IconTrash } from "../../components/Icons";
 import { saveBlob, schemaApi, type ErdColumn, type ErdRelation } from "./api";
 import { quoteIdent } from "./common";
+import { t } from "../../i18n";
 
 // ------------------------------------------------------------------ model
 interface Col extends Partial<ErdColumn> { name: string; type: string; isNew?: boolean }
@@ -212,7 +213,7 @@ export function ErdTab({ tab, visible }: { tab: WorkTab; visible: boolean }) {
     setNodes((cur) => cur.map((n) => (n.name === child ? {
       ...n, columns: n.columns.map((c) => (c.name === col ? { ...c, fk: true, type: c.isNew && refType ? refType.data_type ?? refType.type : c.type } : c)),
     } : n)));
-    app.toast(`Foreign key ${child}.${col} → ${parent}.${refCol} added to the design`, "info");
+    app.toast(t("Foreign key {child}.{col} → {parent}.{refCol} added to the design", { child, col, parent, refCol }), "info");
   };
   const addTable = () => {
     let name = `NEW_TABLE_${newSeq.current++}`;
@@ -300,7 +301,7 @@ export function ErdTab({ tab, visible }: { tab: WorkTab; visible: boolean }) {
       ctx.drawImage(img, 0, 0, w, h);
       canvas.toBlob((blob) => blob && saveBlob(blob, `${dbLabel}-erd.png`), "image/png");
     };
-    img.onerror = () => app.toast("PNG export failed", "error");
+    img.onerror = () => app.toast(t("PNG export failed"), "error");
     img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(text);
   };
 
@@ -331,18 +332,18 @@ export function ErdTab({ tab, visible }: { tab: WorkTab; visible: boolean }) {
   return (
     <div className="sch-col" style={{ display: visible ? undefined : "none" }}>
       <div className="toolbar">
-        <button className="btn" onClick={() => load()}><IconRefresh /> Reload</button>
-        <button className="btn" onClick={() => { const laid = autoLayout(nodes, rels, keysOnly); setNodes(laid); setTimeout(() => fit(laid), 0); }}>Auto layout</button>
-        <button className="btn" onClick={() => fit()}>Fit</button>
-        <button className="btn icon" title="Zoom in" onClick={() => setView((v) => ({ ...v, k: Math.min(3, v.k * 1.2) }))}>＋</button>
-        <button className="btn icon" title="Zoom out" onClick={() => setView((v) => ({ ...v, k: Math.max(0.1, v.k / 1.2) }))}>－</button>
+        <button className="btn" onClick={() => load()}><IconRefresh /> {t("Reload")}</button>
+        <button className="btn" onClick={() => { const laid = autoLayout(nodes, rels, keysOnly); setNodes(laid); setTimeout(() => fit(laid), 0); }}>{t("Auto layout")}</button>
+        <button className="btn" onClick={() => fit()}>{t("Fit")}</button>
+        <button className="btn icon" title={t("Zoom in")} onClick={() => setView((v) => ({ ...v, k: Math.min(3, v.k * 1.2) }))}>＋</button>
+        <button className="btn icon" title={t("Zoom out")} onClick={() => setView((v) => ({ ...v, k: Math.max(0.1, v.k / 1.2) }))}>－</button>
         <span className="muted">{Math.round(view.k * 100)}%</span>
-        <label><input type="checkbox" checked={keysOnly} onChange={(e) => setKeysOnly(e.target.checked)} /> Keys only</label>
+        <label><input type="checkbox" checked={keysOnly} onChange={(e) => setKeysOnly(e.target.checked)} /> {t("Keys only")}</label>
         <span className="sep" />
-        <button className="btn" onClick={addTable}><IconPlus /> Add table</button>
-        <button className="btn" disabled={!ddl} onClick={() => app.openQueryTool(sid, dbid, ddl)}><IconTerminal /> Generate DDL</button>
+        <button className="btn" onClick={addTable}><IconPlus /> {t("Add table")}</button>
+        <button className="btn" disabled={!ddl} onClick={() => app.openQueryTool(sid, dbid, ddl)}><IconTerminal /> {t("Generate DDL")}</button>
         <span className="grow" />
-        <span className="muted">{nodes.length} tables · {rels.length} relations</span>
+        <span className="muted">{t("{tables} tables · {relations} relations", { tables: nodes.length, relations: rels.length })}</span>
         <button className="btn" onClick={exportSvg}><IconDownload /> SVG</button>
         <button className="btn" onClick={exportPng}><IconDownload /> PNG</button>
       </div>
@@ -394,7 +395,7 @@ export function ErdTab({ tab, visible }: { tab: WorkTab; visible: boolean }) {
                         <text x={w - PAD - 12} y={14} fontSize={10.5} fontFamily="var(--mono)" fill="var(--muted)" textAnchor="end">{c.type}</text>
                         <circle data-noexport cx={w - 7} cy={ROW_H / 2} r={4} className="erd-handle"
                           onMouseDown={(e) => startLink(e, n.name, c.name)}>
-                          <title>Drag onto the referenced column to create a foreign key</title>
+                          <title>{t("Drag onto the referenced column to create a foreign key")}</title>
                         </circle>
                       </g>
                     );
@@ -410,9 +411,9 @@ export function ErdTab({ tab, visible }: { tab: WorkTab; visible: boolean }) {
             })()}
           </g>
         </svg>
-        {loading && <div className="sch-erd-overlay muted">Loading…</div>}
-        {!loading && nodes.length === 0 && <div className="sch-erd-overlay muted">No tables yet — use “Add table” to design one.</div>}
-        <div className="sch-erd-help muted">Wheel: zoom · drag background: pan · drag a header: move · drag a column’s ● onto another column: foreign key</div>
+        {loading && <div className="sch-erd-overlay muted">{t("Loading…")}</div>}
+        {!loading && nodes.length === 0 && <div className="sch-erd-overlay muted">{t("No tables yet — use “Add table” to design one.")}</div>}
+        <div className="sch-erd-help muted">{t("Wheel: zoom · drag background: pan · drag a header: move · drag a column’s ● onto another column: foreign key")}</div>
         {sel && (
           <div className="sch-erd-panel">
             <div className="sch-erd-panel-head">
@@ -420,11 +421,11 @@ export function ErdTab({ tab, visible }: { tab: WorkTab; visible: boolean }) {
                 <input className="text" defaultValue={sel.name} key={sel.name} onBlur={(e) => renameTable(sel.name, e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()} />
               ) : <b>{sel.name}</b>}
-              <button className="btn icon small" title="Close" onClick={() => setSelected(null)}>×</button>
+              <button className="btn icon small" title={t("Close")} onClick={() => setSelected(null)}>×</button>
             </div>
             {sel.comment && <div className="muted" style={{ marginBottom: 6 }}>{sel.comment}</div>}
             <table className="sch-erd-cols">
-              <thead><tr><th>Column</th><th>Type</th><th title="Primary key"><IconKey size={12} /></th><th title="Not null">NN</th><th /></tr></thead>
+              <thead><tr><th>{t("Column")}</th><th>{t("Type")}</th><th title={t("Primary key")}><IconKey size={12} /></th><th title={t("Not null")}>NN</th><th /></tr></thead>
               <tbody>
                 {sel.columns.map((c, i) => (
                   <tr key={i} className={c.isNew ? "new" : ""}>
@@ -434,7 +435,7 @@ export function ErdTab({ tab, visible }: { tab: WorkTab; visible: boolean }) {
                         <td><input className="text" list="erd-types" value={c.type} onChange={(e) => updateNode(sel.name, (n) => ({ ...n, columns: n.columns.map((x, j) => (j === i ? { ...x, type: e.target.value.toUpperCase() } : x)) }))} /></td>
                         <td><input type="checkbox" disabled={!sel.isNew} checked={!!c.pk} onChange={(e) => updateNode(sel.name, (n) => ({ ...n, columns: n.columns.map((x, j) => (j === i ? { ...x, pk: e.target.checked } : x)) }))} /></td>
                         <td><input type="checkbox" checked={!!c.not_null || !!c.pk} onChange={(e) => updateNode(sel.name, (n) => ({ ...n, columns: n.columns.map((x, j) => (j === i ? { ...x, not_null: e.target.checked } : x)) }))} /></td>
-                        <td><button className="btn icon small" title="Remove column" onClick={() => updateNode(sel.name, (n) => ({ ...n, columns: n.columns.filter((_, j) => j !== i) }))}><IconTrash size={12} /></button></td>
+                        <td><button className="btn icon small" title={t("Remove column")} onClick={() => updateNode(sel.name, (n) => ({ ...n, columns: n.columns.filter((_, j) => j !== i) }))}><IconTrash size={12} /></button></td>
                       </>
                     ) : (
                       <>
@@ -447,17 +448,17 @@ export function ErdTab({ tab, visible }: { tab: WorkTab; visible: boolean }) {
             </table>
             <datalist id="erd-types">{TYPES.map((t) => <option key={t} value={t} />)}</datalist>
             <div style={{ display: "flex", gap: 6, margin: "8px 0" }}>
-              <button className="btn small" onClick={() => updateNode(sel.name, (n) => ({ ...n, columns: [...n.columns, { name: `COL${n.columns.length + 1}`, type: "VARCHAR(50)", isNew: true }] }))}><IconPlus size={12} /> Column</button>
-              {sel.isNew && <button className="btn small danger" onClick={() => removeTable(sel.name)}><IconTrash size={12} /> Remove table</button>}
+              <button className="btn small" onClick={() => updateNode(sel.name, (n) => ({ ...n, columns: [...n.columns, { name: `COL${n.columns.length + 1}`, type: "VARCHAR(50)", isNew: true }] }))}><IconPlus size={12} /> {t("Column")}</button>
+              {sel.isNew && <button className="btn small danger" onClick={() => removeTable(sel.name)}><IconTrash size={12} /> {t("Remove table")}</button>}
             </div>
-            {selRels.length > 0 && <div className="sch-group" style={{ padding: "4px 0" }}>Foreign keys</div>}
+            {selRels.length > 0 && <div className="sch-group" style={{ padding: "4px 0" }}>{t("Foreign keys")}</div>}
             {selRels.map((r) => (
               <div key={r.name + r.from_table} className="sch-erd-rel">
                 <span>{r.from_table}({r.from_columns.join(", ")}) → {r.to_table}({r.to_columns.join(", ")})</span>
-                {r.isNew && <button className="btn icon small" title="Remove" onClick={() => setRels((cur) => cur.filter((x) => x !== r))}><IconTrash size={12} /></button>}
+                {r.isNew && <button className="btn icon small" title={t("Remove")} onClick={() => setRels((cur) => cur.filter((x) => x !== r))}><IconTrash size={12} /></button>}
               </div>
             ))}
-            {ddl && <div className="muted" style={{ marginTop: 8 }}>Unsaved design changes: use <b>Generate DDL</b> to review and run them in the Query Tool.</div>}
+            {ddl && <div className="muted" style={{ marginTop: 8 }}>{t("Unsaved design changes: use")} <b>{t("Generate DDL")}</b> {t("to review and run them in the Query Tool.")}</div>}
           </div>
         )}
       </div>

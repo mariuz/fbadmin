@@ -1,5 +1,6 @@
 import { ApiError, request } from "../../api";
 import type { Job } from "../../types";
+import { t } from "../../i18n";
 
 const enc = encodeURIComponent;
 const sbase = (sid: string, dbid: string) => `/api/servers/${sid}/databases/${dbid}/schema`;
@@ -104,7 +105,7 @@ export function uploadFile(file: File, onProgress?: (fraction: number) => void):
       if (xhr.status >= 200 && xhr.status < 300) resolve(data);
       else reject(new ApiError(xhr.status, data.detail || xhr.statusText));
     };
-    xhr.onerror = () => reject(new Error("Upload failed"));
+    xhr.onerror = () => reject(new Error(t("Upload failed")));
     xhr.send(file);
   });
 }

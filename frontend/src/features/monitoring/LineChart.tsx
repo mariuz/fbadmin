@@ -4,6 +4,7 @@
  * (arrow keys move the crosshair) and a table view twin.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
+import { t } from "../../i18n";
 
 export interface Series {
   key: string;
@@ -139,7 +140,7 @@ export function LineChart(props: LineChartProps) {
       {table ? (
         <div className="chart-table">
           <table className="grid">
-            <thead><tr><th>Time</th>{series.map((s) => <th key={s.key}>{s.label}</th>)}</tr></thead>
+            <thead><tr><th>{t("Time")}</th>{series.map((s) => <th key={s.key}>{s.label}</th>)}</tr></thead>
             <tbody>
               {times.map((t, i) => ({ t, i })).reverse().slice(0, 200).map(({ t, i }) => (
                 <tr key={i}><td>{fmtTime(t, !!props.longRange)}</td>{series.map((s) => <td key={s.key} className="num">{fmt(s.values[i])}</td>)}</tr>
@@ -150,14 +151,14 @@ export function LineChart(props: LineChartProps) {
       ) : (
         <div ref={wrap} className={"chart-wrap" + (props.loading ? " loading" : "")}>
           {n === 0 ? (
-            <div className="chart-empty" style={{ height }}>Waiting for data…</div>
+            <div className="chart-empty" style={{ height }}>{t("Waiting for data…")}</div>
           ) : (
             <svg
               className="chart-svg"
               width={width}
               height={height}
               role="img"
-              aria-label={`${props.title} line chart`}
+              aria-label={t("{title} line chart", { title: props.title })}
               tabIndex={0}
               onPointerMove={onMove}
               onPointerLeave={() => setHover(null)}
@@ -199,7 +200,7 @@ export function LineChart(props: LineChartProps) {
         </div>
       )}
       <div className="chart-foot">
-        <button onClick={() => setTable((v) => !v)} aria-pressed={table}>{table ? "Chart" : "Table"}</button>
+        <button onClick={() => setTable((v) => !v)} aria-pressed={table}>{table ? t("Chart") : t("Table")}</button>
       </div>
     </div>
   );

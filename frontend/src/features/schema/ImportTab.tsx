@@ -6,6 +6,7 @@ import { IconPlay, IconSpinner, IconTable, IconUpload } from "../../components/I
 import { cellText } from "../../components/ResultGrid";
 import { schemaApi, uploadFile, type Preview } from "./api";
 import { JobStatus, useJob } from "./common";
+import { t } from "../../i18n";
 
 interface MapRow { source: string; include: boolean; target: string; type: string }
 
@@ -32,7 +33,7 @@ export function ImportTab({ tab }: { tab: WorkTab }) {
   const job = useJob((r) => {
     if (r.status === "finished") {
       app.invalidate(keys.folder(sid, dbid, "tables"));
-      app.toast(`Imported ${r.inserted} row(s)`, "ok");
+      app.toast(t("Imported {n} row(s)", { n: String(r.inserted) }), "ok");
     }
   });
 
@@ -117,31 +118,31 @@ export function ImportTab({ tab }: { tab: WorkTab }) {
     <div className="sch-col sch-scroll">
       <div className="sch-steps">
         <section>
-          <h3>1. File</h3>
+          <h3>{t("1. File")}</h3>
           <div className="sch-row">
-            <label className="btn primary"><IconUpload /> {file ? "Change file…" : "Choose CSV, JSON or XLSX…"}
+            <label className="btn primary"><IconUpload /> {file ? t("Change file…") : t("Choose CSV, JSON or XLSX…")}
               <input type="file" accept=".csv,.tsv,.txt,.json,.ndjson,.jsonl,.xlsx" style={{ display: "none" }} onChange={(e) => choose(e.target.files?.[0])} />
             </label>
             {file && <span>{file.name} <span className="muted">({(file.size / 1024).toFixed(1)} KB)</span></span>}
-            {progress !== null && <span className="muted"><IconSpinner /> uploading {Math.round(progress * 100)}%</span>}
+            {progress !== null && <span className="muted"><IconSpinner /> {t("uploading {pct}%", { pct: Math.round(progress * 100) })}</span>}
           </div>
           {preview && (
             <div className="sch-row">
-              <label>Format <select className="text" value={format} onChange={(e) => { setFormat(e.target.value); loadPreview(preview.upload_id, e.target.value); }}>
+              <label>{t("Format")} <select className="text" value={format} onChange={(e) => { setFormat(e.target.value); loadPreview(preview.upload_id, e.target.value); }}>
                 <option value="csv">CSV</option><option value="json">JSON</option><option value="xlsx">XLSX</option></select></label>
               {format === "csv" && <>
-                <label>Delimiter <select className="text" value={opts.delimiter} onChange={(e) => setOpt("delimiter", e.target.value)}>
-                  <option value="">auto ({preview.delimiter === "\t" ? "tab" : preview.delimiter})</option>
-                  <option value=",">,</option><option value=";">;</option><option value={"\t"}>tab</option><option value="|">|</option></select></label>
-                <label>Encoding <select className="text" value={opts.encoding} onChange={(e) => setOpt("encoding", e.target.value)}>
+                <label>{t("Delimiter")} <select className="text" value={opts.delimiter} onChange={(e) => setOpt("delimiter", e.target.value)}>
+                  <option value="">{t("auto ({delimiter})", { delimiter: preview.delimiter === "\t" ? t("tab") : preview.delimiter ?? "" })}</option>
+                  <option value=",">,</option><option value=";">;</option><option value={"\t"}>{t("tab")}</option><option value="|">|</option></select></label>
+                <label>{t("Encoding")} <select className="text" value={opts.encoding} onChange={(e) => setOpt("encoding", e.target.value)}>
                   <option value="utf-8-sig">UTF-8</option><option value="latin-1">Latin-1</option><option value="cp1252">Windows-1252</option></select></label>
               </>}
               {format === "xlsx" && preview.sheets.length > 1 && (
-                <label>Sheet <select className="text" value={opts.sheet} onChange={(e) => setOpt("sheet", e.target.value)}>
+                <label>{t("Sheet")} <select className="text" value={opts.sheet} onChange={(e) => setOpt("sheet", e.target.value)}>
                   {preview.sheets.map((s) => <option key={s} value={s}>{s}</option>)}</select></label>
               )}
-              {format !== "json" && <label><input type="checkbox" checked={opts.header} onChange={(e) => setOpt("header", e.target.checked)} /> First row is a header</label>}
-              <label><input type="checkbox" checked={opts.empty_as_null} onChange={(e) => setOpt("empty_as_null", e.target.checked)} /> Empty text as NULL</label>
+              {format !== "json" && <label><input type="checkbox" checked={opts.header} onChange={(e) => setOpt("header", e.target.checked)} /> {t("First row is a header")}</label>}
+              <label><input type="checkbox" checked={opts.empty_as_null} onChange={(e) => setOpt("empty_as_null", e.target.checked)} /> {t("Empty text as NULL")}</label>
             </div>
           )}
           {preview && (
@@ -157,24 +158,24 @@ export function ImportTab({ tab }: { tab: WorkTab }) {
         </section>
         {preview && (
           <section>
-            <h3>2. Target table</h3>
+            <h3>{t("2. Target table")}</h3>
             <div className="sch-row">
-              <label><input type="radio" checked={mode === "create"} onChange={() => setMode("create")} /> New table</label>
+              <label><input type="radio" checked={mode === "create"} onChange={() => setMode("create")} /> {t("New table")}</label>
               <input className="text" disabled={mode !== "create"} value={newName} onChange={(e) => setNewName(e.target.value.toUpperCase())} placeholder="TABLE_NAME" />
-              <label><input type="radio" checked={mode === "append"} onChange={() => setMode("append")} /> Existing table</label>
+              <label><input type="radio" checked={mode === "append"} onChange={() => setMode("append")} /> {t("Existing table")}</label>
               <select className="text" disabled={mode !== "append"} value={table} onChange={(e) => setTable(e.target.value)}>
-                <option value="">— choose —</option>
+                <option value="">{t("— choose —")}</option>
                 {tables.map((t) => <option key={t} value={t}>{t}</option>)}
               </select>
-              {mode === "append" && <label><input type="checkbox" checked={truncate} onChange={(e) => setTruncate(e.target.checked)} /> Delete existing rows first</label>}
+              {mode === "append" && <label><input type="checkbox" checked={truncate} onChange={(e) => setTruncate(e.target.checked)} /> {t("Delete existing rows first")}</label>}
             </div>
           </section>
         )}
         {preview && (
           <section>
-            <h3>3. Column mapping and types</h3>
+            <h3>{t("3. Column mapping and types")}</h3>
             <table className="sch-map">
-              <thead><tr><th /><th>File column</th><th>Sample</th><th>Table column</th><th>{mode === "create" ? "Type" : "Column type"}</th></tr></thead>
+              <thead><tr><th /><th>{t("File column")}</th><th>{t("Sample")}</th><th>{t("Table column")}</th><th>{mode === "create" ? t("Type") : t("Column type")}</th></tr></thead>
               <tbody>
                 {mapping.map((m, i) => (
                   <tr key={m.source} className={m.include ? "" : "off"}>
@@ -185,7 +186,7 @@ export function ImportTab({ tab }: { tab: WorkTab }) {
                       <input className="text" value={m.target} onChange={(e) => setMapping(mapping.map((x, j) => (j === i ? { ...x, target: e.target.value.toUpperCase() } : x)))} />
                     ) : (
                       <select className="text" value={m.target} onChange={(e) => setMapping(mapping.map((x, j) => (j === i ? { ...x, target: e.target.value, include: !!e.target.value } : x)))}>
-                        <option value="">— skip —</option>
+                        <option value="">{t("— skip —")}</option>
                         {tableCols.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
                       </select>
                     )}</td>
@@ -197,22 +198,21 @@ export function ImportTab({ tab }: { tab: WorkTab }) {
               </tbody>
             </table>
             <datalist id="imp-types">{["INTEGER", "BIGINT", "NUMERIC(18,2)", "DOUBLE PRECISION", "VARCHAR(50)", "VARCHAR(255)", "DATE", "TIMESTAMP", "TIME", "BOOLEAN", "BLOB SUB_TYPE TEXT"].map((t) => <option key={t} value={t} />)}</datalist>
-            <p className="muted">Values are converted to the column types (numbers, dates in ISO or local formats, booleans as true/false/1/0/yes/no).
-              Types of a new table are inferred from the first {preview.sampled_rows.toLocaleString()} rows.</p>
+            <p className="muted">{t("Values are converted to the column types (numbers, dates in ISO or local formats, booleans as true/false/1/0/yes/no). Types of a new table are inferred from the first {n} rows.", { n: preview.sampled_rows.toLocaleString() })}</p>
           </section>
         )}
         {preview && (
           <section>
-            <h3>4. Import</h3>
+            <h3>{t("4. Import")}</h3>
             <div className="sch-row">
-              <label>On error <select className="text" value={onError} onChange={(e) => setOnError(e.target.value as "abort" | "skip")}>
-                <option value="abort">roll back everything</option><option value="skip">skip bad rows and report them</option></select></label>
-              <button className="btn primary" disabled={!ready} onClick={start}>{job.running ? <IconSpinner /> : <IconPlay />} Import into {target || "…"}</button>
+              <label>{t("On error")} <select className="text" value={onError} onChange={(e) => setOnError(e.target.value as "abort" | "skip")}>
+                <option value="abort">{t("roll back everything")}</option><option value="skip">{t("skip bad rows and report them")}</option></select></label>
+              <button className="btn primary" disabled={!ready} onClick={start}>{job.running ? <IconSpinner /> : <IconPlay />} {t("Import into {table}", { table: target || "…" })}</button>
               {job.result?.status === "finished" && (
-                <button className="btn" onClick={() => app.openTab({ kind: "data", title: target, serverId: sid, dbId: dbid, otype: "tables", name: target })}><IconTable /> View data</button>
+                <button className="btn" onClick={() => app.openTab({ kind: "data", title: target, serverId: sid, dbId: dbid, otype: "tables", name: target })}><IconTable /> {t("View data")}</button>
               )}
             </div>
-            <p className="muted">All rows are inserted in one transaction; the file is read as a stream on the server.</p>
+            <p className="muted">{t("All rows are inserted in one transaction; the file is read as a stream on the server.")}</p>
             <JobStatus result={job.result} log={job.log} />
           </section>
         )}

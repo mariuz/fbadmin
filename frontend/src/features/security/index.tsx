@@ -9,6 +9,7 @@ import { AuditLog, UsersAdmin } from "./AdminPanels";
 import { FbSecurityPanel, SvcUsersPanel } from "./FbSecurity";
 import { UserMenu } from "./UserMenu";
 import "./security.css";
+import { t } from "../../i18n";
 
 registerTopbar({ id: "security-user", render: (app) => <UserMenu app={app} /> });
 
@@ -20,11 +21,11 @@ registerTabKind("security-audit", {
 });
 registerTabKind("fb-security", {
   icon: <IconRole size={13} />,
-  render: (t) => <FbSecurityPanel serverId={t.serverId!} dbId={t.dbId!} />,
+  render: (tab) => <FbSecurityPanel serverId={tab.serverId!} dbId={tab.dbId!} />,
 });
 registerTabKind("fb-svc-users", {
   icon: <IconUser size={13} />,
-  render: (t) => <SvcUsersPanel serverId={t.serverId!} />,
+  render: (tab) => <SvcUsersPanel serverId={tab.serverId!} />,
   same: (a, b) => a.kind === b.kind && a.serverId === b.serverId,
 });
 
@@ -33,16 +34,16 @@ registerMenu((app, sel) => {
   if (!srv) return [];
   if (sel.kind === "server") {
     return [{
-      label: "Firebird users (Services API)…", icon: <IconUser />,
-      onClick: () => app.openTab({ kind: "fb-svc-users", title: `${srv.name} · users`, serverId: srv.id }),
+      label: t("Firebird users (Services API)…"), icon: <IconUser />,
+      onClick: () => app.openTab({ kind: "fb-svc-users", title: t("{server} · users", { server: srv.name }), serverId: srv.id }),
     }];
   }
   const showDb = sel.kind === "database" || (sel.kind === "folder" && (sel.otype === "users" || sel.otype === "roles"));
   if (showDb && sel.dbId) {
     const db = srv.databases.find((d) => d.id === sel.dbId);
     return [{
-      label: "Users, roles & mappings…", icon: <IconRole />,
-      onClick: () => app.openTab({ kind: "fb-security", title: `${db?.name ?? "db"} · security`, serverId: srv.id, dbId: sel.dbId }),
+      label: t("Users, roles & mappings…"), icon: <IconRole />,
+      onClick: () => app.openTab({ kind: "fb-security", title: t("{db} · security", { db: db?.name ?? "db" }), serverId: srv.id, dbId: sel.dbId }),
     }];
   }
   return [];

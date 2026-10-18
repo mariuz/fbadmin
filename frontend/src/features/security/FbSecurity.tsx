@@ -4,6 +4,7 @@ import { errMsg, useApp } from "../../context";
 import { Modal } from "../../components/Modal";
 import { IconPlus, IconRefresh, IconTrash } from "../../components/Icons";
 import { secApi, type FbUser, type Mapping, type RoleInfo, type SqlResult } from "./api";
+import { t } from "../../i18n";
 
 type Props = { serverId: string; dbId: string };
 
@@ -28,7 +29,7 @@ function SqlDialog(props: {
       const r = (await props.run(preview)) as SqlResult | undefined;
       if (preview) setSql(r?.sql ?? []);
       else {
-        app.toast(props.okLabel ? `${props.okLabel}: done` : "Done");
+        app.toast(props.okLabel ? t("{action}: done", { action: props.okLabel }) : t("Done"));
         props.onDone();
         close();
       }
@@ -41,9 +42,9 @@ function SqlDialog(props: {
   return (
     <Modal title={props.title} onClose={close} wide={props.wide} footer={<>
       {error && <span className="err">{error}</span>}
-      <button className="btn" onClick={close}>Cancel</button>
-      <button className="btn" disabled={busy} onClick={() => go(true)}>Preview SQL</button>
-      <button className="btn primary" disabled={busy} onClick={() => go(false)}>{props.okLabel ?? "Save"}</button>
+      <button className="btn" onClick={close}>{t("Cancel")}</button>
+      <button className="btn" disabled={busy} onClick={() => go(true)}>{t("Preview SQL")}</button>
+      <button className="btn primary" disabled={busy} onClick={() => go(false)}>{props.okLabel ?? t("Save")}</button>
     </>}>
       {props.children}
       {sql && <pre className="log sec-sql">{sql.map((s) => s + ";").join("\n")}</pre>}
@@ -56,9 +57,9 @@ export function FbSecurityPanel(props: Props) {
   return (
     <div className="pad sec-panel">
       <div className="subtabs">
-        <button className={tab === "users" ? "active" : ""} onClick={() => setTab("users")}>Users</button>
-        <button className={tab === "roles" ? "active" : ""} onClick={() => setTab("roles")}>Roles &amp; system privileges</button>
-        <button className={tab === "mappings" ? "active" : ""} onClick={() => setTab("mappings")}>Mappings</button>
+        <button className={tab === "users" ? "active" : ""} onClick={() => setTab("users")}>{t("Users")}</button>
+        <button className={tab === "roles" ? "active" : ""} onClick={() => setTab("roles")}>{t("Roles & system privileges")}</button>
+        <button className={tab === "mappings" ? "active" : ""} onClick={() => setTab("mappings")}>{t("Mappings")}</button>
       </div>
       {tab === "users" && <UsersTab {...props} />}
       {tab === "roles" && <RolesTab {...props} />}
@@ -76,35 +77,35 @@ function UsersTab(props: Props) {
   useEffect(() => { load(); }, []);
   const edit = (u?: FbUser) => app.showDialog(<FbUserDialog {...props} user={u} plugins={data?.plugins ?? ["Srp"]} onDone={load} />);
   const drop = async (u: FbUser) => {
-    if (!confirm(`Drop user ${u.name}${u.plugin ? ` (${u.plugin})` : ""}?`)) return;
-    try { await secApi.dropFbUser(props.serverId, props.dbId, u.name, u.plugin); app.toast(`User ${u.name} dropped`); load(); }
+    if (!confirm(t("Drop user {name}{plugin}?", { name: u.name, plugin: u.plugin ? ` (${u.plugin})` : "" }))) return;
+    try { await secApi.dropFbUser(props.serverId, props.dbId, u.name, u.plugin); app.toast(t("User {name} dropped", { name: u.name })); load(); }
     catch (e) { app.toast(errMsg(e), "error"); }
   };
   return (
     <>
       <div className="sec-bar">
-        <button className="btn primary" onClick={() => edit()}><IconPlus /> Create user</button>
-        <button className="btn" onClick={load}><IconRefresh /> Refresh</button>
-        {data && <span className="muted">Security database: <b>{data.security_database ?? "?"}</b> · plugins: {data.plugins.join(", ")} · signed in as {data.current_user}</span>}
+        <button className="btn primary" onClick={() => edit()}><IconPlus /> {t("Create user")}</button>
+        <button className="btn" onClick={load}><IconRefresh /> {t("Refresh")}</button>
+        {data && <span className="muted">{t("Security database:")} <b>{data.security_database ?? "?"}</b> {t("· plugins: {plugins} · signed in as {user}", { plugins: data.plugins.join(", "), user: data.current_user })}</span>}
         {error && <span className="err">{error}</span>}
       </div>
       {data && (
         <div className="grid-wrap" style={{ maxHeight: "none" }}>
           <table className="grid">
-            <thead><tr><th>User</th><th>Plugin</th><th>Name</th><th>Active</th><th title="GRANT ADMIN ROLE in the security database">Admin role</th><th title="RDB$ADMIN granted in this database">RDB$ADMIN</th><th>Tags</th><th>Description</th><th /></tr></thead>
+            <thead><tr><th>{t("User")}</th><th>{t("Plugin")}</th><th>{t("Name")}</th><th>{t("Active")}</th><th title={t("GRANT ADMIN ROLE in the security database")}>{t("Admin role")}</th><th title={t("RDB$ADMIN granted in this database")}>RDB$ADMIN</th><th>{t("Tags")}</th><th>{t("Description")}</th><th /></tr></thead>
             <tbody>
               {data.users.map((u) => (
                 <tr key={u.name + "/" + u.plugin}>
                   <td><b>{u.name}</b></td>
                   <td>{u.plugin}</td>
                   <td>{[u.first_name, u.middle_name, u.last_name].filter(Boolean).join(" ")}</td>
-                  <td>{u.active ? "yes" : <span className="err">no</span>}</td>
+                  <td>{u.active ? t("yes") : <span className="err">{t("no")}</span>}</td>
                   <td>{u.admin ? "✓" : ""}</td>
                   <td>{u.db_admin ? "✓" : ""}</td>
                   <td>{Object.entries(u.tags).map(([k, v]) => <span key={k} className="pill tag">{k}={v}</span>)}</td>
                   <td>{u.description}</td>
                   <td style={{ whiteSpace: "nowrap" }}>
-                    <button className="btn small" onClick={() => edit(u)}>Edit</button>{" "}
+                    <button className="btn small" onClick={() => edit(u)}>{t("Edit")}</button>{" "}
                     <button className="btn small danger" onClick={() => drop(u)}><IconTrash size={12} /></button>
                   </td>
                 </tr>
@@ -140,42 +141,42 @@ function FbUserDialog(props: Props & { user?: FbUser; plugins: string[]; onDone:
     ? secApi.alterFbUser(props.serverId, props.dbId, u.name, body(), preview)
     : secApi.createFbUser(props.serverId, props.dbId, body(), preview);
   return (
-    <SqlDialog title={u ? `Alter user ${u.name}` : "Create user"} run={run} onDone={props.onDone} okLabel={u ? "Alter user" : "Create user"}>
+    <SqlDialog title={u ? t("Alter user {name}", { name: u.name }) : t("Create user")} run={run} onDone={props.onDone} okLabel={u ? t("Alter user") : t("Create user")}>
       <div className="form">
-        <label className="l">User name</label>
-        <input className="text" autoFocus={!u} disabled={!!u} value={f.name} placeholder='JOHN, or "MixedCase"' onChange={(e) => set("name", e.target.value)} />
-        <label className="l">{u ? "New password" : "Password"}</label>
-        <input className="text" type="password" autoComplete="new-password" placeholder={u ? "(unchanged)" : ""} value={f.password} onChange={(e) => set("password", e.target.value)} />
-        <label className="l">First / middle / last name</label>
+        <label className="l">{t("User name")}</label>
+        <input className="text" autoFocus={!u} disabled={!!u} value={f.name} placeholder={t('JOHN, or "MixedCase"')} onChange={(e) => set("name", e.target.value)} />
+        <label className="l">{u ? t("New password") : t("Password")}</label>
+        <input className="text" type="password" autoComplete="new-password" placeholder={u ? t("(unchanged)") : ""} value={f.password} onChange={(e) => set("password", e.target.value)} />
+        <label className="l">{t("First / middle / last name")}</label>
         <div style={{ display: "flex", gap: 6 }}>
           <input className="text" style={{ flex: 1, minWidth: 0 }} value={f.first_name} onChange={(e) => set("first_name", e.target.value)} />
           <input className="text" style={{ flex: 1, minWidth: 0 }} value={f.middle_name} onChange={(e) => set("middle_name", e.target.value)} />
           <input className="text" style={{ flex: 1, minWidth: 0 }} value={f.last_name} onChange={(e) => set("last_name", e.target.value)} />
         </div>
-        <label className="l">Plugin (USING PLUGIN)</label>
+        <label className="l">{t("Plugin (USING PLUGIN)")}</label>
         <div>
-          <input className="text" list="fb-user-plugins" value={f.plugin} disabled={!!u} placeholder="default (first UserManager plugin)" onChange={(e) => set("plugin", e.target.value)} />
+          <input className="text" list="fb-user-plugins" value={f.plugin} disabled={!!u} placeholder={t("default (first UserManager plugin)")} onChange={(e) => set("plugin", e.target.value)} />
           <datalist id="fb-user-plugins">{[...new Set([...props.plugins, "Srp", "Legacy_UserManager"])].map((p) => <option key={p} value={p} />)}</datalist>
         </div>
         <span />
         <div className="sec-checks">
-          <label className="check"><input type="checkbox" checked={f.active} onChange={(e) => set("active", e.target.checked)} /> Active</label>
-          <label className="check" title="Administrator of the security database (can manage users)"><input type="checkbox" checked={f.admin} onChange={(e) => set("admin", e.target.checked)} /> GRANT ADMIN ROLE</label>
-          <label className="check" title="GRANT RDB$ADMIN TO USER in this database"><input type="checkbox" checked={f.db_admin} onChange={(e) => set("db_admin", e.target.checked)} /> RDB$ADMIN in this database</label>
+          <label className="check"><input type="checkbox" checked={f.active} onChange={(e) => set("active", e.target.checked)} /> {t("Active")}</label>
+          <label className="check" title={t("Administrator of the security database (can manage users)")}><input type="checkbox" checked={f.admin} onChange={(e) => set("admin", e.target.checked)} /> GRANT ADMIN ROLE</label>
+          <label className="check" title={t("GRANT RDB$ADMIN TO USER in this database")}><input type="checkbox" checked={f.db_admin} onChange={(e) => set("db_admin", e.target.checked)} /> {t("RDB$ADMIN in this database")}</label>
         </div>
-        <label className="l">Tags</label>
+        <label className="l">{t("Tags")}</label>
         <div className="sec-tags">
           {tags.map(([k, v], i) => (
             <div key={i} className="sec-tag-row">
-              <input className="text" placeholder="key" value={k} onChange={(e) => setTags(tags.map((t, j) => (j === i ? [e.target.value, t[1]] : t)))} />
+              <input className="text" placeholder={t("key")} value={k} onChange={(e) => setTags(tags.map((t, j) => (j === i ? [e.target.value, t[1]] : t)))} />
               <span>=</span>
-              <input className="text" placeholder="value" value={v} onChange={(e) => setTags(tags.map((t, j) => (j === i ? [t[0], e.target.value] : t)))} />
+              <input className="text" placeholder={t("value")} value={v} onChange={(e) => setTags(tags.map((t, j) => (j === i ? [t[0], e.target.value] : t)))} />
               <button className="btn small" onClick={() => setTags(tags.filter((_, j) => j !== i))}><IconTrash size={12} /></button>
             </div>
           ))}
-          <button className="btn small" onClick={() => setTags([...tags, ["", ""]])}><IconPlus size={12} /> Add tag</button>
+          <button className="btn small" onClick={() => setTags([...tags, ["", ""]])}><IconPlus size={12} /> {t("Add tag")}</button>
         </div>
-        <label className="l">Description</label>
+        <label className="l">{t("Description")}</label>
         <input className="text" value={f.description} onChange={(e) => set("description", e.target.value)} />
       </div>
     </SqlDialog>
@@ -192,34 +193,34 @@ function RolesTab(props: Props) {
   const edit = (r?: RoleInfo) => data && app.showDialog(<RoleDialog {...props} role={r} all={data.privileges} supported={data.supported} onDone={load} />);
   const grant = (r: RoleInfo) => app.showDialog(<GrantDialog {...props} role={r} onDone={load} />);
   const revoke = async (r: RoleInfo, user: string) => {
-    try { await secApi.grantRole(props.serverId, props.dbId, r.name, { user: `"${user}"`, grant: false }); app.toast(`Revoked ${r.name} from ${user}`); load(); }
+    try { await secApi.grantRole(props.serverId, props.dbId, r.name, { user: `"${user}"`, grant: false }); app.toast(t("Revoked {role} from {user}", { role: r.name, user })); load(); }
     catch (e) { app.toast(errMsg(e), "error"); }
   };
   return (
     <>
       <div className="sec-bar">
-        <button className="btn primary" onClick={() => edit()}><IconPlus /> Create role</button>
-        <button className="btn" onClick={load}><IconRefresh /> Refresh</button>
-        {data && !data.supported && <span className="warn">System privileges need Firebird 4 or newer (this is Firebird {data.engine_major}).</span>}
+        <button className="btn primary" onClick={() => edit()}><IconPlus /> {t("Create role")}</button>
+        <button className="btn" onClick={load}><IconRefresh /> {t("Refresh")}</button>
+        {data && !data.supported && <span className="warn">{t("System privileges need Firebird 4 or newer (this is Firebird {version}).", { version: data.engine_major })}</span>}
         {error && <span className="err">{error}</span>}
       </div>
       {data && (
         <div className="grid-wrap" style={{ maxHeight: "none" }}>
           <table className="grid">
-            <thead><tr><th>Role</th><th>Owner</th><th>System privileges</th><th>Granted to</th><th /></tr></thead>
+            <thead><tr><th>{t("Role")}</th><th>{t("Owner")}</th><th>{t("System privileges")}</th><th>{t("Granted to")}</th><th /></tr></thead>
             <tbody>
               {data.roles.map((r) => (
                 <tr key={r.name}>
-                  <td><b>{r.name}</b>{r.system && <span className="muted"> (system)</span>}{r.description && <div className="muted">{r.description}</div>}</td>
+                  <td><b>{r.name}</b>{r.system && <span className="muted"> {t("(system)")}</span>}{r.description && <div className="muted">{r.description}</div>}</td>
                   <td>{r.owner}</td>
-                  <td className="sec-privs">{r.name === "RDB$ADMIN" ? <span className="pill">all</span> : r.privileges.map((p) => <span key={p} className="pill">{p}</span>)}</td>
+                  <td className="sec-privs">{r.name === "RDB$ADMIN" ? <span className="pill">{t("all")}</span> : r.privileges.map((p) => <span key={p} className="pill">{p}</span>)}</td>
                   <td>{r.members.map((m) => (
-                    <span key={m.user} className="pill tag">{m.user}{m.admin_option ? " (admin option)" : ""}
-                      <a className="x" title="Revoke" onClick={() => revoke(r, m.user)}>×</a></span>
+                    <span key={m.user} className="pill tag">{m.user}{m.admin_option ? " " + t("(admin option)") : ""}
+                      <a className="x" title={t("Revoke")} onClick={() => revoke(r, m.user)}>×</a></span>
                   ))}</td>
                   <td style={{ whiteSpace: "nowrap" }}>
-                    {!r.system && data.supported && <><button className="btn small" onClick={() => edit(r)}>Privileges…</button>{" "}</>}
-                    <button className="btn small" onClick={() => grant(r)}>Grant…</button>
+                    {!r.system && data.supported && <><button className="btn small" onClick={() => edit(r)}>{t("Privileges…")}</button>{" "}</>}
+                    <button className="btn small" onClick={() => grant(r)}>{t("Grant…")}</button>
                   </td>
                 </tr>
               ))}
@@ -242,25 +243,25 @@ function RoleDialog(props: Props & { role?: RoleInfo; all: string[]; supported: 
     ? secApi.alterRole(props.serverId, props.dbId, r.name, ordered, preview)
     : secApi.createRole(props.serverId, props.dbId, { name, privileges: ordered, description: desc || null }, preview);
   return (
-    <SqlDialog title={r ? `System privileges of ${r.name}` : "Create role"} run={run} onDone={props.onDone} wide okLabel={r ? "Apply" : "Create role"}>
+    <SqlDialog title={r ? t("System privileges of {role}", { role: r.name }) : t("Create role")} run={run} onDone={props.onDone} wide okLabel={r ? t("Apply") : t("Create role")}>
       {!r && (
         <div className="form" style={{ marginBottom: 12 }}>
-          <label className="l">Role name</label>
+          <label className="l">{t("Role name")}</label>
           <input className="text" autoFocus value={name} onChange={(e) => setName(e.target.value)} />
-          <label className="l">Description</label>
+          <label className="l">{t("Description")}</label>
           <input className="text" value={desc} onChange={(e) => setDesc(e.target.value)} />
         </div>
       )}
       {props.supported ? (
         <>
-          <div className="muted" style={{ marginBottom: 6 }}>SET SYSTEM PRIVILEGES TO … (users get them when the role is active, e.g. granted as DEFAULT)</div>
+          <div className="muted" style={{ marginBottom: 6 }}>{t("SET SYSTEM PRIVILEGES TO … (users get them when the role is active, e.g. granted as DEFAULT)")}</div>
           <div className="sec-priv-grid">
             {props.all.map((p) => (
               <label key={p} className="check"><input type="checkbox" checked={privs.includes(p)} onChange={() => toggle(p)} /> {p}</label>
             ))}
           </div>
         </>
-      ) : <p className="muted">System privileges need Firebird 4 or newer.</p>}
+      ) : <p className="muted">{t("System privileges need Firebird 4 or newer.")}</p>}
     </SqlDialog>
   );
 }
@@ -275,22 +276,22 @@ function GrantDialog(props: Props & { role: RoleInfo; onDone: () => void }) {
   const go = async () => {
     try {
       await secApi.grantRole(props.serverId, props.dbId, props.role.name, { user, grant: true, default: def, admin_option: adminOpt });
-      app.toast(`Granted ${props.role.name} to ${user}`);
+      app.toast(t("Granted {role} to {user}", { role: props.role.name, user }));
       props.onDone();
       close();
     } catch (e) { setError(errMsg(e)); }
   };
   return (
-    <Modal title={`Grant ${props.role.name}`} onClose={close} footer={<>
+    <Modal title={t("Grant {role}", { role: props.role.name })} onClose={close} footer={<>
       {error && <span className="err">{error}</span>}
-      <button className="btn" onClick={close}>Cancel</button>
-      <button className="btn primary" disabled={!user} onClick={go}>Grant</button>
+      <button className="btn" onClick={close}>{t("Cancel")}</button>
+      <button className="btn primary" disabled={!user} onClick={go}>{t("Grant")}</button>
     </>}>
       <div className="form">
-        <label className="l">To user</label>
+        <label className="l">{t("To user")}</label>
         <input className="text" autoFocus value={user} onChange={(e) => setUser(e.target.value)} />
         <span />
-        <label className="check"><input type="checkbox" checked={def} onChange={(e) => setDef(e.target.checked)} /> DEFAULT (active without SET ROLE)</label>
+        <label className="check"><input type="checkbox" checked={def} onChange={(e) => setDef(e.target.checked)} /> {t("DEFAULT (active without SET ROLE)")}</label>
         <span />
         <label className="check"><input type="checkbox" checked={adminOpt} onChange={(e) => setAdminOpt(e.target.checked)} /> WITH ADMIN OPTION</label>
       </div>
@@ -311,30 +312,30 @@ function MappingsTab(props: Props) {
   useEffect(() => { load(); }, []);
   const edit = (m?: Mapping, global = false) => app.showDialog(<MappingDialog {...props} mapping={m} global={global} onDone={load} />);
   const drop = async (m: Mapping) => {
-    if (!confirm(`Drop ${m.global ? "global " : ""}mapping ${m.name}?`)) return;
-    try { await secApi.dropMapping(props.serverId, props.dbId, m.name, m.global); app.toast("Mapping dropped"); load(); }
+    if (!confirm(m.global ? t("Drop global mapping {name}?", { name: m.name }) : t("Drop mapping {name}?", { name: m.name }))) return;
+    try { await secApi.dropMapping(props.serverId, props.dbId, m.name, m.global); app.toast(t("Mapping dropped")); load(); }
     catch (e) { app.toast(errMsg(e), "error"); }
   };
   const table = (rows: Mapping[]) => (
     <div className="grid-wrap" style={{ maxHeight: "none", marginBottom: 14 }}>
       <table className="grid">
-        <thead><tr><th>Name</th><th>Using</th><th>In database</th><th>From</th><th>To</th><th>Description</th><th /></tr></thead>
+        <thead><tr><th>{t("Name")}</th><th>{t("Using")}</th><th>{t("In database")}</th><th>{t("From")}</th><th>{t("To")}</th><th>{t("Description")}</th><th /></tr></thead>
         <tbody>
           {rows.map((m) => (
             <tr key={m.name}>
-              <td><b>{m.name}</b>{m.system && <span className="muted"> (system)</span>}</td>
+              <td><b>{m.name}</b>{m.system && <span className="muted"> {t("(system)")}</span>}</td>
               <td>{USING_LABEL[m.using] ?? m.using}{m.plugin ? ` ${m.plugin}` : ""}</td>
               <td>{m.database}</td>
               <td>{m.from_name === "*" ? `ANY ${m.from_type}` : `${m.from_type} ${m.from_name}`}</td>
-              <td>{m.to_type} {m.to_name ?? <span className="muted">(same name)</span>}</td>
+              <td>{m.to_type} {m.to_name ?? <span className="muted">{t("(same name)")}</span>}</td>
               <td>{m.description}</td>
               <td style={{ whiteSpace: "nowrap" }}>
-                {!m.system && <><button className="btn small" onClick={() => edit(m, m.global)}>Edit</button>{" "}
+                {!m.system && <><button className="btn small" onClick={() => edit(m, m.global)}>{t("Edit")}</button>{" "}
                   <button className="btn small danger" onClick={() => drop(m)}><IconTrash size={12} /></button></>}
               </td>
             </tr>
           ))}
-          {rows.length === 0 && <tr><td colSpan={7} className="muted">No mappings</td></tr>}
+          {rows.length === 0 && <tr><td colSpan={7} className="muted">{t("No mappings")}</td></tr>}
         </tbody>
       </table>
     </div>
@@ -342,17 +343,17 @@ function MappingsTab(props: Props) {
   return (
     <>
       <div className="sec-bar">
-        <button className="btn primary" onClick={() => edit(undefined, false)}><IconPlus /> Local mapping</button>
-        <button className="btn" onClick={() => edit(undefined, true)}><IconPlus /> Global mapping</button>
-        <button className="btn" onClick={load}><IconRefresh /> Refresh</button>
+        <button className="btn primary" onClick={() => edit(undefined, false)}><IconPlus /> {t("Local mapping")}</button>
+        <button className="btn" onClick={() => edit(undefined, true)}><IconPlus /> {t("Global mapping")}</button>
+        <button className="btn" onClick={load}><IconRefresh /> {t("Refresh")}</button>
         {error && <span className="err">{error}</span>}
       </div>
       {data && <>
-        <h3>Local mappings <span className="muted">(RDB$AUTH_MAPPING – this database)</span></h3>
+        <h3>{t("Local mappings")} <span className="muted">{t("(RDB$AUTH_MAPPING – this database)")}</span></h3>
         {table(data.local)}
-        <h3>Global mappings <span className="muted">(SEC$GLOBAL_AUTH_MAPPING – security database)</span></h3>
+        <h3>{t("Global mappings")} <span className="muted">{t("(SEC$GLOBAL_AUTH_MAPPING – security database)")}</span></h3>
         {data.global_error ? <p className="err">{data.global_error}</p> : table(data.global)}
-        <p className="muted">Mappings turn an authenticated identity (e.g. a Windows account via Win_Sspi trusted authentication, or a user from another security database) into a Firebird user or role.</p>
+        <p className="muted">{t("Mappings turn an authenticated identity (e.g. a Windows account via Win_Sspi trusted authentication, or a user from another security database) into a Firebird user or role.")}</p>
       </>}
     </>
   );
@@ -378,51 +379,51 @@ function MappingDialog(props: Props & { mapping?: Mapping; global: boolean; onDo
     ? secApi.alterMapping(props.serverId, props.dbId, m.name, body(), preview)
     : secApi.createMapping(props.serverId, props.dbId, body(), preview);
   return (
-    <SqlDialog title={m ? `Alter ${m.global ? "global " : ""}mapping ${m.name}` : `Create ${f.is_global ? "global" : "local"} mapping`} run={run} onDone={props.onDone} okLabel={m ? "Alter mapping" : "Create mapping"}>
+    <SqlDialog title={m ? (m.global ? t("Alter global mapping {name}", { name: m.name }) : t("Alter mapping {name}", { name: m.name })) : (f.is_global ? t("Create global mapping") : t("Create local mapping"))} run={run} onDone={props.onDone} okLabel={m ? t("Alter mapping") : t("Create mapping")}>
       <div className="form">
-        <label className="l">Name</label>
+        <label className="l">{t("Name")}</label>
         <input className="text" autoFocus={!m} disabled={!!m} value={f.name} onChange={(e) => set("name", e.target.value)} />
-        <label className="l">Scope</label>
+        <label className="l">{t("Scope")}</label>
         <select className="text" disabled={!!m} value={f.is_global ? "global" : "local"} onChange={(e) => set("is_global", e.target.value === "global")}>
-          <option value="local">local (this database)</option>
-          <option value="global">global (security database, all databases)</option>
+          <option value="local">{t("local (this database)")}</option>
+          <option value="global">{t("global (security database, all databases)")}</option>
         </select>
-        <label className="l">Using</label>
+        <label className="l">{t("Using")}</label>
         <select className="text" value={f.using} onChange={(e) => set("using", e.target.value)}>
-          <option value="plugin">PLUGIN – one authentication plugin</option>
+          <option value="plugin">{t("PLUGIN – one authentication plugin")}</option>
           <option value="any_plugin">ANY PLUGIN</option>
           <option value="serverwide">ANY PLUGIN SERVERWIDE</option>
-          <option value="mapping">MAPPING – result of another mapping</option>
-          <option value="all">* – any method</option>
+          <option value="mapping">{t("MAPPING – result of another mapping")}</option>
+          <option value="all">{t("* – any method")}</option>
         </select>
         {f.using === "plugin" && <>
-          <label className="l">Plugin</label>
+          <label className="l">{t("Plugin")}</label>
           <div>
             <input className="text" list="fb-map-plugins" value={f.plugin} onChange={(e) => set("plugin", e.target.value)} />
             <datalist id="fb-map-plugins">{["Srp", "Srp256", "Win_Sspi", "Legacy_Auth"].map((p) => <option key={p} value={p} />)}</datalist>
           </div>
         </>}
         {f.using !== "serverwide" && <>
-          <label className="l">In database</label>
-          <input className="text" value={f.database} placeholder="optional: where the identity comes from" onChange={(e) => set("database", e.target.value)} />
+          <label className="l">{t("In database")}</label>
+          <input className="text" value={f.database} placeholder={t("optional: where the identity comes from")} onChange={(e) => set("database", e.target.value)} />
         </>}
-        <label className="l">From</label>
+        <label className="l">{t("From")}</label>
         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
           <select className="text" value={f.from_type} onChange={(e) => set("from_type", e.target.value)}>
             {[...new Set([...FROM_TYPES, f.from_type])].map((t) => <option key={t}>{t}</option>)}
           </select>
           <label className="check"><input type="checkbox" checked={f.any} onChange={(e) => set("any", e.target.checked)} /> ANY</label>
-          {!f.any && <input className="text" style={{ flex: 1 }} value={f.from_name} placeholder="e.g. DOMAIN_ANY_RID_ADMINS" onChange={(e) => set("from_name", e.target.value)} />}
+          {!f.any && <input className="text" style={{ flex: 1 }} value={f.from_name} placeholder={t("e.g. DOMAIN_ANY_RID_ADMINS")} onChange={(e) => set("from_name", e.target.value)} />}
         </div>
-        <label className="l">To</label>
+        <label className="l">{t("To")}</label>
         <div style={{ display: "flex", gap: 6 }}>
           <select className="text" value={f.to_type} onChange={(e) => set("to_type", e.target.value)}>
             <option>USER</option><option>ROLE</option>
           </select>
-          <input className="text" style={{ flex: 1 }} value={f.to_name} placeholder={f.to_type === "ROLE" ? "role name, e.g. RDB$ADMIN" : "(empty = same name)"} onChange={(e) => set("to_name", e.target.value)} />
+          <input className="text" style={{ flex: 1 }} value={f.to_name} placeholder={f.to_type === "ROLE" ? t("role name, e.g. RDB$ADMIN") : t("(empty = same name)")} onChange={(e) => set("to_name", e.target.value)} />
         </div>
-        <label className="l">Description</label>
-        <input className="text" value={f.description} placeholder="Firebird 5+" onChange={(e) => set("description", e.target.value)} />
+        <label className="l">{t("Description")}</label>
+        <input className="text" value={f.description} placeholder={t("Firebird 5+")} onChange={(e) => set("description", e.target.value)} />
       </div>
     </SqlDialog>
   );
@@ -439,32 +440,32 @@ export function SvcUsersPanel(props: { serverId: string }) {
   const edit = (u?: { user_name: string; first_name: string; middle_name: string; last_name: string; admin: boolean }) =>
     app.showDialog(<SvcUserDialog serverId={props.serverId} securityDb={secDb} user={u} onDone={load} />);
   const drop = async (name: string) => {
-    if (!confirm(`Delete user ${name}?`)) return;
-    try { await secApi.svcDeleteUser(props.serverId, name, secDb || undefined); app.toast(`User ${name} deleted`); load(); }
+    if (!confirm(t("Delete user {name}?", { name }))) return;
+    try { await secApi.svcDeleteUser(props.serverId, name, secDb || undefined); app.toast(t("User {name} deleted", { name })); load(); }
     catch (e) { app.toast(errMsg(e), "error"); }
   };
   return (
     <div className="pad sec-panel">
       <div className="sec-bar">
-        <button className="btn primary" onClick={() => edit()}><IconPlus /> Add user</button>
-        <button className="btn" onClick={load}><IconRefresh /> Refresh</button>
-        <label className="muted">Security database of
-          <input className="text" style={{ width: 280, marginLeft: 6 }} value={secDb} placeholder="(default) or a database path/alias"
+        <button className="btn primary" onClick={() => edit()}><IconPlus /> {t("Add user")}</button>
+        <button className="btn" onClick={load}><IconRefresh /> {t("Refresh")}</button>
+        <label className="muted">{t("Security database of")}
+          <input className="text" style={{ width: 280, marginLeft: 6 }} value={secDb} placeholder={t("(default) or a database path/alias")}
             onChange={(e) => setSecDb(e.target.value)} onKeyDown={(e) => e.key === "Enter" && load()} />
         </label>
         {error && <span className="err">{error}</span>}
       </div>
-      <p className="muted">Services API user management (like gsec). It works without a database connection; plugins and tags are managed per database under “Users, roles &amp; mappings”.</p>
+      <p className="muted">{t("Services API user management (like gsec). It works without a database connection; plugins and tags are managed per database under “Users, roles & mappings”.")}</p>
       {users && (
         <div className="grid-wrap" style={{ maxHeight: "none" }}>
           <table className="grid">
-            <thead><tr><th>User</th><th>First name</th><th>Middle name</th><th>Last name</th><th>Admin</th><th /></tr></thead>
+            <thead><tr><th>{t("User")}</th><th>{t("First name")}</th><th>{t("Middle name")}</th><th>{t("Last name")}</th><th>{t("Admin")}</th><th /></tr></thead>
             <tbody>
               {users.map((u) => (
                 <tr key={u.user_name}>
                   <td><b>{u.user_name}</b></td><td>{u.first_name}</td><td>{u.middle_name}</td><td>{u.last_name}</td><td>{u.admin ? "✓" : ""}</td>
                   <td style={{ whiteSpace: "nowrap" }}>
-                    <button className="btn small" onClick={() => edit(u)}>Edit</button>{" "}
+                    <button className="btn small" onClick={() => edit(u)}>{t("Edit")}</button>{" "}
                     <button className="btn small danger" onClick={() => drop(u.user_name)}><IconTrash size={12} /></button>
                   </td>
                 </tr>
@@ -489,30 +490,30 @@ function SvcUserDialog(props: { serverId: string; securityDb: string; user?: { u
       const body = { ...f, password: f.password || null, security_db: props.securityDb || null };
       if (u) await secApi.svcModifyUser(props.serverId, u.user_name, body);
       else await secApi.svcAddUser(props.serverId, body);
-      app.toast(u ? "User modified" : "User added");
+      app.toast(u ? t("User modified") : t("User added"));
       props.onDone();
       close();
     } catch (e) { setError(errMsg(e)); }
   };
   return (
-    <Modal title={u ? `Modify user ${u.user_name}` : "Add user (Services API)"} onClose={close} footer={<>
+    <Modal title={u ? t("Modify user {name}", { name: u.user_name }) : t("Add user (Services API)")} onClose={close} footer={<>
       {error && <span className="err">{error}</span>}
-      <button className="btn" onClick={close}>Cancel</button>
-      <button className="btn primary" disabled={!f.name || (!u && !f.password)} onClick={save}>{u ? "Save" : "Add"}</button>
+      <button className="btn" onClick={close}>{t("Cancel")}</button>
+      <button className="btn primary" disabled={!f.name || (!u && !f.password)} onClick={save}>{u ? t("Save") : t("Add")}</button>
     </>}>
       <div className="form">
-        <label className="l">User name</label>
+        <label className="l">{t("User name")}</label>
         <input className="text" autoFocus={!u} disabled={!!u} value={f.name} onChange={(e) => set("name", e.target.value)} />
-        <label className="l">{u ? "New password" : "Password"}</label>
-        <input className="text" type="password" autoComplete="new-password" placeholder={u ? "(unchanged)" : ""} value={f.password} onChange={(e) => set("password", e.target.value)} />
-        <label className="l">First name</label>
+        <label className="l">{u ? t("New password") : t("Password")}</label>
+        <input className="text" type="password" autoComplete="new-password" placeholder={u ? t("(unchanged)") : ""} value={f.password} onChange={(e) => set("password", e.target.value)} />
+        <label className="l">{t("First name")}</label>
         <input className="text" value={f.first_name} onChange={(e) => set("first_name", e.target.value)} />
-        <label className="l">Middle name</label>
+        <label className="l">{t("Middle name")}</label>
         <input className="text" value={f.middle_name} onChange={(e) => set("middle_name", e.target.value)} />
-        <label className="l">Last name</label>
+        <label className="l">{t("Last name")}</label>
         <input className="text" value={f.last_name} onChange={(e) => set("last_name", e.target.value)} />
         <span />
-        <label className="check"><input type="checkbox" checked={f.admin} onChange={(e) => set("admin", e.target.checked)} /> Administrator (admin role in the security database)</label>
+        <label className="check"><input type="checkbox" checked={f.admin} onChange={(e) => set("admin", e.target.checked)} /> {t("Administrator (admin role in the security database)")}</label>
       </div>
     </Modal>
   );

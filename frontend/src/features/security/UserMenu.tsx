@@ -7,6 +7,7 @@ import { IconUser } from "../../components/Icons";
 import { secApi } from "./api";
 import { isAdmin, refreshAuth, setAuth, useAuth } from "./state";
 import { VaultDialog } from "./VaultDialog";
+import { t } from "../../i18n";
 
 export function UserMenu(props: { app: AppApi }) {
   const { app } = props;
@@ -25,31 +26,31 @@ export function UserMenu(props: { app: AppApi }) {
   const item = (label: string, fn: () => void, cls = "") => (
     <button className={cls} onClick={() => { setOpen(false); fn(); }}>{label}</button>
   );
-  const label = auth.server_mode ? auth.user?.username : "Security";
+  const label = auth.server_mode ? auth.user?.username : t("Security");
 
   return (
     <div className="user-menu" ref={ref}>
-      <button className="tb" onClick={() => setOpen(!open)} title={auth.server_mode ? `Signed in as ${auth.user?.username}` : "Security"}>
-        <IconUser /> {label}{locked && <span className="badge" title="Saved passwords are locked">locked</span>}
+      <button className="tb" onClick={() => setOpen(!open)} title={auth.server_mode ? t("Signed in as {user}", { user: String(auth.user?.username) }) : t("Security")}>
+        <IconUser /> {label}{locked && <span className="badge" title={t("Saved passwords are locked")}>{t("locked")}</span>}
       </button>
       {open && (
         <div className="ctx user-menu-pop">
           {auth.server_mode && (
             <div className="sub-h">{auth.user?.email || auth.user?.username} · {auth.user?.role} · {auth.user?.auth_source}</div>
           )}
-          {item(vault?.enabled ? (locked ? "Unlock saved passwords…" : "Master password…") : "Set master password…",
-            () => app.showDialog(<VaultDialog manage onDone={(ok) => { app.showDialog(null); if (ok) { app.toast("Master password updated"); app.reloadServers(); } }} />))}
-          {vault?.enabled && !locked && !vault.login_bound && item("Lock saved passwords", async () => {
+          {item(vault?.enabled ? (locked ? t("Unlock saved passwords…") : t("Master password…")) : t("Set master password…"),
+            () => app.showDialog(<VaultDialog manage onDone={(ok) => { app.showDialog(null); if (ok) { app.toast(t("Master password updated")); app.reloadServers(); } }} />))}
+          {vault?.enabled && !locked && !vault.login_bound && item(t("Lock saved passwords"), async () => {
             await secApi.vaultLock();
             await refreshAuth();
-            app.toast("Saved passwords locked", "info");
+            app.toast(t("Saved passwords locked"), "info");
           })}
-          {auth.server_mode && auth.user?.auth_source === "internal" && item("Change password…", () => app.showDialog(<ChangePasswordDialog app={app} />))}
+          {auth.server_mode && auth.user?.auth_source === "internal" && item(t("Change password…"), () => app.showDialog(<ChangePasswordDialog app={app} />))}
           {isAdmin(auth) && <hr />}
-          {isAdmin(auth) && auth.server_mode && item("Manage users", () => app.openTab({ kind: "security-users", title: "fbadmin users" }))}
-          {isAdmin(auth) && item("Audit log", () => app.openTab({ kind: "security-audit", title: "Audit log" }))}
+          {isAdmin(auth) && auth.server_mode && item(t("Manage users"), () => app.openTab({ kind: "security-users", title: t("fbadmin users") }))}
+          {isAdmin(auth) && item(t("Audit log"), () => app.openTab({ kind: "security-audit", title: t("Audit log") }))}
           {auth.server_mode && <hr />}
-          {auth.server_mode && item("Sign out", async () => {
+          {auth.server_mode && item(t("Sign out"), async () => {
             try { await secApi.logout(); } catch { /* ignore */ }
             setAuth({ ...auth, authenticated: false, user: null });
             refreshAuth().catch(() => undefined);
@@ -65,30 +66,30 @@ function ChangePasswordDialog(props: { app: AppApi }) {
   const [error, setError] = useState<string | null>(null);
   const close = () => props.app.showDialog(null);
   const submit = async () => {
-    if (f.pw !== f.pw2) return setError("The passwords do not match");
+    if (f.pw !== f.pw2) return setError(t("The passwords do not match"));
     try {
       await secApi.changePassword(f.old, f.pw);
-      props.app.toast("Password changed");
+      props.app.toast(t("Password changed"));
       close();
     } catch (e) {
       setError(errMsg(e));
     }
   };
   return (
-    <Modal title="Change password" onClose={close} footer={<>
+    <Modal title={t("Change password")} onClose={close} footer={<>
       {error && <span className="err">{error}</span>}
-      <button className="btn" onClick={close}>Cancel</button>
-      <button className="btn primary" disabled={!f.old || f.pw.length < 8} onClick={submit}>Change</button>
+      <button className="btn" onClick={close}>{t("Cancel")}</button>
+      <button className="btn primary" disabled={!f.old || f.pw.length < 8} onClick={submit}>{t("Change")}</button>
     </>}>
       <div className="form">
-        <label className="l">Current password</label>
+        <label className="l">{t("Current password")}</label>
         <input className="text" type="password" autoFocus value={f.old} onChange={(e) => setF({ ...f, old: e.target.value })} />
-        <label className="l">New password</label>
+        <label className="l">{t("New password")}</label>
         <input className="text" type="password" value={f.pw} onChange={(e) => setF({ ...f, pw: e.target.value })} />
-        <label className="l">Confirm</label>
+        <label className="l">{t("Confirm")}</label>
         <input className="text" type="password" value={f.pw2} onChange={(e) => setF({ ...f, pw2: e.target.value })} />
       </div>
-      <p className="muted">Your saved Firebird passwords are protected by this password and stay available.</p>
+      <p className="muted">{t("Your saved Firebird passwords are protected by this password and stay available.")}</p>
     </Modal>
   );
 }

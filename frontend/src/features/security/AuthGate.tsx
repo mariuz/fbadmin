@@ -10,6 +10,7 @@ import { Flame } from "../../components/Icons";
 import { secApi } from "./api";
 import { refreshAuth, setAuth, useAuth } from "./state";
 import { VaultDialog } from "./VaultDialog";
+import { t } from "../../i18n";
 
 let showVault: ((resolve: (ok: boolean) => void) => void) | null = null;
 
@@ -40,9 +41,9 @@ export function AuthGate(props: { children: ReactNode }) {
 
   if (error && !auth) {
     return <div className="auth-page"><div className="auth-card"><Brand /><p className="err">{error}</p>
-      <button className="btn" onClick={() => location.reload()}>Retry</button></div></div>;
+      <button className="btn" onClick={() => location.reload()}>{t("Retry")}</button></div></div>;
   }
-  if (!auth) return <div className="auth-page"><div className="muted">Loading…</div></div>;
+  if (!auth) return <div className="auth-page"><div className="muted">{t("Loading…")}</div></div>;
   if (auth.server_mode && auth.needs_setup) return <SetupPage />;
   if (auth.server_mode && !auth.authenticated) return <LoginPage />;
   return (
@@ -54,7 +55,7 @@ export function AuthGate(props: { children: ReactNode }) {
 }
 
 function Brand() {
-  return <div className="auth-brand"><Flame size={30} /><div><b>fbadmin</b><small>Firebird administration</small></div></div>;
+  return <div className="auth-brand"><Flame size={30} /><div><b>fbadmin</b><small>{t("Firebird administration")}</small></div></div>;
 }
 
 function LoginPage() {
@@ -86,23 +87,23 @@ function LoginPage() {
     <div className="auth-page">
       <form className="auth-card" onSubmit={submit}>
         <Brand />
-        <h2>Sign in</h2>
+        <h2>{t("Sign in")}</h2>
         {password_ok && (
           <>
-            <label>User name or e-mail
+            <label>{t("User name or e-mail")}
               <input className="text" autoFocus autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} />
             </label>
-            <label>Password
+            <label>{t("Password")}
               <input className="text" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />
             </label>
-            <button className="btn primary" disabled={busy || !username || !password} type="submit">{busy ? "Signing in…" : "Sign in"}</button>
+            <button className="btn primary" disabled={busy || !username || !password} type="submit">{busy ? t("Signing in…") : t("Sign in")}</button>
           </>
         )}
-        {oidc.length > 0 && password_ok && <div className="auth-or"><span>or</span></div>}
+        {oidc.length > 0 && password_ok && <div className="auth-or"><span>{t("or")}</span></div>}
         {oidc.map((o) => (
-          <a key={o.name} className="btn auth-sso" href={`/api/auth/oidc/${encodeURIComponent(o.name)}/login`}>Continue with {o.title || o.name}</a>
+          <a key={o.name} className="btn auth-sso" href={`/api/auth/oidc/${encodeURIComponent(o.name)}/login`}>{t("Continue with {name}", { name: o.title || o.name })}</a>
         ))}
-        {proxyOnly && <p className="muted">Sign-in is handled by the reverse proxy in front of fbadmin. Reload the page after signing in there.</p>}
+        {proxyOnly && <p className="muted">{t("Sign-in is handled by the reverse proxy in front of fbadmin. Reload the page after signing in there.")}</p>}
         {error && <p className="err" role="alert">{error}</p>}
       </form>
     </div>
@@ -116,7 +117,7 @@ function SetupPage() {
   const set = (k: string, v: string) => setF((o) => ({ ...o, [k]: v }));
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (f.password !== f.confirm) return setError("The passwords do not match");
+    if (f.password !== f.confirm) return setError(t("The passwords do not match"));
     setBusy(true);
     setError(null);
     try {
@@ -131,13 +132,13 @@ function SetupPage() {
     <div className="auth-page">
       <form className="auth-card" onSubmit={submit}>
         <Brand />
-        <h2>Welcome – create the administrator</h2>
-        <p className="muted">fbadmin runs in server mode. This first account manages users, shared servers and the audit log.</p>
-        <label>User name<input className="text" autoFocus value={f.username} onChange={(e) => set("username", e.target.value)} /></label>
-        <label>E-mail (optional)<input className="text" type="email" value={f.email} onChange={(e) => set("email", e.target.value)} /></label>
-        <label>Password (8+ characters)<input className="text" type="password" autoComplete="new-password" value={f.password} onChange={(e) => set("password", e.target.value)} /></label>
-        <label>Confirm password<input className="text" type="password" autoComplete="new-password" value={f.confirm} onChange={(e) => set("confirm", e.target.value)} /></label>
-        <button className="btn primary" type="submit" disabled={busy || !f.username || f.password.length < 8}>Create administrator</button>
+        <h2>{t("Welcome – create the administrator")}</h2>
+        <p className="muted">{t("fbadmin runs in server mode. This first account manages users, shared servers and the audit log.")}</p>
+        <label>{t("User name")}<input className="text" autoFocus value={f.username} onChange={(e) => set("username", e.target.value)} /></label>
+        <label>{t("E-mail (optional)")}<input className="text" type="email" value={f.email} onChange={(e) => set("email", e.target.value)} /></label>
+        <label>{t("Password (8+ characters)")}<input className="text" type="password" autoComplete="new-password" value={f.password} onChange={(e) => set("password", e.target.value)} /></label>
+        <label>{t("Confirm password")}<input className="text" type="password" autoComplete="new-password" value={f.confirm} onChange={(e) => set("confirm", e.target.value)} /></label>
+        <button className="btn primary" type="submit" disabled={busy || !f.username || f.password.length < 8}>{t("Create administrator")}</button>
         {error && <p className="err" role="alert">{error}</p>}
       </form>
     </div>

@@ -3,6 +3,7 @@ import { api } from "../../api";
 import { errMsg, useApp } from "../../context";
 import type { Job } from "../../types";
 import { schemaApi, type JobResult } from "./api";
+import { t } from "../../i18n";
 
 export const quoteIdent = (n: string) => (/^[A-Z][A-Z0-9_$]*$/.test(n) ? n : `"${n.replace(/"/g, '""')}"`);
 
@@ -79,15 +80,15 @@ export function JobStatus(props: { result: JobResult | null; log: string[]; chil
     <div className="sch-job">
       <div>
         <span className={"pill " + r.status}>{r.status}</span>{" "}
-        {r.inserted !== undefined && <b>{r.inserted.toLocaleString()} row(s) inserted</b>}
-        {!!r.failed && <span className="err"> · {r.failed} failed</span>}
-        {r.rows !== undefined && <b>{r.rows.toLocaleString()} row(s) copied</b>}
+        {r.inserted !== undefined && <b>{t("{n} row(s) inserted", { n: r.inserted.toLocaleString() })}</b>}
+        {!!r.failed && <span className="err"> · {t("{n} failed", { n: r.failed })}</span>}
+        {r.rows !== undefined && <b>{t("{n} row(s) copied", { n: r.rows.toLocaleString() })}</b>}
         {props.children}
       </div>
       {r.error && <div className="err" style={{ whiteSpace: "pre-wrap" }}>{r.error}</div>}
       {!!r.errors?.length && (
         <div className="grid-wrap" style={{ maxHeight: 200 }}>
-          <table className="grid"><thead><tr><th>Row</th><th>Error</th></tr></thead>
+          <table className="grid"><thead><tr><th>{t("Row")}</th><th>{t("Error")}</th></tr></thead>
             <tbody>{r.errors.map((e, i) => <tr key={i}><td className="num">{e.row}</td><td title={e.message}>{e.message}</td></tr>)}</tbody>
           </table>
         </div>
@@ -147,8 +148,8 @@ export function SideBySide(props: { left: string | null; right: string | null; l
             <pre className={r.kind === "chg" && r.r !== undefined ? "r" : ""}>{r.r ?? (props.right === null ? "" : " ")}</pre>
           </div>
         ))}
-        {props.left === null && <div className="sch-sbs-note left">not in source</div>}
-        {props.right === null && <div className="sch-sbs-note right">not in target</div>}
+        {props.left === null && <div className="sch-sbs-note left">{t("not in source")}</div>}
+        {props.right === null && <div className="sch-sbs-note right">{t("not in target")}</div>}
       </div>
     </div>
   );
