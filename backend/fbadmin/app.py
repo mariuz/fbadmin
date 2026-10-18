@@ -16,6 +16,7 @@ from .api import ROUTERS
 from .api.deps import get_state
 from .config import settings
 from .connections import PasswordRequired
+from .maintenance import scheduler
 from .metadata import OBJECT_TYPES
 from .plugins import load_plugins
 
@@ -34,7 +35,9 @@ def _reaper(stop: threading.Event) -> None:
 async def lifespan(app: FastAPI):
     stop = threading.Event()
     threading.Thread(target=_reaper, args=(stop,), daemon=True).start()
+    scheduler.startup()
     yield
+    scheduler.shutdown()
     stop.set()
     get_state().manager.close_all()
 

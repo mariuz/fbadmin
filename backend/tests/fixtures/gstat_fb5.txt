@@ -1,0 +1,133 @@
+
+Database "/var/lib/firebird/data/gstatfix_e4dfbc.fdb"
+Gstat execution time Sun Oct 18 19:52:51 2026
+
+Database header page information:
+	Flags			0
+	Generation		10
+	System Change Number	0
+	Page size		4096
+	ODS version		13.1
+	Oldest transaction	5
+	Oldest active		6
+	Oldest snapshot		6
+	Next transaction	7
+	Sequence number		0
+	Next attachment ID	4
+	Implementation		HW=AMD/Intel/x64 little-endian OS=Linux CC=gcc
+	Shadow count		0
+	Page buffers		0
+	Next header page	0
+	Database dialect	3
+	Creation date		Oct 18, 2026 19:52:32
+	Attributes		force write
+
+    Variable header data:
+	Database GUID:	{6C4E74FA-1340-4361-97C1-A2B221FBE4FC}
+	*END*
+
+
+Database file sequence:
+File /var/lib/firebird/data/gstatfix_e4dfbc.fdb is the only file
+
+Analyzing database pages ...
+CUSTOMER (128)
+    Primary pointer page: 279, Index root page: 280
+    Total formats: 1, used formats: 1
+    Average record length: 32.80, total records: 3000
+    Average version length: 11.00, total versions: 1500, max versions: 1
+    Average fragment length: 0.00, total fragments: 0, max fragments: 0
+    Average unpacked length: 264.00, compression ratio: 8.05
+    Pointer pages: 2, data page slots: 1064
+    Data pages: 1064, average fill: 69%
+    Primary pages: 64, secondary pages: 1000, swept pages: 0
+    Empty pages: 7, full pages: 1055
+    Blobs: 3000, total length: 2700000, blob pages: 0
+        Level 0: 3000, total length: 2700000, blob pages: 0
+    Table size: 4366336 bytes
+    Fill distribution:
+	 0 - 19% = 7
+	20 - 39% = 0
+	40 - 59% = 2
+	60 - 79% = 998
+	80 - 99% = 57
+
+    Index IX_CUST_NAME (1)
+	Root page: 301, depth: 2, leaf buckets: 7, nodes: 4500
+	Average node length: 4.03, total dup: 4425, max dup: 59
+	Average key length: 2.05, compression ratio: 3.97
+	Average prefix length: 8.09, average data length: 0.04
+	Clustering factor: 4248, ratio: 0.94
+	Fill distribution:
+	     0 - 19% = 0
+	    20 - 39% = 0
+	    40 - 59% = 2
+	    60 - 79% = 4
+	    80 - 99% = 1
+
+    Index RDB$PRIMARY1 (0)
+	Root page: 299, depth: 2, leaf buckets: 4, nodes: 3000
+	Average node length: 4.99, total dup: 0, max dup: 0
+	Average key length: 3.00, compression ratio: 0.98
+	Average prefix length: 1.95, average data length: 1.00
+	Clustering factor: 57, ratio: 0.02
+	Fill distribution:
+	     0 - 19% = 0
+	    20 - 39% = 0
+	    40 - 59% = 0
+	    60 - 79% = 1
+	    80 - 99% = 3
+
+EMPTY_T (130)
+    Primary pointer page: 283, Index root page: 284
+    Total formats: 1, used formats: 0
+    Average record length: 0.00, total records: 0
+    Average version length: 0.00, total versions: 0, max versions: 0
+    Average fragment length: 0.00, total fragments: 0, max fragments: 0
+    Average unpacked length: 0.00, compression ratio: 0.00
+    Pointer pages: 1, data page slots: 0
+    Data pages: 0, average fill: 0%
+    Primary pages: 0, secondary pages: 0, swept pages: 0
+    Empty pages: 0, full pages: 0
+    Table size: 4096 bytes
+    Fill distribution:
+	 0 - 19% = 0
+	20 - 39% = 0
+	40 - 59% = 0
+	60 - 79% = 0
+	80 - 99% = 0
+
+WIDE_KEYS (129)
+    Primary pointer page: 281, Index root page: 282
+    Total formats: 1, used formats: 1
+    Average record length: 20.33, total records: 1500
+    Average version length: 25.99, total versions: 500, max versions: 1
+    Average fragment length: 0.00, total fragments: 0, max fragments: 0
+    Average unpacked length: 1012.00, compression ratio: 49.78
+    Pointer pages: 1, data page slots: 32
+    Data pages: 32, average fill: 59%
+    Primary pages: 32, secondary pages: 0, swept pages: 0
+    Empty pages: 5, full pages: 26
+    Table size: 135168 bytes
+    Fill distribution:
+	 0 - 19% = 5
+	20 - 39% = 0
+	40 - 59% = 1
+	60 - 79% = 26
+	80 - 99% = 0
+
+    Index IX_WIDE (0)
+	Root page: 1387, depth: 3, leaf buckets: 100, nodes: 1500
+	Average node length: 246.75, total dup: 0, max dup: 0
+	Average key length: 245.34, compression ratio: 1.00
+	Average prefix length: 4.59, average data length: 241.41
+	Clustering factor: 27, ratio: 0.02
+	Fill distribution:
+	     0 - 19% = 0
+	    20 - 39% = 0
+	    40 - 59% = 0
+	    60 - 79% = 0
+	    80 - 99% = 100
+
+Gstat completion time Sun Oct 18 19:52:51 2026
+

@@ -2,7 +2,14 @@
 
 from fastapi import APIRouter
 
-from . import ai, databases, jobs, query, servers
+from . import ai  # noqa: I001 - one import per line keeps parallel branches mergeable
+from . import databases
+from . import jobs
+from . import maintenance
+from . import query
+from . import schedules
+from . import servers
+from . import trace
 
 ROUTERS: list[APIRouter] = [
     servers.router,
@@ -10,4 +17,7 @@ ROUTERS: list[APIRouter] = [
     query.router,
     jobs.router,
     ai.router,
+    maintenance.router,
+    trace.router,
+    schedules.router,
 ]
