@@ -32,7 +32,8 @@ def test_pick_asset_and_sums():
     assert updater.pick_asset(assets, "1.2.0", "dmg", "x86_64")["name"] == names[2]
     assert updater.pick_asset(assets, "1.2.0", "appimage", "aarch64")["name"] == names[4]
     assert updater.pick_asset(assets, "1.3.0", "msi", "AMD64") is None
-    sums = updater.parse_sums("%s  fbadmin-1.2.0-x64.msi\n%s *dist/fbadmin-1.2.0-x86_64.AppImage\n" % ("a" * 64, "B" * 64))
+    a, b = "a" * 64, "B" * 64
+    sums = updater.parse_sums(f"{a}  fbadmin-1.2.0-x64.msi\n{b} *dist/fbadmin-1.2.0-x86_64.AppImage\n")
     assert sums == {"fbadmin-1.2.0-x64.msi": "a" * 64, "fbadmin-1.2.0-x86_64.AppImage": "b" * 64}
 
 
