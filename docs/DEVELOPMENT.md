@@ -114,8 +114,12 @@ scripts/gen-api-types.sh          # regenerate after changing an endpoint or a p
 scripts/gen-api-types.sh --check  # what CI runs: fails when the file is stale
 ```
 
-Use them in new code with `import type { components, paths } from "./api-types.gen"`,
-e.g. `paths["/api/version/latest"]["get"]["responses"]["200"]["content"]["application/json"]`.
+Request bodies in the API clients (`frontend/src/api.ts` and the `features/*/api.ts` files) are
+typed from it. Use `Body<"/api/schedules", "post">` from `api.ts`, which takes the JSON body of
+an OpenAPI path and also fails to compile when the path no longer exists. You can also use the
+schemas directly (`components["schemas"]["ServerIn"]`). Request-body fields that have defaults
+on the server are optional (`--default-non-nullable false`). Most endpoints return plain
+dicts, so their response types are still written by hand in `types.ts`.
 After merging branches that touch the API, regenerate the file instead of resolving
 conflicts in it by hand.
 

@@ -1,4 +1,4 @@
-import { ApiError, request } from "../../api";
+import { ApiError, request, type Body } from "../../api";
 import { t } from "../../i18n";
 import type { Job } from "../../types";
 
@@ -58,23 +58,23 @@ export interface HistoryItem { schedule_id: string; schedule_name: string; kind:
 
 export const mapi = {
   capabilities: (sid: string) => request<Capabilities>("GET", `${srv(sid)}/maintenance/capabilities`),
-  prepareDownload: (sid: string, dbid: string, opts: Record<string, unknown>) =>
+  prepareDownload: (sid: string, dbid: string, opts: Body<"/api/servers/{server_id}/databases/{db_id}/maintenance/backup/stream", "post">) =>
     request<{ token: string; filename: string; url: string }>("POST", `${mdb(sid, dbid)}/backup/stream`, opts),
-  backupJob: (sid: string, dbid: string, body: Record<string, unknown>) => request<Job>("POST", `${mdb(sid, dbid)}/backup`, body),
-  restoreJob: (sid: string, body: Record<string, unknown>) => request<Job>("POST", `${srv(sid)}/maintenance/restore`, body),
+  backupJob: (sid: string, dbid: string, body: Body<"/api/servers/{server_id}/databases/{db_id}/maintenance/backup", "post">) => request<Job>("POST", `${mdb(sid, dbid)}/backup`, body),
+  restoreJob: (sid: string, body: Body<"/api/servers/{server_id}/maintenance/restore", "post">) => request<Job>("POST", `${srv(sid)}/maintenance/restore`, body),
   archive: (sid: string) => request<ArchiveItem[]>("GET", `${srv(sid)}/maintenance/archive`),
   archiveUrl: (sid: string, path: string) => `${srv(sid)}/maintenance/archive/download?path=${encodeURIComponent(path)}`,
   deleteArchive: (sid: string, path: string) => request<void>("DELETE", `${srv(sid)}/maintenance/archive?path=${encodeURIComponent(path)}`),
 
-  nbackup: (sid: string, dbid: string, body: Record<string, unknown>) => request<Job>("POST", `${mdb(sid, dbid)}/nbackup`, body),
-  nrestore: (sid: string, body: Record<string, unknown>) => request<Job>("POST", `${srv(sid)}/maintenance/nrestore`, body),
+  nbackup: (sid: string, dbid: string, body: Body<"/api/servers/{server_id}/databases/{db_id}/maintenance/nbackup", "post">) => request<Job>("POST", `${mdb(sid, dbid)}/nbackup`, body),
+  nrestore: (sid: string, body: Body<"/api/servers/{server_id}/maintenance/nrestore", "post">) => request<Job>("POST", `${srv(sid)}/maintenance/nrestore`, body),
   nbackupLock: (sid: string, dbid: string) => request<DbState>("POST", `${mdb(sid, dbid)}/nbackup/lock`),
   nbackupUnlock: (sid: string, dbid: string) => request<DbState>("POST", `${mdb(sid, dbid)}/nbackup/unlock`),
   nbackupFixup: (sid: string, dbid: string, database_path?: string) =>
     request<{ ok: boolean; output: string[] }>("POST", `${mdb(sid, dbid)}/nbackup/fixup`, { database_path: database_path || null }),
   nbackupHistory: (sid: string, dbid: string) => request<Array<Record<string, any>>>("GET", `${mdb(sid, dbid)}/nbackup/history`),
 
-  validate: (sid: string, dbid: string, body: Record<string, unknown>) => request<Job>("POST", `${mdb(sid, dbid)}/validate`, body),
+  validate: (sid: string, dbid: string, body: Body<"/api/servers/{server_id}/databases/{db_id}/maintenance/validate", "post">) => request<Job>("POST", `${mdb(sid, dbid)}/validate`, body),
   sweep: (sid: string, dbid: string, parallel_workers?: number | null) =>
     request<Job>("POST", `${mdb(sid, dbid)}/sweep`, { parallel_workers: parallel_workers || null }),
   icu: (sid: string, dbid: string) => request<Job>("POST", `${mdb(sid, dbid)}/icu`),
@@ -86,10 +86,10 @@ export const mapi = {
     request<Header>("POST", `${mdb(sid, dbid)}/shutdown`, body),
   online: (sid: string, dbid: string, mode: string) => request<Header>("POST", `${mdb(sid, dbid)}/online`, { mode }),
   properties: (sid: string, dbid: string) => request<DbState>("GET", `${mdb(sid, dbid)}/properties`),
-  setProperties: (sid: string, dbid: string, body: Record<string, unknown>) =>
+  setProperties: (sid: string, dbid: string, body: Body<"/api/servers/{server_id}/databases/{db_id}/maintenance/properties", "put">) =>
     request<{ changed: string[]; state: DbState }>("PUT", `${mdb(sid, dbid)}/properties`, body),
 
-  gstat: (sid: string, dbid: string, body: Record<string, unknown>) => request<Job>("POST", `${mdb(sid, dbid)}/gstat`, body),
+  gstat: (sid: string, dbid: string, body: Body<"/api/servers/{server_id}/databases/{db_id}/maintenance/gstat", "post">) => request<Job>("POST", `${mdb(sid, dbid)}/gstat`, body),
   gstatResult: (sid: string, jobId: string) => request<GstatResult>("GET", `${srv(sid)}/maintenance/gstat/${jobId}`),
   gstatParse: (sid: string, text: string) => request<GstatResult>("POST", `${srv(sid)}/maintenance/gstat/parse`, { text }),
 
@@ -101,9 +101,9 @@ export const mapi = {
     request<{ available: boolean; message: string | null; rows: Array<{ id: number; name: string; value: string | null; default: string | null; is_set: boolean; source: string | null }> }>("GET", `${mdb(sid, dbid)}/config`),
 
   traceTemplates: (sid: string) => request<TraceTemplate[]>("GET", `${srv(sid)}/trace/templates`),
-  tracePreview: (sid: string, body: Record<string, unknown>) => request<{ config: string }>("POST", `${srv(sid)}/trace/preview`, body),
+  tracePreview: (sid: string, body: Body<"/api/servers/{server_id}/trace/preview", "post">) => request<{ config: string }>("POST", `${srv(sid)}/trace/preview`, body),
   traceSessions: (sid: string) => request<{ local: TraceSummary[]; server: Array<{ id: number; name: string | null; user: string | null; date: string | null; flags: string[] }> }>("GET", `${srv(sid)}/trace/sessions`),
-  traceStart: (sid: string, body: Record<string, unknown>) => request<TraceSummary>("POST", `${srv(sid)}/trace/sessions`, body),
+  traceStart: (sid: string, body: Body<"/api/servers/{server_id}/trace/sessions", "post">) => request<TraceSummary>("POST", `${srv(sid)}/trace/sessions`, body),
   traceEvents: (sid: string, id: string, after: number) =>
     request<{ session: TraceSummary; events: TraceEvent[]; last_seq: number }>("GET", `${srv(sid)}/trace/sessions/${id}/events?after=${after}&limit=2000`),
   traceStop: (sid: string, id: string) => request<TraceSummary>("POST", `${srv(sid)}/trace/sessions/${id}/stop`),
@@ -112,8 +112,8 @@ export const mapi = {
   traceStopServer: (sid: string, sessionId: number) => request("POST", `${srv(sid)}/trace/server-sessions/${sessionId}/stop`),
 
   schedules: () => request<Schedule[]>("GET", "/api/schedules"),
-  createSchedule: (body: Record<string, unknown>) => request<Schedule>("POST", "/api/schedules", body),
-  updateSchedule: (id: string, body: Record<string, unknown>) => request<Schedule>("PUT", `/api/schedules/${id}`, body),
+  createSchedule: (body: Body<"/api/schedules", "post">) => request<Schedule>("POST", "/api/schedules", body),
+  updateSchedule: (id: string, body: Body<"/api/schedules/{schedule_id}", "put">) => request<Schedule>("PUT", `/api/schedules/${id}`, body),
   deleteSchedule: (id: string, deleteBackups: boolean) => request<void>("DELETE", `/api/schedules/${id}?delete_backups=${deleteBackups}`),
   runSchedule: (id: string) => request<Job>("POST", `/api/schedules/${id}/run`),
   scheduleHistory: (id?: string) => request<HistoryItem[]>("GET", id ? `/api/schedules/${id}/history` : "/api/schedules/history"),

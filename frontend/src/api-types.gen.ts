@@ -2994,7 +2994,7 @@ export interface components {
              * Min Rows
              * @default 1000
              */
-            min_rows: number;
+            min_rows?: number;
             /**
              * Sources
              * @default [
@@ -3003,7 +3003,7 @@ export interface components {
              *       "compiled"
              *     ]
              */
-            sources: string[];
+            sources?: string[];
             /** Sql */
             sql?: string | null;
         };
@@ -3015,24 +3015,24 @@ export interface components {
              * Dialect
              * @default MySQL
              */
-            dialect: string;
+            dialect?: string;
             /**
              * Error
              * @default
              */
-            error: string;
+            error?: string;
             /**
              * Question
              * @default
              */
-            question: string;
+            question?: string;
             /** Server Id */
             server_id?: string | null;
             /**
              * Sql
              * @default
              */
-            sql: string;
+            sql?: string;
             /** Task */
             task: string;
         };
@@ -3042,29 +3042,29 @@ export interface components {
              * Convert External
              * @default false
              */
-            convert_external: boolean;
+            convert_external?: boolean;
             /** Crypt Plugin */
             crypt_plugin?: string | null;
             /**
              * Expand
              * @default false
              */
-            expand: boolean;
+            expand?: boolean;
             /**
              * Garbage Collect
              * @default true
              */
-            garbage_collect: boolean;
+            garbage_collect?: boolean;
             /**
              * Ignore Checksums
              * @default false
              */
-            ignore_checksums: boolean;
+            ignore_checksums?: boolean;
             /**
              * Ignore Limbo
              * @default false
              */
-            ignore_limbo: boolean;
+            ignore_limbo?: boolean;
             /** Include Data */
             include_data?: string | null;
             /** Key Name */
@@ -3075,12 +3075,12 @@ export interface components {
              * Metadata Only
              * @default false
              */
-            metadata_only: boolean;
+            metadata_only?: boolean;
             /**
              * Old Descriptions
              * @default false
              */
-            old_descriptions: boolean;
+            old_descriptions?: boolean;
             /** Parallel Workers */
             parallel_workers?: number | null;
             /** Skip Data */
@@ -3089,12 +3089,12 @@ export interface components {
              * Transportable
              * @default true
              */
-            transportable: boolean;
+            transportable?: boolean;
             /**
              * Zip
              * @default false
              */
-            zip: boolean;
+            zip?: boolean;
         };
         /** ConfIn */
         ConfIn: {
@@ -3104,7 +3104,7 @@ export interface components {
              * Role
              * @default primary
              */
-            role: string;
+            role?: string;
         } & {
             [key: string]: unknown;
         };
@@ -3119,12 +3119,12 @@ export interface components {
              * Batch Size
              * @default 1000
              */
-            batch_size: number;
+            batch_size?: number;
             /**
              * Create Tables
              * @default true
              */
-            create_tables: boolean;
+            create_tables?: boolean;
             source: components["schemas"]["Endpoint"];
             /** Tables */
             tables: string[];
@@ -3133,7 +3133,7 @@ export interface components {
              * Truncate
              * @default false
              */
-            truncate: boolean;
+            truncate?: boolean;
         };
         /** CreateDatabaseIn */
         CreateDatabaseIn: {
@@ -3141,14 +3141,14 @@ export interface components {
              * Charset
              * @default UTF8
              */
-            charset: string;
+            charset?: string;
             /** Name */
             name: string;
             /**
              * Page Size
              * @default 16384
              */
-            page_size: number;
+            page_size?: number;
             /** Path */
             path: string;
         };
@@ -3171,17 +3171,17 @@ export interface components {
              * Deletes
              * @default []
              */
-            deletes: components["schemas"]["RowChange"][];
+            deletes?: components["schemas"]["RowChange"][];
             /**
              * Inserts
              * @default []
              */
-            inserts: components["schemas"]["RowChange"][];
+            inserts?: components["schemas"]["RowChange"][];
             /**
              * Updates
              * @default []
              */
-            updates: components["schemas"]["RowChange"][];
+            updates?: components["schemas"]["RowChange"][];
         };
         /** DatabaseIn */
         DatabaseIn: {
@@ -3196,7 +3196,7 @@ export interface components {
              * Set Term
              * @default true
              */
-            set_term: boolean;
+            set_term?: boolean;
             source: components["schemas"]["Side"];
             target: components["schemas"]["Side"];
         };
@@ -3225,17 +3225,17 @@ export interface components {
              * Delimiter
              * @default ,
              */
-            delimiter: string;
+            delimiter?: string;
             /**
              * Format
              * @default csv
              */
-            format: string;
+            format?: string;
             /**
              * Header
              * @default true
              */
-            header: boolean;
+            header?: boolean;
             /** Sql */
             sql?: string | null;
             /** Table */
@@ -3249,7 +3249,7 @@ export interface components {
              * Rows
              * @default 1000
              */
-            rows: number;
+            rows?: number;
         };
         /** GenerateIn */
         GenerateIn: {
@@ -3257,12 +3257,12 @@ export interface components {
              * Null Ratio
              * @default 0.1
              */
-            null_ratio: number;
+            null_ratio?: number;
             /**
              * Overrides
              * @default {}
              */
-            overrides: {
+            overrides?: {
                 [key: string]: {
                     [key: string]: unknown;
                 };
@@ -3271,7 +3271,7 @@ export interface components {
              * Rows
              * @default 100
              */
-            rows: number;
+            rows?: number;
             /** Seed */
             seed?: number | null;
             /** Table */
@@ -3283,17 +3283,17 @@ export interface components {
              * Admin Option
              * @default false
              */
-            admin_option: boolean;
+            admin_option?: boolean;
             /**
              * Default
              * @default false
              */
-            default: boolean;
+            default?: boolean;
             /**
              * Grant
              * @default true
              */
-            grant: boolean;
+            grant?: boolean;
             /** User */
             user: string;
         };
@@ -3319,24 +3319,24 @@ export interface components {
              * Create
              * @default false
              */
-            create: boolean;
+            create?: boolean;
             /**
              * Delete Upload
              * @default true
              */
-            delete_upload: boolean;
+            delete_upload?: boolean;
             /** Format */
             format?: string | null;
             /**
              * On Error
              * @default abort
              */
-            on_error: string;
+            on_error?: string;
             /**
              * Options
              * @default {}
              */
-            options: {
+            options?: {
                 [key: string]: unknown;
             };
             /** Table */
@@ -3345,7 +3345,7 @@ export interface components {
              * Truncate
              * @default false
              */
-            truncate: boolean;
+            truncate?: boolean;
             /** Upload Id */
             upload_id: string;
         };
@@ -3362,7 +3362,7 @@ export interface components {
              * Action
              * @default CREATE
              */
-            action: string;
+            action?: string;
             /** Database */
             database?: string | null;
             /** Description */
@@ -3373,12 +3373,12 @@ export interface components {
              * From Type
              * @default USER
              */
-            from_type: string;
+            from_type?: string;
             /**
              * Is Global
              * @default false
              */
-            is_global: boolean;
+            is_global?: boolean;
             /** Name */
             name: string;
             /** Plugin */
@@ -3389,12 +3389,12 @@ export interface components {
              * To Type
              * @default USER
              */
-            to_type: string;
+            to_type?: string;
             /**
              * Using
              * @default plugin
              */
-            using: string;
+            using?: string;
         };
         /** NbackupIn */
         NbackupIn: {
@@ -3408,12 +3408,12 @@ export interface components {
              * Level
              * @default 0
              */
-            level: number;
+            level?: number;
             /**
              * No Triggers
              * @default false
              */
-            no_triggers: boolean;
+            no_triggers?: boolean;
         };
         /** NrestoreIn */
         NrestoreIn: {
@@ -3425,7 +3425,7 @@ export interface components {
              * Inplace
              * @default false
              */
-            inplace: boolean;
+            inplace?: boolean;
             /** Register As */
             register_as?: string | null;
         };
@@ -3435,7 +3435,7 @@ export interface components {
              * Mode
              * @default normal
              */
-            mode: string;
+            mode?: string;
         };
         /** OptionsIn */
         OptionsIn: {
@@ -3443,14 +3443,14 @@ export interface components {
              * Isolation
              * @default read_committed
              */
-            isolation: string;
+            isolation?: string;
             /** Lock Timeout */
             lock_timeout?: number | null;
             /**
              * Read Only
              * @default false
              */
-            read_only: boolean;
+            read_only?: boolean;
             /** Search Schema */
             search_schema?: string | null;
             /** Statement Timeout */
@@ -3459,7 +3459,7 @@ export interface components {
              * Wait
              * @default true
              */
-            wait: boolean;
+            wait?: boolean;
         };
         /** PasswordChangeIn */
         PasswordChangeIn: {
@@ -3531,7 +3531,7 @@ export interface components {
              * Deactivate Indexes
              * @default false
              */
-            deactivate_indexes: boolean;
+            deactivate_indexes?: boolean;
             /** Fix Fss Data */
             fix_fss_data?: string | null;
             /** Fix Fss Metadata */
@@ -3546,22 +3546,22 @@ export interface components {
              * Metadata Only
              * @default false
              */
-            metadata_only: boolean;
+            metadata_only?: boolean;
             /**
              * No Shadow
              * @default false
              */
-            no_shadow: boolean;
+            no_shadow?: boolean;
             /**
              * No Validity
              * @default false
              */
-            no_validity: boolean;
+            no_validity?: boolean;
             /**
              * One At A Time
              * @default false
              */
-            one_at_a_time: boolean;
+            one_at_a_time?: boolean;
             /** Page Size */
             page_size?: number | null;
             /** Parallel Workers */
@@ -3570,19 +3570,19 @@ export interface components {
              * Read Only
              * @default false
              */
-            read_only: boolean;
+            read_only?: boolean;
             /**
              * Replace
              * @default false
              */
-            replace: boolean;
+            replace?: boolean;
             /** Skip Data */
             skip_data?: string | null;
             /**
              * Use All Space
              * @default false
              */
-            use_all_space: boolean;
+            use_all_space?: boolean;
         };
         /** RoleIn */
         RoleIn: {
@@ -3594,7 +3594,7 @@ export interface components {
              * Privileges
              * @default []
              */
-            privileges: string[];
+            privileges?: string[];
         };
         /** RowChange */
         RowChange: {
@@ -3617,18 +3617,18 @@ export interface components {
              * Enabled
              * @default true
              */
-            enabled: boolean;
+            enabled?: boolean;
             /**
              * Keep
              * @default 7
              */
-            keep: number;
+            keep?: number;
             /**
              * Kind
              * @default backup
              * @enum {string}
              */
-            kind: "backup" | "sweep" | "validate";
+            kind?: "backup" | "sweep" | "validate";
             /** Name */
             name: string;
             options?: components["schemas"]["BackupOptions"] | null;
@@ -3661,17 +3661,17 @@ export interface components {
              * Charset
              * @default UTF8
              */
-            charset: string;
+            charset?: string;
             /**
              * Group
              * @default Servers
              */
-            group: string;
+            group?: string;
             /**
              * Host
              * @default localhost
              */
-            host: string;
+            host?: string;
             /** Name */
             name: string;
             /** Password */
@@ -3680,39 +3680,39 @@ export interface components {
              * Port
              * @default 3050
              */
-            port: number;
+            port?: number;
             /**
              * Read Only
              * @default false
              */
-            read_only: boolean;
+            read_only?: boolean;
             /** Role */
             role?: string | null;
             /**
              * Save Password
              * @default true
              */
-            save_password: boolean;
+            save_password?: boolean;
             /**
              * Shared
              * @default false
              */
-            shared: boolean;
+            shared?: boolean;
             /**
              * User
              * @default SYSDBA
              */
-            user: string;
+            user?: string;
             /**
              * Wire Compress
              * @default false
              */
-            wire_compress: boolean;
+            wire_compress?: boolean;
             /**
              * Wire Crypt
              * @default true
              */
-            wire_crypt: boolean;
+            wire_crypt?: boolean;
         };
         /** ServerUpdate */
         ServerUpdate: {
@@ -3778,17 +3778,17 @@ export interface components {
              * Method
              * @default force
              */
-            method: string;
+            method?: string;
             /**
              * Mode
              * @default full
              */
-            mode: string;
+            mode?: string;
             /**
              * Timeout
              * @default 0
              */
-            timeout: number;
+            timeout?: number;
         };
         /** Side */
         Side: {
@@ -3807,12 +3807,12 @@ export interface components {
              * Record Versions
              * @default true
              */
-            record_versions: boolean;
+            record_versions?: boolean;
             /**
              * System
              * @default false
              */
-            system: boolean;
+            system?: boolean;
             /** Tables */
             tables?: string[] | null;
         };
@@ -3841,12 +3841,12 @@ export interface components {
              * All
              * @default false
              */
-            all: boolean;
+            all?: boolean;
             /**
              * Tables
              * @default []
              */
-            tables: string[];
+            tables?: string[];
         };
         /** TraceIn */
         TraceIn: {
@@ -3862,14 +3862,14 @@ export interface components {
              * Max Sql Length
              * @default 4000
              */
-            max_sql_length: number;
+            max_sql_length?: number;
             /** Name */
             name?: string | null;
             /**
              * Template
              * @default slow_queries
              */
-            template: string;
+            template?: string;
             /** Time Threshold */
             time_threshold?: number | null;
         };
@@ -3895,7 +3895,7 @@ export interface components {
              * Ignore Checksums
              * @default false
              */
-            ignore_checksums: boolean;
+            ignore_checksums?: boolean;
             /** Indices Exclude */
             indices_exclude?: string | null;
             /** Indices Include */
@@ -3906,7 +3906,7 @@ export interface components {
              * Mode
              * @default online
              */
-            mode: string;
+            mode?: string;
             /** Tables Exclude */
             tables_exclude?: string | null;
             /** Tables Include */
@@ -3943,12 +3943,12 @@ export interface components {
              * Active
              * @default true
              */
-            active: boolean;
+            active?: boolean;
             /**
              * Auth Source
              * @default internal
              */
-            auth_source: string;
+            auth_source?: string;
             /** Email */
             email?: string | null;
             /** Password */
@@ -3957,7 +3957,7 @@ export interface components {
              * Role
              * @default user
              */
-            role: string;
+            role?: string;
             /** Username */
             username: string;
         };
@@ -3972,7 +3972,7 @@ export interface components {
              * Active
              * @default true
              */
-            active: boolean | null;
+            active?: boolean | null;
             /** Admin */
             admin?: boolean | null;
             /** Db Admin */
@@ -3991,7 +3991,7 @@ export interface components {
              * Name
              * @default
              */
-            name: string;
+            name?: string;
             /** Password */
             password?: string | null;
             /** Plugin */
@@ -4010,7 +4010,7 @@ export interface components {
              * Target
              * @default archive
              */
-            target: string;
+            target?: string;
         };
         /** RestoreIn */
         fbadmin__api__maintenance__RestoreIn: {
@@ -4025,7 +4025,7 @@ export interface components {
              * Source
              * @default server
              */
-            source: string;
+            source?: string;
         };
         /** ExecuteIn */
         fbadmin__api__query__ExecuteIn: {
@@ -4033,12 +4033,12 @@ export interface components {
              * Autocommit
              * @default true
              */
-            autocommit: boolean;
+            autocommit?: boolean;
             /**
              * Keep Cursor
              * @default true
              */
-            keep_cursor: boolean;
+            keep_cursor?: boolean;
             /** Max Rows */
             max_rows?: number | null;
             /** Params */
@@ -4051,12 +4051,12 @@ export interface components {
              * With Plan
              * @default false
              */
-            with_plan: boolean;
+            with_plan?: boolean;
             /**
              * With Stats
              * @default false
              */
-            with_stats: boolean;
+            with_stats?: boolean;
         };
         /** PreviewIn */
         fbadmin__api__schema__PreviewIn: {
@@ -4066,7 +4066,7 @@ export interface components {
              * Options
              * @default {}
              */
-            options: {
+            options?: {
                 [key: string]: unknown;
             };
         };
@@ -4080,17 +4080,17 @@ export interface components {
              * Garbage Collect
              * @default true
              */
-            garbage_collect: boolean;
+            garbage_collect?: boolean;
             /**
              * Metadata Only
              * @default false
              */
-            metadata_only: boolean;
+            metadata_only?: boolean;
             /**
              * Transportable
              * @default true
              */
-            transportable: boolean;
+            transportable?: boolean;
         };
         /** RestoreIn */
         fbadmin__api__servers__RestoreIn: {
@@ -4102,7 +4102,7 @@ export interface components {
              * Deactivate Indexes
              * @default false
              */
-            deactivate_indexes: boolean;
+            deactivate_indexes?: boolean;
             /** Page Size */
             page_size?: number | null;
             /** Register As */
@@ -4111,7 +4111,7 @@ export interface components {
              * Replace
              * @default false
              */
-            replace: boolean;
+            replace?: boolean;
         };
         /** PreviewIn */
         fbadmin__api__trace__PreviewIn: {
@@ -4127,14 +4127,14 @@ export interface components {
              * Max Sql Length
              * @default 4000
              */
-            max_sql_length: number;
+            max_sql_length?: number;
             /** Name */
             name?: string | null;
             /**
              * Template
              * @default slow_queries
              */
-            template: string;
+            template?: string;
             /** Time Threshold */
             time_threshold?: number | null;
         };

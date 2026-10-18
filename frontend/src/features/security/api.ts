@@ -1,4 +1,4 @@
-import { request } from "../../api";
+import { request, type Body } from "../../api";
 import type { AuthStatus, VaultStatus } from "./state";
 
 const enc = encodeURIComponent;
@@ -99,8 +99,8 @@ export const secApi = {
   vaultReset: () => request<VaultStatus & { dropped: number }>("POST", "/api/auth/vault/reset", undefined, false),
 
   users: () => request<AppUser[]>("GET", "/api/admin/users"),
-  createUser: (u: Record<string, unknown>) => request<AppUser>("POST", "/api/admin/users", u),
-  updateUser: (id: number, u: Record<string, unknown>) => request<AppUser>("PUT", `/api/admin/users/${id}`, u),
+  createUser: (u: Body<"/api/admin/users", "post">) => request<AppUser>("POST", "/api/admin/users", u),
+  updateUser: (id: number, u: Body<"/api/admin/users/{user_id}", "put">) => request<AppUser>("PUT", `/api/admin/users/${id}`, u),
   deleteUser: (id: number) => request<void>("DELETE", `/api/admin/users/${id}`),
   audit: (params: Record<string, unknown>) =>
     request<{ total: number; rows: AuditRow[]; enabled: boolean }>("GET", "/api/admin/audit" + q(params)),
@@ -108,37 +108,37 @@ export const secApi = {
   // Firebird security (SQL, per database)
   fbUsers: (sid: string, dbid: string) =>
     request<{ users: FbUser[]; plugins: string[]; security_database: string | null; current_user: string }>("GET", sec(sid, dbid) + "/users"),
-  createFbUser: (sid: string, dbid: string, body: Record<string, unknown>, preview = false) =>
+  createFbUser: (sid: string, dbid: string, body: Body<"/api/servers/{server_id}/databases/{db_id}/security/users", "post">, preview = false) =>
     request<SqlResult>("POST", sec(sid, dbid) + "/users" + q({ preview }), body),
-  alterFbUser: (sid: string, dbid: string, name: string, body: Record<string, unknown>, preview = false) =>
+  alterFbUser: (sid: string, dbid: string, name: string, body: Body<"/api/servers/{server_id}/databases/{db_id}/security/users/{name}", "put">, preview = false) =>
     request<SqlResult>("PUT", sec(sid, dbid) + `/users/${enc(name)}` + q({ preview }), body),
   dropFbUser: (sid: string, dbid: string, name: string, plugin?: string | null) =>
     request<SqlResult>("DELETE", sec(sid, dbid) + `/users/${enc(name)}` + q({ plugin })),
 
   mappings: (sid: string, dbid: string) =>
     request<{ local: Mapping[]; global: Mapping[]; global_error: string | null }>("GET", sec(sid, dbid) + "/mappings"),
-  createMapping: (sid: string, dbid: string, body: Record<string, unknown>, preview = false) =>
+  createMapping: (sid: string, dbid: string, body: Body<"/api/servers/{server_id}/databases/{db_id}/security/mappings", "post">, preview = false) =>
     request<SqlResult>("POST", sec(sid, dbid) + "/mappings" + q({ preview }), body),
-  alterMapping: (sid: string, dbid: string, name: string, body: Record<string, unknown>, preview = false) =>
+  alterMapping: (sid: string, dbid: string, name: string, body: Body<"/api/servers/{server_id}/databases/{db_id}/security/mappings/{name}", "put">, preview = false) =>
     request<SqlResult>("PUT", sec(sid, dbid) + `/mappings/${enc(name)}` + q({ preview }), body),
   dropMapping: (sid: string, dbid: string, name: string, isGlobal: boolean) =>
     request<SqlResult>("DELETE", sec(sid, dbid) + `/mappings/${enc(name)}` + q({ is_global: isGlobal })),
 
   roles: (sid: string, dbid: string) =>
     request<{ supported: boolean; engine_major: number; privileges: string[]; roles: RoleInfo[] }>("GET", sec(sid, dbid) + "/roles"),
-  createRole: (sid: string, dbid: string, body: Record<string, unknown>, preview = false) =>
+  createRole: (sid: string, dbid: string, body: Body<"/api/servers/{server_id}/databases/{db_id}/security/roles", "post">, preview = false) =>
     request<SqlResult>("POST", sec(sid, dbid) + "/roles" + q({ preview }), body),
   alterRole: (sid: string, dbid: string, name: string, privileges: string[], preview = false) =>
     request<SqlResult>("PUT", sec(sid, dbid) + `/roles/${enc(name)}` + q({ preview }), { privileges }),
-  grantRole: (sid: string, dbid: string, name: string, body: Record<string, unknown>) =>
+  grantRole: (sid: string, dbid: string, name: string, body: Body<"/api/servers/{server_id}/databases/{db_id}/security/roles/{name}/members", "post">) =>
     request<SqlResult>("POST", sec(sid, dbid) + `/roles/${enc(name)}/members`, body),
 
   // Services API users (per server)
   svcUsers: (sid: string, securityDb?: string) =>
     request<{ users: Array<{ user_name: string; first_name: string; middle_name: string; last_name: string; admin: boolean }> }>(
       "GET", `/api/servers/${sid}/fbusers` + q({ security_db: securityDb })),
-  svcAddUser: (sid: string, body: Record<string, unknown>) => request("POST", `/api/servers/${sid}/fbusers`, body),
-  svcModifyUser: (sid: string, name: string, body: Record<string, unknown>) =>
+  svcAddUser: (sid: string, body: Body<"/api/servers/{server_id}/fbusers", "post">) => request("POST", `/api/servers/${sid}/fbusers`, body),
+  svcModifyUser: (sid: string, name: string, body: Body<"/api/servers/{server_id}/fbusers/{name}", "put">) =>
     request("PUT", `/api/servers/${sid}/fbusers/${enc(name)}`, body),
   svcDeleteUser: (sid: string, name: string, securityDb?: string) =>
     request("DELETE", `/api/servers/${sid}/fbusers/${enc(name)}` + q({ security_db: securityDb })),

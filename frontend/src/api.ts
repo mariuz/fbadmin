@@ -1,4 +1,13 @@
 import type { Completion, Job, ObjectDetail, ScriptResult, Server, SessionOptions } from "./types";
+import type { components, paths } from "./api-types.gen";
+
+/** Request bodies, generated from the backend's Pydantic models (scripts/gen-api-types.sh). */
+type In = components["schemas"];
+
+/** JSON request body of ``method`` on an OpenAPI ``path`` (also checks at compile time that the path exists),
+ *  e.g. ``Body<"/api/schedules", "post">``. */
+export type Body<P extends keyof paths, M extends "post" | "put" | "patch"> =
+  NonNullable<paths[P][M]> extends { requestBody?: { content: { "application/json": infer B } } } ? B : never;
 
 export class ApiError extends Error {
   status: number;
@@ -91,8 +100,8 @@ const db = (sid: string, dbid: string) => `/api/servers/${sid}/databases/${dbid}
 
 export const api = {
   servers: () => request<Server[]>("GET", "/api/servers"),
-  addServer: (s: Record<string, unknown>) => request<Server>("POST", "/api/servers", s),
-  updateServer: (id: string, s: Record<string, unknown>) => request<Server>("PUT", `/api/servers/${id}`, s),
+  addServer: (s: In["ServerIn"]) => request<Server>("POST", "/api/servers", s),
+  updateServer: (id: string, s: In["ServerUpdate"]) => request<Server>("PUT", `/api/servers/${id}`, s),
   deleteServer: (id: string) => request<void>("DELETE", `/api/servers/${id}`),
   connectServer: (id: string, password?: string) =>
     request<{ server_version: string }>("POST", `/api/servers/${id}/connect`, { password }),
@@ -100,10 +109,10 @@ export const api = {
   serverInfo: (id: string) => request<Record<string, any>>("GET", `/api/servers/${id}/info`),
   serverLog: (id: string) => request<{ log: string }>("GET", `/api/servers/${id}/log`),
 
-  addDatabase: (sid: string, d: { name: string; path: string }) => request("POST", `/api/servers/${sid}/databases`, d),
-  createDatabase: (sid: string, d: Record<string, unknown>) =>
+  addDatabase: (sid: string, d: In["DatabaseIn"]) => request("POST", `/api/servers/${sid}/databases`, d),
+  createDatabase: (sid: string, d: In["CreateDatabaseIn"]) =>
     request("POST", `/api/servers/${sid}/databases/create`, d),
-  updateDatabase: (sid: string, dbid: string, d: { name: string; path: string }) =>
+  updateDatabase: (sid: string, dbid: string, d: In["DatabaseIn"]) =>
     request("PUT", db(sid, dbid), d),
   removeDatabase: (sid: string, dbid: string) => request<void>("DELETE", db(sid, dbid)),
   dropDatabase: (sid: string, dbid: string) => request<void>("POST", db(sid, dbid) + "/drop"),
@@ -141,7 +150,7 @@ export const api = {
   },
   tableCount: (sid: string, dbid: string, name: string) =>
     request<{ count: number }>("GET", db(sid, dbid) + `/tables/${enc(name)}/count`),
-  saveTableData: (sid: string, dbid: string, name: string, changes: Record<string, unknown>) =>
+  saveTableData: (sid: string, dbid: string, name: string, changes: In["DataChanges"]) =>
     request<{ statements: number; affected: number }>("POST", db(sid, dbid) + `/tables/${enc(name)}/data`, changes),
 
   monitor: (sid: string, dbid: string) => request<Record<string, any>>("GET", db(sid, dbid) + "/monitor"),
@@ -154,14 +163,11 @@ export const api = {
   openSession: (server_id: string, database_id: string, schema?: string) =>
     withSchema(server_id, database_id, schema, () =>
       request<{ session_id: string; options: SessionOptions }>("POST", "/api/query/sessions", { server_id, database_id })),
-  runQuery: (sess: string, body: {
-    sql: string; autocommit: boolean; with_plan?: boolean; with_stats?: boolean; max_rows?: number;
-    params?: Record<string, unknown>;
-  }) => request<ScriptResult>("POST", `/api/query/sessions/${sess}/execute`, body),
+  runQuery: (sess: string, body: In["fbadmin__api__query__ExecuteIn"]) => request<ScriptResult>("POST", `/api/query/sessions/${sess}/execute`, body),
   fetchMore: (sess: string, rows: number) =>
     request<{ rows: unknown[][]; has_more: boolean; transaction_open: boolean }>("POST", `/api/query/sessions/${sess}/fetch`, { rows }),
   cancel: (sess: string) => request<{ cancelled: number }>("POST", `/api/query/sessions/${sess}/cancel`),
-  setOptions: (sess: string, o: Partial<SessionOptions> & { search_schema?: string }) => request<SessionOptions>("PUT", `/api/query/sessions/${sess}/options`, o),
+  setOptions: (sess: string, o: In["OptionsIn"]) => request<SessionOptions>("PUT", `/api/query/sessions/${sess}/options`, o),
   queryParams: (sql: string) => request<{ params: string[] }>("POST", "/api/query/params", { sql }),
   explain: (sess: string, sql: string) =>
     request<{ plan: string | null; detailed: string | null }>("POST", `/api/query/sessions/${sess}/explain`, { sql }),
@@ -170,8 +176,8 @@ export const api = {
   completion: (sid: string, dbid: string) => request<Completion>("GET", db(sid, dbid) + "/completion"),
   closeSession: (sess: string) => request<void>("DELETE", `/api/query/sessions/${sess}`),
 
-  backup: (sid: string, body: Record<string, unknown>) => request<Job>("POST", `/api/servers/${sid}/backup`, body),
-  restore: (sid: string, body: Record<string, unknown>) => request<Job>("POST", `/api/servers/${sid}/restore`, body),
+  backup: (sid: string, body: In["fbadmin__api__servers__BackupIn"]) => request<Job>("POST", `/api/servers/${sid}/backup`, body),
+  restore: (sid: string, body: In["fbadmin__api__servers__RestoreIn"]) => request<Job>("POST", `/api/servers/${sid}/restore`, body),
   sweep: (sid: string, dbid: string) => request<Job>("POST", db(sid, dbid) + "/sweep"),
   statistics: (sid: string, dbid: string) => request<Job>("POST", db(sid, dbid) + "/statistics"),
   recomputeSelectivity: (sid: string, dbid: string) => request<Job>("POST", db(sid, dbid) + "/recompute-selectivity"),

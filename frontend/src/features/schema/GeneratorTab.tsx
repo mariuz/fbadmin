@@ -51,7 +51,7 @@ export function GeneratorTab({ tab }: { tab: WorkTab }) {
   const setO = (name: string, patch: Partial<Override>) => setOv({ ...ov, [name]: { ...(ov[name] ?? { mode: "auto" }), ...patch } });
   const start = async () => {
     setError(null);
-    const overrides: Record<string, unknown> = {};
+    const overrides: Record<string, Record<string, unknown>> = {};
     for (const [k, o] of Object.entries(ov)) {
       if (o.mode === "auto") continue;
       overrides[k] = { mode: o.mode, value: o.value, values: o.values, min: o.min, max: o.max };

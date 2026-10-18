@@ -51,8 +51,8 @@ export function ServerDialog(props: { server?: Server }) {
   const close = () => app.showDialog(null);
   const submit = () =>
     run(async () => {
-      const body: Record<string, unknown> = { ...f, name: f.name || f.host, role: f.role || null, auth_plugin: f.auth_plugin || null };
-      delete body.database;
+      const { database: _firstDb, ...fields } = f;
+      const body = { ...fields, name: f.name || f.host, role: f.role || null, auth_plugin: f.auth_plugin || null };
       if (s) {
         await api.updateServer(s.id, body);
         app.invalidate(keys.server(s.id));

@@ -21,7 +21,7 @@ from fbadmin.app import create_app
 json.dump(create_app().openapi(), sys.stdout, indent=1, sort_keys=True)
 ') > "$tmp/openapi.json"
 
-"$root/frontend/node_modules/.bin/openapi-typescript" "$tmp/openapi.json" -o "$tmp/api-types.ts" >/dev/null
+"$root/frontend/node_modules/.bin/openapi-typescript" "$tmp/openapi.json" --default-non-nullable false -o "$tmp/api-types.ts" >/dev/null
 {
   echo "// GENERATED FILE - do not edit. Run scripts/gen-api-types.sh after changing the API."
   echo "// Types for the fbadmin REST API, generated from FastAPI's OpenAPI schema by openapi-typescript."

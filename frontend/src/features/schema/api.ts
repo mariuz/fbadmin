@@ -1,4 +1,4 @@
-import { ApiError, request } from "../../api";
+import { ApiError, request, type Body } from "../../api";
 import type { Job } from "../../types";
 import { t } from "../../i18n";
 
@@ -78,15 +78,15 @@ export const schemaApi = {
     request<{ tables: ErdTable[]; relations: ErdRelation[] }>("GET", `${sbase(sid, dbid)}/erd`),
   preview: (uploadId: string, format: string | null, options: Record<string, unknown>) =>
     request<Preview>("POST", `/api/schema/uploads/${uploadId}/preview`, { format, options }),
-  importData: (sid: string, dbid: string, body: Record<string, unknown>) =>
+  importData: (sid: string, dbid: string, body: Body<"/api/servers/{server_id}/databases/{db_id}/schema/import", "post">) =>
     request<Job>("POST", `${sbase(sid, dbid)}/import`, body),
   exportUrl: (sid: string, dbid: string, table: string, format: string, delimiter: string, header: boolean) =>
     `${sbase(sid, dbid)}/export?table=${enc(table)}&format=${format}&delimiter=${enc(delimiter)}&header=${header}`,
-  copy: (body: Record<string, unknown>) => request<Job>("POST", "/api/schema/copy", body),
+  copy: (body: Body<"/api/schema/copy", "post">) => request<Job>("POST", "/api/schema/copy", body),
   search: (sid: string, dbid: string, q: string, scopes: string[], types: string[]) =>
     request<{ items: SearchItem[]; truncated: boolean }>(
       "GET", `${sbase(sid, dbid)}/search?q=${enc(q)}&scopes=${scopes.join(",")}&types=${types.join(",")}`),
-  generate: (sid: string, dbid: string, body: Record<string, unknown>) =>
+  generate: (sid: string, dbid: string, body: Body<"/api/servers/{server_id}/databases/{db_id}/schema/generate", "post">) =>
     request<Job>("POST", `${sbase(sid, dbid)}/generate`, body),
   report: (sid: string, dbid: string) => request<{ sections: ReportSection[] }>("GET", `${sbase(sid, dbid)}/report`),
   jobResult: (id: string) => request<JobResult>("GET", `/api/schema/jobs/${id}/result`),
