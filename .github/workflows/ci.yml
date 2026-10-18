@@ -44,6 +44,38 @@ jobs:
         env:
           FBADMIN_TEST_DIR: /var/lib/firebird/data
 
+  integrations:
+    name: Real services (crypt plugin, OpenLDAP, Dex OIDC)
+    runs-on: ubuntu-latest
+    services:
+      firebird:
+        image: firebirdsql/firebird:5
+        env:
+          FIREBIRD_ROOT_PASSWORD: masterkey
+        ports:
+          - 3050:3050
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e "backend[dev,ldap]"
+      - name: Firebird 5 with the sample database crypt plugin (port 3055)
+        run: scripts/crypt-test-server.sh
+      - name: OpenLDAP (slapd, port 3389)
+        run: |
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends slapd ldap-utils
+          sudo systemctl stop slapd || true
+          scripts/ldap-test-server.sh
+      - name: Dex OpenID Connect provider (port 5556)
+        run: scripts/oidc-test-server.sh
+      - run: pytest -q backend/tests/test_encryption_plugin.py backend/tests/test_ldap_real.py backend/tests/test_oidc_real.py -rs
+        env:
+          FBADMIN_TEST_DIR: /var/lib/firebird/data
+          FBADMIN_TEST_CRYPT_PORT: "3055"
+          FBADMIN_TEST_LDAP_URL: ldap://127.0.0.1:3389
+          FBADMIN_TEST_OIDC_ISSUER: http://127.0.0.1:5556/dex
+
   frontend:
     name: Frontend build
     runs-on: ubuntu-latest
