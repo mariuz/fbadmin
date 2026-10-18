@@ -76,18 +76,16 @@ serverMode:
   adminUser: admin
   # Leave empty to let the chart generate a random password (kept across upgrades).
   adminPassword: ""
-  # Key that encrypts saved Firebird passwords. Generated (and kept) when empty.
-  masterPassword: ""
+  # Saved Firebird passwords are encrypted per user with a key derived from each user's
+  # login password (docs/SECURITY.md), so no server-wide master password is needed.
   # Use an existing Secret with the keys below instead of creating one.
   existingSecret: ""
   secretKeys:
     adminPassword: admin-password
-    masterPassword: master-password
   env:
     enabled: FBADMIN_SERVER_MODE
-    adminUser: FBADMIN_ADMIN_USER
+    adminUser: FBADMIN_ADMIN_USERNAME
     adminPassword: FBADMIN_ADMIN_PASSWORD
-    masterPassword: FBADMIN_MASTER_PASSWORD
 
 # Generic fbadmin settings (environment variables, see docs/admin/configuration.md).
 config:

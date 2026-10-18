@@ -70,13 +70,20 @@ nav:
       - Object explorer: user-guide/object-explorer.md
       - Query Tool: QUERY_TOOL.md
       - Data grid: user-guide/data-grid.md
+      - Object dialogs: OBJECT_DIALOGS.md
+      - Schema tools: SCHEMA_TOOLS.md
       - Monitoring and maintenance: user-guide/monitoring.md
+      - Monitoring and performance: MONITORING.md
   - Administration:
       - Overview: admin/index.md
       - Configuration: admin/configuration.md
       - Deployment (Docker, Kubernetes): admin/deployment.md
+      - Security and server mode: SECURITY.md
+      - Maintenance: MAINTENANCE.md
+      - Replication: REPLICATION.md
       - Privacy: PRIVACY.md
   - Development:
       - Architecture: ARCHITECTURE.md
+      - Plugins: PLUGINS.md
       - Development and testing: DEVELOPMENT.md
       - Packaging and releases: PACKAGING.md

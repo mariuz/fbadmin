@@ -74,11 +74,6 @@ spec:
                 secretKeyRef:
                   name: {{ include "fbadmin.secretName" . }}
                   key: {{ .Values.serverMode.secretKeys.adminPassword }}
-            - name: {{ .Values.serverMode.env.masterPassword }}
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "fbadmin.secretName" . }}
-                  key: {{ .Values.serverMode.secretKeys.masterPassword }}
             {{- end }}
             {{- with .Values.extraEnv }}
             {{- toYaml . | nindent 12 }}

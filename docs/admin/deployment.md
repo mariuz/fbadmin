@@ -39,8 +39,8 @@ Useful values (see `values.yaml` for all of them):
 | Value | Default | |
 |---|---|---|
 | `serverMode.enabled` | `false` | Login screen and encrypted credentials |
-| `serverMode.adminUser` / `adminPassword` / `masterPassword` | `admin` / generated / generated | |
-| `serverMode.existingSecret` | | Use your own Secret (keys `admin-password`, `master-password`) |
+| `serverMode.adminUser` / `adminPassword` | `admin` / generated | Initial administrator (`FBADMIN_ADMIN_USERNAME` / `FBADMIN_ADMIN_PASSWORD`). Saved Firebird passwords are encrypted per user, see SECURITY.md |
+| `serverMode.existingSecret` | | Use your own Secret (key `admin-password`) |
 | `persistence.size` / `storageClass` / `existingClaim` | `1Gi` | Data volume |
 | `config.logFormat` | `json` | |
 | `config.rateLimit` | `600` | Requests per minute per client |
