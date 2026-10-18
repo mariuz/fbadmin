@@ -23,6 +23,7 @@ type Sub = (typeof SUBTABS)[number][0];
 
 export function PerformanceTab(props: Props & { initial?: string }) {
   const [sub, setSub] = useState<Sub>((props.initial as Sub) ?? "live");
+  useEffect(() => { if (props.initial) setSub(props.initial as Sub); }, [props.initial]);
   const [features, setFeatures] = useState<Features | null>(null);
   useEffect(() => { monApi.features(props.serverId, props.dbId).then(setFeatures).catch(() => {}); }, [props.serverId, props.dbId]);
   return (

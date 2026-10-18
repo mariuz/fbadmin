@@ -78,6 +78,10 @@ export default function App() {
           : x.serverId === tab.serverId && x.dbId === tab.dbId && x.name === tab.name && x.schema === tab.schema));
         if (existing) {
           id = existing.id;
+          // e.g. "Index advisor" on an open performance tab: pass the new props to the tab
+          if (tab.props && JSON.stringify(tab.props) !== JSON.stringify(existing.props)) {
+            return cur.map((x) => (x.id === existing.id ? { ...x, props: { ...x.props, ...tab.props } } : x));
+          }
           return cur;
         }
       }

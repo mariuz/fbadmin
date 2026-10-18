@@ -96,7 +96,7 @@ test("maintenance: gstat statistics charts", async () => {
 test("monitoring: performance dashboard and index advisor", async () => {
   await menu(DB_LABEL, "Performance dashboard");
   await expect(pane()).toContainText(/Attachments|attachments/);
-  await pane().locator(".subtabs button, button", { hasText: /^Index advisor$/ }).first().click();
+  await menu(DB_LABEL, "Index advisor"); // reuses the open tab and switches to its advisor view
   await pane().locator("button", { hasText: "Analyze" }).first().click();
   await expect(pane()).toContainText("Analyzed statements");
 });
