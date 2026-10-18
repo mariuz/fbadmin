@@ -5,9 +5,10 @@
    (``Malformed string`` for non-UTF-8 bytes). Send them as ``blr_text2`` with charset OCTETS
    instead; ``str`` parameters keep the old encoding.
 
-3. Result descriptors: ``calc_blr`` describes CHAR/VARCHAR outputs without a charset, so
-   Firebird 6 converts OCTETS columns to the connection charset (``Malformed string``).
-   Describe OCTETS outputs as ``blr_text2``/``blr_varying2`` with charset 1.
+3. Result descriptors: ``calc_blr`` describes CHAR/VARCHAR outputs without a charset. Firebird 6
+   then mis-sizes or converts them (``string right truncation`` on ASCII system columns,
+   ``Malformed string`` on OCTETS). Describe them like fbclient does: ``blr_text2`` /
+   ``blr_varying2`` with the charset the server reported.
 
 2. ``CHAR``/``VARCHAR`` columns with ``CHARACTER SET OCTETS`` (e.g. binary UUIDs) are decoded
    as text by the driver and raise ``UnicodeDecodeError``. Return ``bytes`` for them, and fall
@@ -91,18 +92,16 @@ def _patch_calc_blr() -> None:
         original = xsqlvar.calc_blr
 
         def calc_blr(xsqlda):
-            if not any(
-                x.sqltype in (SQL_TYPE_TEXT, SQL_TYPE_VARYING) and x.sqlsubtype is not None and (x.sqlsubtype & 0xFF) == 1
-                for x in xsqlda
-            ):
-                return original(xsqlda)
+            # Like fbclient: describe text outputs as blr_text2 / blr_varying2 carrying the
+            # charset the server reported for the column (sqlsubtype low byte).
             out = bytearray()
             for x in xsqlda:
-                one = bytearray(original([x]))[6:-2]  # strip message header and blr_end/eoc
-                if x.sqltype in (SQL_TYPE_TEXT, SQL_TYPE_VARYING) and x.sqlsubtype is not None and (x.sqlsubtype & 0xFF) == 1:
-                    code = 15 if x.sqltype == SQL_TYPE_TEXT else 38  # blr_text2 / blr_varying2
-                    one = bytearray([code, 1, 0, x.sqllen & 255, x.sqllen >> 8, 7, 0])
-                out += one
+                if x.sqltype in (SQL_TYPE_TEXT, SQL_TYPE_VARYING):
+                    cs = (x.sqlsubtype or 0) & 0xFF
+                    code = 15 if x.sqltype == SQL_TYPE_TEXT else 38
+                    out += bytes([code, cs, 0, x.sqllen & 255, x.sqllen >> 8, 7, 0])
+                else:
+                    out += bytes(original([x]))[6:-2]  # strip message header and blr_end/eoc
             ln = len(xsqlda) * 2
             return bytes([5, 2, 4, 0, ln & 255, ln >> 8]) + bytes(out) + bytes([255, 76])
 
