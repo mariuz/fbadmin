@@ -24,6 +24,7 @@ from contextlib import contextmanager
 import firebirdsql
 from firebirdsql import services
 
+from .native import connect_native, native_enabled
 from .query import QuerySession, apply_tpb, end_transaction
 from .store import DatabaseEntry, ServerEntry, ServerStore
 
@@ -94,6 +95,16 @@ class ConnectionManager:
         db: DatabaseEntry = self.store.get_database(server_id, db_id)
         return FbConnection(connect(srv, db.path, self._password(server_id)))
 
+    def _open_meta(self, key: tuple[str, str]) -> FbConnection:
+        """Metadata connections may use the optional native driver (FBADMIN_DRIVER=native)."""
+        if not native_enabled():
+            return self._open(*key)
+        srv = self.store.get(key[0])
+        db: DatabaseEntry = self.store.get_database(*key)
+        return FbConnection(connect_native(host=srv.host, port=srv.port, database=db.path, user=srv.user,
+                                           password=self._password(key[0]), role=srv.role,
+                                           charset=srv.charset or "UTF8"))
+
     # --- metadata connections -----------------------------------------
     # Each database has a small pool of metadata connections (FBADMIN_META_POOL_SIZE,
     # default 3) so one slow request (a big DDL extraction, a long MON$ query) does not
@@ -107,7 +118,7 @@ class ConnectionManager:
             with self._lock:
                 pool = self._meta.get(key)
                 if not pool:
-                    fbc = self._open(*key)
+                    fbc = self._open_meta(key)
                     fbc.lock.acquire()
                     self._meta[key] = [fbc]
                     return fbc
@@ -115,7 +126,7 @@ class ConnectionManager:
                     if fbc.lock.acquire(blocking=False):
                         return fbc
                 if len(pool) < self.meta_pool_size:
-                    fbc = self._open(*key)
+                    fbc = self._open_meta(key)
                     fbc.lock.acquire()
                     pool.append(fbc)
                     return fbc
