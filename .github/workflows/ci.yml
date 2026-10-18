@@ -58,6 +58,9 @@ jobs:
         working-directory: frontend
       - run: npm run build
         working-directory: frontend
+      # every t("…") string must be in all locale catalogs, translated
+      - run: npm run i18n:check
+        working-directory: frontend
 
   api-types:
     name: API types up to date

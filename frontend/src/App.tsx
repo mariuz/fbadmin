@@ -198,10 +198,35 @@ export default function App() {
     return <DependenciesPanel sel={selection} detail={detail} />;
   };
 
+  // --- tab bar accessibility (WAI-ARIA tabs pattern)
+  const visibleTabIds = [
+    ...FIXED_TABS.map((x) => x.id),
+    ...getObjectTabs().filter((ot) => ot.applies(selection)).map((ot) => ot.id),
+    ...tabs.map((x) => x.id),
+  ];
+  const tabProps = (id: string) => ({
+    role: "tab", id: `tab-${id}`, "aria-selected": active === id, "aria-controls": `pane-${id}`,
+    tabIndex: active === id ? 0 : -1, onClick: () => setActive(id),
+  });
+  const paneProps = (id: string) => ({ role: "tabpanel", id: `pane-${id}`, "aria-labelledby": `tab-${id}` });
+  const onTabsKey = (e: React.KeyboardEvent) => {
+    const i = visibleTabIds.indexOf(active);
+    let next: string | undefined;
+    if (e.key === "ArrowRight") next = visibleTabIds[(i + 1) % visibleTabIds.length];
+    else if (e.key === "ArrowLeft") next = visibleTabIds[(i - 1 + visibleTabIds.length) % visibleTabIds.length];
+    else if (e.key === "Home") next = visibleTabIds[0];
+    else if (e.key === "End") next = visibleTabIds[visibleTabIds.length - 1];
+    else if (e.key === "Delete" && tabs.some((x) => x.id === active)) { closeTab(active); e.preventDefault(); return; }
+    if (!next) return;
+    e.preventDefault();
+    setActive(next);
+    setTimeout(() => document.getElementById(`tab-${next}`)?.focus(), 0);
+  };
+
   return (
     <AppCtx.Provider value={app}>
       <div className="app">
-        <div className="topbar">
+        <header className="topbar">
           <div className="brand"><Flame /> fbadmin <small>{t("Firebird administration")}</small></div>
           <button className="tb" onClick={() => setDialog(<ServerDialog />)}><IconPlus /> {t("Add server")}</button>
           <button className="tb" disabled={!selDb} style={{ opacity: selDb ? 1 : 0.5 }} onClick={() => selDb && openQueryTool(selDb.serverId, selDb.dbId!)}><IconTerminal /> {t("Query Tool")}</button>
@@ -218,53 +243,55 @@ export default function App() {
           <button className="tb" title={t("Toggle theme")} aria-label={t("Toggle theme")} onClick={() => setTheme(theme === "dark" ? "light" : theme === "light" ? "contrast" : theme === "contrast" ? "" : "dark")}>
             {theme === "dark" ? <IconMoon /> : theme === "light" ? <IconSun /> : theme === "contrast" ? <span style={{ fontWeight: 700 }}>◐</span> : <><IconSun /><span style={{ fontSize: 11 }}>{t("auto")}</span></>}
           </button>
-        </div>
+        </header>
         <div className="main">
-          <div className="sidebar" style={{ width: sidebarW }}>
+          <nav className="sidebar" style={{ width: sidebarW }} aria-label={t("Object Explorer")}>
             <div className="sidebar-head">
               <span className="grow">{t("Object Explorer")}</span>
               <button className="btn icon small" title={t("Reload servers")} onClick={() => reloadServers()}><IconRefresh size={13} /></button>
               <button className="btn icon small" title={t("Register server")} onClick={() => setDialog(<ServerDialog />)}><IconPlus size={13} /></button>
             </div>
             <Tree />
-          </div>
+          </nav>
           <div className="splitter-v" onMouseDown={startResize} />
-          <div className="workspace">
-            <div className="tabs">
+          <main className="workspace">
+            {/* WAI-ARIA tabs: arrows/Home/End move between tabs, Delete closes a work tab */}
+            <div className="tabs" role="tablist" aria-label={t("Panels")} onKeyDown={onTabsKey}>
               {FIXED_TABS.map((ft) => (
-                <div key={ft.id} className={"tab" + (active === ft.id ? " active" : "")} onClick={() => setActive(ft.id)}>
-                  <span className="t">{t(ft.title)}</span>
+                <div key={ft.id} className={"tab" + (active === ft.id ? " active" : "")} role="presentation" onClick={() => setActive(ft.id)}>
+                  <span className="t" {...tabProps(ft.id)}>{t(ft.title)}</span>
                 </div>
               ))}
               {getObjectTabs().filter((ot) => ot.applies(selection)).map((ot) => (
-                <div key={ot.id} className={"tab" + (active === ot.id ? " active" : "")} onClick={() => setActive(ot.id)}>
-                  <span className="t">{t(ot.title)}</span>
+                <div key={ot.id} className={"tab" + (active === ot.id ? " active" : "")} role="presentation" onClick={() => setActive(ot.id)}>
+                  <span className="t" {...tabProps(ot.id)}>{t(ot.title)}</span>
                 </div>
               ))}
               {tabs.map((tab) => {
                 // the Processes tab has a static (N_-marked) title; other titles carry data
                 const title = tab.kind === "jobs" ? t(tab.title) : tab.title;
                 return (
-                <div key={tab.id} className={"tab" + (active === tab.id ? " active" : "")} onClick={() => setActive(tab.id)}
+                <div key={tab.id} className={"tab" + (active === tab.id ? " active" : "")} role="presentation" onClick={() => setActive(tab.id)}
                   onAuxClick={(e) => e.button === 1 && closeTab(tab.id)} title={title}>
                   {tab.kind === "query" ? <IconTerminal size={13} /> : tab.kind === "data" ? <IconTable size={13} /> : getTabKind(tab.kind)?.icon ?? <IconActivity size={13} />}
-                  <span className="t">{title}</span>
-                  <button className="x" onClick={(e) => { e.stopPropagation(); closeTab(tab.id); }}><IconX size={12} /></button>
+                  <span className="t" {...tabProps(tab.id)} aria-keyshortcuts="Delete">{title}</span>
+                  {/* mouse target only: from the keyboard, Delete closes the focused tab */}
+                  <span className="x" aria-hidden="true" title={t("Close {title}", { title })} onClick={(e) => { e.stopPropagation(); closeTab(tab.id); }}><IconX size={12} /></span>
                 </div>
                 );
               })}
             </div>
             <div className="tab-body">
               {FIXED_TABS.map((ft) => (
-                <div key={ft.id} className={"tab-pane" + (active === ft.id ? "" : " hidden")}>{active === ft.id && renderFixed(ft.id)}</div>
+                <div key={ft.id} className={"tab-pane" + (active === ft.id ? "" : " hidden")} {...paneProps(ft.id)}>{active === ft.id && renderFixed(ft.id)}</div>
               ))}
               {getObjectTabs().map((ot) => (
-                <div key={ot.id} className={"tab-pane" + (active === ot.id ? "" : " hidden")}>
+                <div key={ot.id} className={"tab-pane" + (active === ot.id ? "" : " hidden")} {...paneProps(ot.id)}>
                   {active === ot.id && selection && ot.applies(selection) && ot.render(selection, detail)}
                 </div>
               ))}
               {tabs.map((tab) => (
-                <div key={tab.id} className={"tab-pane" + (active === tab.id ? "" : " hidden")} style={{ overflow: "hidden" }}>
+                <div key={tab.id} className={"tab-pane" + (active === tab.id ? "" : " hidden")} style={{ overflow: "hidden" }} {...paneProps(tab.id)}>
                   <Suspense fallback={<div className="empty">{t("Loading…")}</div>}>
                   {tab.kind === "query" && <QueryTool serverId={tab.serverId!} dbId={tab.dbId!} schema={tab.schema} initialSql={tab.initialSql} autorun={tab.autorun} visible={active === tab.id} />}
                   {tab.kind === "data" && <DataView serverId={tab.serverId!} dbId={tab.dbId!} otype={tab.otype!} name={tab.name!} showFilter={tab.initialSql === "filter"} />}
@@ -277,11 +304,11 @@ export default function App() {
                 </div>
               ))}
             </div>
-          </div>
+          </main>
         </div>
         {dialog}
-        <div className="toasts">
-          {toasts.map((ts) => <div key={ts.id} className={"toast " + ts.kind}>{ts.msg}</div>)}
+        <div className="toasts" role="status" aria-live="polite">
+          {toasts.map((ts) => <div key={ts.id} className={"toast " + ts.kind} role={ts.kind === "error" ? "alert" : undefined}>{ts.msg}</div>)}
         </div>
       </div>
     </AppCtx.Provider>
