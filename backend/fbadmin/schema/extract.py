@@ -13,7 +13,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from .. import __version__
+from ..metadata import Catalog
 from ..metadata.types import quote_ident
+from ..schema_ctx import current_schema
 from .model import Snapshot
 
 
@@ -146,8 +148,22 @@ def make_header(snap: Snapshot, path: str | None = None, page_size: int | None =
     return "\n".join(lines) + "\n"
 
 
+def user_schemas(conn) -> list[str]:
+    """Firebird 6: the schemas holding user objects, PUBLIC first; [] on older servers."""
+    cat = Catalog(conn, schema="")
+    if not cat.schemas_supported:
+        return []
+    names = [r["name"] for r in cat.list_schemas()
+             if not r["system_flag"] and r["name"] != "SYSTEM" and not r["name"].startswith("PLG$")]
+    return sorted(names, key=lambda n: (n != "PUBLIC", n))
+
+
 def extract_database(conn, *, set_term: bool = True, header: bool = True, grants: bool = True,
                      comments: bool = True, sequence_values: bool = True, path: str | None = None) -> str:
+    schemas = user_schemas(conn)
+    if schemas and schemas != ["PUBLIC"]:
+        return _extract_schemas(conn, schemas, set_term=set_term, header=header, grants=grants,
+                                comments=comments, sequence_values=sequence_values, path=path)
     snap = Snapshot(conn)
     head = None
     if header:
@@ -155,3 +171,32 @@ def extract_database(conn, *, set_term: bool = True, header: bool = True, grants
         head = make_header(snap, path, ps.get("ps"))
     sections = build_sections(snap, grants=grants, comments=comments, sequence_values=sequence_values)
     return render(sections, set_term=set_term, header=head)
+
+
+def _extract_schemas(conn, schemas: list[str], *, set_term: bool, header: bool, grants: bool, comments: bool,
+                     sequence_values: bool, path: str | None) -> str:
+    """Firebird 6 database with several schemas: one block per schema, each run under its search path
+    (so the unqualified names in the DDL and in PSQL bodies resolve as they did in the source)."""
+    out: list[str] = []
+    cur = conn.cursor()
+    cur.execute("SELECT RDB$GET_CONTEXT('SYSTEM', 'SEARCH_PATH') FROM RDB$DATABASE")
+    original = cur.fetchone()[0] or "PUBLIC, SYSTEM"
+    for n, schema in enumerate(schemas):
+        token = current_schema.set(schema)
+        try:
+            # the server resolves names (e.g. GEN_ID of a sequence) through the search path, too
+            cur.execute(f"SET SEARCH_PATH TO {quote_ident(schema)}, SYSTEM")
+            snap = Snapshot(conn, include_global=n == 0)
+        finally:
+            current_schema.reset(token)
+            cur.execute(f"SET SEARCH_PATH TO {original}")
+        if n == 0 and header:
+            ps = snap.cat.one("SELECT MON$PAGE_SIZE AS ps FROM MON$DATABASE") or {}
+            out.append(make_header(snap, path, ps.get("ps")).rstrip())
+            out.append("".join(f"CREATE SCHEMA {quote_ident(s)};\n" for s in schemas if s != "PUBLIC").rstrip())
+        elif n == 0:
+            out.append("".join(f"CREATE SCHEMA {quote_ident(s)};\n" for s in schemas if s != "PUBLIC").rstrip())
+        sections = build_sections(snap, grants=grants, comments=comments, sequence_values=sequence_values)
+        out.append(f"/* ===== Schema {schema} ===== */\nSET SEARCH_PATH TO {quote_ident(schema)}, SYSTEM;")
+        out.append(render(sections, set_term=set_term).rstrip())
+    return "\n\n".join(x for x in out if x) + "\n"

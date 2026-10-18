@@ -21,6 +21,35 @@ function serverIdFromPath(path: string): string | null {
   return m ? m[1] : null;
 }
 
+// --- Firebird 6 SQL schemas ------------------------------------------------------------------
+// Each database has an "active" schema (picked in the tree, a tab or the Query Tool). Requests to
+// that database carry it in the X-Fbadmin-Schema header, so the backend scopes metadata to it.
+const activeSchemas = new Map<string, string>();
+export function setActiveSchema(sid: string, dbid: string, schema: string | null | undefined) {
+  if (schema) activeSchemas.set(`${sid}/${dbid}`, schema);
+  else activeSchemas.delete(`${sid}/${dbid}`);
+}
+export function activeSchemaOf(sid?: string, dbid?: string): string | undefined {
+  return sid && dbid ? activeSchemas.get(`${sid}/${dbid}`) : undefined;
+}
+/** Run ``fn`` (which must start its requests synchronously) with ``schema`` active for that database. */
+export function withSchema<T>(sid: string, dbid: string, schema: string | undefined, fn: () => T): T {
+  if (!schema) return fn();
+  const prev = activeSchemaOf(sid, dbid);
+  setActiveSchema(sid, dbid, schema);
+  try {
+    return fn();
+  } finally {
+    setActiveSchema(sid, dbid, prev);
+  }
+}
+function schemaHeaders(path: string, body: unknown): Record<string, string> {
+  const m = path.match(/^\/api\/servers\/([^/]+)\/databases\/([^/?]+)/);
+  const b = (body ?? {}) as { server_id?: string; database_id?: string };
+  const schema = m ? activeSchemas.get(`${m[1]}/${m[2]}`) : activeSchemaOf(b.server_id, b.database_id);
+  return schema ? { "X-Fbadmin-Schema": schema } : {};
+}
+
 // --- security (server mode): CSRF token header and handlers for auth errors -------------
 /** Error code (e.g. "auth_required", "master_password_required") -> handler; true = retry the request. */
 const errorHandlers: Record<string, () => Promise<boolean>> = {};
@@ -36,7 +65,9 @@ function csrfHeaders(method: string): Record<string, string> {
 export async function request<T>(method: string, path: string, body?: unknown, retry = true): Promise<T> {
   const res = await fetch(path, {
     method,
-    headers: { ...(body !== undefined ? { "Content-Type": "application/json" } : {}), ...csrfHeaders(method) },
+    headers: {
+      ...(body !== undefined ? { "Content-Type": "application/json" } : {}), ...csrfHeaders(method), ...schemaHeaders(path, body),
+    },
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
   if (res.status === 204) return undefined as T;
@@ -79,6 +110,9 @@ export const api = {
   connectDatabase: (sid: string, dbid: string) =>
     request<{ engine_version: string; charset: string }>("POST", db(sid, dbid) + "/connect"),
   disconnectDatabase: (sid: string, dbid: string) => request("POST", db(sid, dbid) + "/disconnect"),
+  schemas: (sid: string, dbid: string) =>
+    request<{ supported: boolean; schemas: Array<{ name: string; owner: string; system_flag: number; description?: string }> }>(
+      "GET", db(sid, dbid) + "/schemas"),
   databaseInfo: (sid: string, dbid: string) =>
     request<{ info: Record<string, any>; counts: Record<string, number> }>("GET", db(sid, dbid) + "/info"),
 
@@ -116,8 +150,10 @@ export const api = {
   cancelStatement: (sid: string, dbid: string, id: number) =>
     request("DELETE", db(sid, dbid) + `/monitor/statements/${id}`),
 
-  openSession: (server_id: string, database_id: string) =>
-    request<{ session_id: string; options: SessionOptions }>("POST", "/api/query/sessions", { server_id, database_id }),
+  /** ``schema`` (Firebird 6) becomes the search path of the new session. */
+  openSession: (server_id: string, database_id: string, schema?: string) =>
+    withSchema(server_id, database_id, schema, () =>
+      request<{ session_id: string; options: SessionOptions }>("POST", "/api/query/sessions", { server_id, database_id })),
   runQuery: (sess: string, body: {
     sql: string; autocommit: boolean; with_plan?: boolean; with_stats?: boolean; max_rows?: number;
     params?: Record<string, unknown>;
@@ -125,7 +161,7 @@ export const api = {
   fetchMore: (sess: string, rows: number) =>
     request<{ rows: unknown[][]; has_more: boolean; transaction_open: boolean }>("POST", `/api/query/sessions/${sess}/fetch`, { rows }),
   cancel: (sess: string) => request<{ cancelled: number }>("POST", `/api/query/sessions/${sess}/cancel`),
-  setOptions: (sess: string, o: Partial<SessionOptions>) => request<SessionOptions>("PUT", `/api/query/sessions/${sess}/options`, o),
+  setOptions: (sess: string, o: Partial<SessionOptions> & { search_schema?: string }) => request<SessionOptions>("PUT", `/api/query/sessions/${sess}/options`, o),
   queryParams: (sql: string) => request<{ params: string[] }>("POST", "/api/query/params", { sql }),
   explain: (sess: string, sql: string) =>
     request<{ plan: string | null; detailed: string | null }>("POST", `/api/query/sessions/${sess}/explain`, { sql }),

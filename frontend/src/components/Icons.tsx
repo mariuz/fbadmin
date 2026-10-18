@@ -26,6 +26,7 @@ export const Flame = (props: { size?: number }) => (
 export const IconServer = p(<><rect x="3" y="4" width="18" height="7" rx="1.5" /><rect x="3" y="13" width="18" height="7" rx="1.5" /><path d="M7 7.5h.01M7 16.5h.01" /></>, "#5b7083");
 export const IconDatabase = p(<><ellipse cx="12" cy="5" rx="8" ry="3" /><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5" /><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3" /></>, "#c2410c");
 export const IconFolder = p("M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z", "#c9a227");
+export const IconSchema = p(<><path d="M12 3l9 5-9 5-9-5z" /><path d="M3 13l9 5 9-5" /></>, "#7c3aed");
 export const IconTable = p(<><rect x="3" y="4" width="18" height="16" rx="1.5" /><path d="M3 10h18M3 15h18M9 10v10" /></>, "#3b82f6");
 export const IconView = p(<><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></>, "#0891b2");
 export const IconProc = p(<><path d="M8 6l-6 6 6 6M16 6l6 6-6 6" /></>, "#7c3aed");

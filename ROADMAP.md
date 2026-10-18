@@ -145,11 +145,12 @@ exact DDL before it runs, like pgAdmin.
 - ⬜ Replica mode switching (read-only / read-write), replication status and lag
 - ⬜ `replication.conf` helper and journal/archive monitoring
 
-## Milestone 0.9 — Firebird 6 support
+## Milestone 0.9 — Firebird 6 support ✅
 
-- ⬜ **SQL schemas:** a new tree level (Database → Schemas → objects), schema-qualified DDL, search path
-- ⬜ New Firebird 6 data types and DDL as they ship
-- ⬜ CI matrix with Firebird 6 snapshots
+- ✅ **SQL schemas:** a new tree level (Database → schemas → objects), an active schema per database (the `X-Fbadmin-Schema` header), schema-scoped catalog, `SET SEARCH_PATH` in extracted DDL, whole-database extract with one block per schema, and a Query Tool schema picker ([docs](docs/FIREBIRD6.md))
+- ✅ Firebird 6 snapshot quirks handled: schema-qualified plans, the profiler's `PLG$PROFILER` schema, the gstat header in full shutdown, `T` build versions, and binary and charset parameter encoding (driver patches)
+- ✅ New Firebird 6 data types and DDL as they ship: none in the snapshots so far (`RDB$TYPES` matches Firebird 5); the full test suite passes against `6-snapshot`
+- ✅ CI matrix with Firebird 6 snapshots (`continue-on-error`), plus an e2e spec for schemas
 
 ## Milestone 1.0 — Packaging and polish
 

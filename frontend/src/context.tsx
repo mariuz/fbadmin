@@ -14,6 +14,8 @@ export interface WorkTab {
   otype?: string;
   initialSql?: string;
   autorun?: boolean;
+  /** Firebird 6 SQL schema the tab works in (made active while the tab is shown). */
+  schema?: string;
   /** Feature-specific data for registered tab kinds. */
   props?: Record<string, any>;
 }

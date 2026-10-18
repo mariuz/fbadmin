@@ -100,7 +100,10 @@ def load_collations(cat: Catalog) -> dict[str, dict]:
 class Snapshot:
     """Load every user object of the database behind ``conn``."""
 
-    def __init__(self, conn):
+    def __init__(self, conn, *, include_global: bool = True):
+        """``include_global=False`` leaves out database-wide objects (roles, role grants): used for the
+        second and later schemas of a Firebird 6 database, where the Catalog is scoped to one schema."""
+        self.include_global = include_global
         self.cat = cat = Catalog(conn)
         self.engine_major = cat.engine_major
         self.charset = cat.default_charset
@@ -112,7 +115,7 @@ class Snapshot:
         self.sequences = self._load_sequences()
         self.exceptions = self._load_exceptions()
         self.roles = {r["name"]: {"ddl": f"CREATE ROLE {quote_ident(r['name'])}", "description": r["description"]}
-                      for r in cat.list_objects("roles")}
+                      for r in cat.list_objects("roles")} if include_global else {}
         self.udfs: dict[str, dict] = {}
         self.procedures = self._load_procedures()
         self.functions = self._load_functions()
@@ -379,7 +382,7 @@ class Snapshot:
             "SELECT TRIM(RDB$USER) AS usr, RDB$USER_TYPE AS utype, TRIM(RDB$GRANTOR) AS grantor, "
             "TRIM(RDB$PRIVILEGE) AS priv, RDB$GRANT_OPTION AS opt, TRIM(RDB$RELATION_NAME) AS obj, "
             "TRIM(RDB$FIELD_NAME) AS fld, RDB$OBJECT_TYPE AS otype FROM RDB$USER_PRIVILEGES "
-            "WHERE RDB$OBJECT_TYPE IN (0, 5, 7, 9, 13, 14, 15, 18)"
+            "WHERE RDB$OBJECT_TYPE IN (0, 5, 7, 9, 13, 14, 15, 18)" + self._grant_scope()
         )
         grouped: dict[tuple, list[str]] = defaultdict(list)
         for r in rows:
@@ -408,6 +411,12 @@ class Snapshot:
             out.append({"object": obj, "ddl": grant, "revoke": revoke})
         out.sort(key=lambda g: (g["object"], g["ddl"]))
         return out
+
+    def _grant_scope(self) -> str:
+        if not self.cat.schema:
+            return ""
+        roles = "RDB$OBJECT_TYPE = 13 OR " if self.include_global else ""
+        return f" AND ({roles}RDB$RELATION_SCHEMA_NAME = {sql_string(self.cat.schema)})"
 
     def _load_comments(self) -> dict[str, str]:
         """COMMENT ON statements keyed by their target (without the text)."""

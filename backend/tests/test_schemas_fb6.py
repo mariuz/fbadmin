@@ -81,3 +81,50 @@ def test_query_tool_search_path(fb6):
     assert opts["search_path"].startswith('"PUBLIC"')
     assert client.post(q + "/execute", json={"sql": "select code from t1"}).json()["results"][0]["rows"] == [["pub"]]
     client.delete(q)
+
+
+MORE = """
+CREATE TABLE APP.T2 (ID INTEGER NOT NULL PRIMARY KEY, T1_ID INTEGER REFERENCES APP.T1 (ID), QTY APP.D_POS);
+CREATE INDEX IX_T2_QTY ON APP.T2 (QTY);
+SET TERM ^ ;
+CREATE PROCEDURE APP.P_COUNT RETURNS (N INTEGER) AS
+BEGIN
+  SELECT COUNT(*) FROM T2 INTO :N;
+  SUSPEND;
+END^
+SET TERM ; ^
+CREATE ROLE R_APP;
+GRANT SELECT ON TABLE APP.T1 TO ROLE R_APP;
+COMMENT ON TABLE APP.T2 IS 'detail rows';
+"""
+
+
+def _strip_header(sql: str) -> str:
+    return "\n".join(ln for ln in sql.splitlines() if not ln.startswith("/* DDL extracted") and "CREATE DATABASE" not in ln)
+
+
+def test_extract_whole_database_with_schemas(fb6):
+    client, base, sid, _ = fb6
+    assert client.post(base + "/execute", json={"sql": MORE}).json()["error"] is None
+    ex = client.get(base + "/schema/extract").json()
+    assert "sql" in ex, ex
+    sql = ex["sql"]
+    assert "CREATE SCHEMA APP;" in sql and "SET SEARCH_PATH TO APP, SYSTEM;" in sql
+    assert sql.index("Schema PUBLIC") < sql.index("Schema APP")
+    assert sql.count("CREATE ROLE R_APP") == 1
+    # replay into an empty database: the same DDL comes back out
+    import uuid
+
+    from .conftest import DB_DIR
+    path = f"{DB_DIR}/fbadmin_s6_{uuid.uuid4().hex[:8]}.fdb"
+    r = client.post(f"/api/servers/{sid}/databases/create", json={"name": "s6copy", "path": path})
+    assert r.status_code == 201, r.text
+    copy = f"/api/servers/{sid}/databases/{r.json()['id']}"
+    try:
+        res = client.post(copy + "/execute", json={"sql": sql}).json()
+        assert res["error"] is None, res["error"]
+        again = client.get(copy + "/schema/extract").json()["sql"]
+        assert _strip_header(again) == _strip_header(sql)
+    finally:
+        client.post(copy + "/disconnect")
+        client.post(copy + "/drop")

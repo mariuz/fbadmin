@@ -72,6 +72,7 @@ nav:
       - Data grid: user-guide/data-grid.md
       - Object dialogs: OBJECT_DIALOGS.md
       - Schema tools: SCHEMA_TOOLS.md
+      - Firebird 6 and SQL schemas: FIREBIRD6.md
       - Monitoring and maintenance: user-guide/monitoring.md
       - Monitoring and performance: MONITORING.md
   - Administration:

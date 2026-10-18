@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { EditorView } from "@codemirror/view";
-import { api } from "../api";
+import { api, setActiveSchema } from "../api";
 import { errMsg, keys, useApp } from "../context";
 import type { ScriptResult, SessionOptions, StatementResult } from "../types";
 import { Modal } from "./Modal";
@@ -169,7 +169,25 @@ function StatsTable(props: { stats: Record<string, number> }) {
 }
 
 // ------------------------------------------------------------ query tool
-export function QueryTool(props: { serverId: string; dbId: string; initialSql?: string; autorun?: boolean; visible: boolean }) {
+/** Firebird 6: first schema of the session search path, selectable. */
+function SchemaPicker(props: { serverId: string; dbId: string; searchPath?: string | null; onChange: (schema: string) => void }) {
+  const [schemas, setSchemas] = useState<string[]>([]);
+  useEffect(() => {
+    api.schemas(props.serverId, props.dbId).then((r) => setSchemas(r.schemas.map((s) => s.name))).catch(() => setSchemas([]));
+  }, [props.serverId, props.dbId]);
+  const m = /^\s*(?:"((?:[^"]|"")+)"|([^,\s]+))/.exec(props.searchPath ?? "");
+  const current = m ? (m[1]?.replace(/""/g, '"') ?? m[2]) : "";
+  return (
+    <label title={`Search path: ${props.searchPath ?? ""}`}>Schema
+      <select className="text" value={current} onChange={(e) => props.onChange(e.target.value)}>
+        {!schemas.includes(current) && <option value={current}>{current}</option>}
+        {schemas.map((s) => <option key={s} value={s}>{s}</option>)}
+      </select>
+    </label>
+  );
+}
+
+export function QueryTool(props: { serverId: string; dbId: string; schema?: string; initialSql?: string; autorun?: boolean; visible: boolean }) {
   const app = useApp();
   const [sql, setSql] = useState(props.initialSql ?? "");
   const [session, setSession] = useState<string | null>(null);
@@ -204,7 +222,7 @@ export function QueryTool(props: { serverId: string; dbId: string; initialSql?: 
 
   const ensureSession = useCallback(async () => {
     if (sessionRef.current) return sessionRef.current;
-    const r = await api.openSession(props.serverId, props.dbId);
+    const r = await api.openSession(props.serverId, props.dbId, props.schema);
     sessionRef.current = r.session_id;
     setSession(r.session_id);
     setOptions(r.options);
@@ -482,6 +500,15 @@ export function QueryTool(props: { serverId: string; dbId: string; initialSql?: 
             <TxSettings options={options} onClose={() => setShowTx(false)} onApply={async (o) => setOptions(await api.setOptions(session, o))} />
           )}
         </div>
+        {options && options.engine_major >= 6 && session && (
+          <SchemaPicker serverId={props.serverId} dbId={props.dbId} searchPath={options.search_path}
+            onChange={async (schema) => {
+              try {
+                setOptions(await api.setOptions(session, { search_schema: schema }));
+                setActiveSchema(props.serverId, props.dbId, schema); // completions follow the session
+              } catch (e) { app.toast(errMsg(e), "error"); }
+            }} />
+        )}
         <span className="sep" />
         <label>Rows
           <select className="text" value={maxRows} onChange={(e) => setMaxRows(Number(e.target.value))}>

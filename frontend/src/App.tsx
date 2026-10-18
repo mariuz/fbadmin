@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { api, setPasswordHandler } from "./api";
+import { activeSchemaOf, api, setActiveSchema, setPasswordHandler } from "./api";
 import { AppCtx, errMsg, selectionKey, type AppApi, type WorkTab } from "./context";
 import type { ObjectDetail, Selection, Server } from "./types";
 import { Tree } from "./components/Tree";
@@ -65,7 +65,9 @@ export default function App() {
 
   const invalidate = useCallback((key: string) => setVersions((v) => ({ ...v, [key]: (v[key] ?? 0) + 1 })), []);
 
-  const openTab = useCallback((t: Omit<WorkTab, "id"> & { id?: string }) => {
+  const openTab = useCallback((t0: Omit<WorkTab, "id"> & { id?: string }) => {
+    // tabs remember the Firebird 6 schema they were opened in
+    const t = { ...t0, schema: t0.schema ?? activeSchemaOf(t0.serverId, t0.dbId) };
     // reuse an existing data/monitor/log tab for the same object
     let id = t.id;
     setTabs((cur) => {
@@ -73,7 +75,7 @@ export default function App() {
         const reg = getTabKind(t.kind);
         const existing = cur.find((x) => x.kind === t.kind && (reg?.same
           ? reg.same(x, t)
-          : x.serverId === t.serverId && x.dbId === t.dbId && x.name === t.name));
+          : x.serverId === t.serverId && x.dbId === t.dbId && x.name === t.name && x.schema === t.schema));
         if (existing) {
           id = existing.id;
           return cur;
@@ -102,8 +104,19 @@ export default function App() {
 
   const jobStarted = useCallback(() => setRunningJobs((n) => n + 1), []);
 
+  // selecting a node of a Firebird 6 schema makes that schema active for its database
+  const select = useCallback((sel: Selection | null) => {
+    if (sel?.dbId && sel.schema) setActiveSchema(sel.serverId, sel.dbId, sel.schema);
+    setSelection(sel);
+  }, []);
+  // ... and so does switching to a tab opened in a schema
+  useEffect(() => {
+    const t = tabs.find((x) => x.id === active);
+    if (t?.serverId && t.dbId && t.schema) setActiveSchema(t.serverId, t.dbId, t.schema);
+  }, [active, tabs]);
+
   const app: AppApi = useMemo(() => ({
-    servers, reloadServers, selection, select: setSelection, openTab, closeTab, showDialog: setDialog, toast,
+    servers, reloadServers, selection, select, openTab, closeTab, showDialog: setDialog, toast,
     invalidate, versions, openQueryTool, jobStarted,
   }), [servers, selection, versions]);
 
@@ -132,7 +145,7 @@ export default function App() {
 
   // load object detail for properties/sql/deps
   const objKey = selection && (selection.kind === "object" || selection.kind === "column")
-    ? `${selection.serverId}:${selection.dbId}:${selection.otype}:${selection.name}` : "";
+    ? `${selection.serverId}:${selection.dbId}:${selection.schema ?? ""}:${selection.otype}:${selection.name}` : "";
   const objVersion = selection?.otype ? versions[`f:${selection.serverId}:${selection.dbId}:${selection.otype}`] ?? 0 : 0;
   useEffect(() => {
     setDetail(null);
@@ -245,7 +258,7 @@ export default function App() {
               {tabs.map((t) => (
                 <div key={t.id} className={"tab-pane" + (active === t.id ? "" : " hidden")} style={{ overflow: "hidden" }}>
                   <Suspense fallback={<div className="empty">Loading…</div>}>
-                  {t.kind === "query" && <QueryTool serverId={t.serverId!} dbId={t.dbId!} initialSql={t.initialSql} autorun={t.autorun} visible={active === t.id} />}
+                  {t.kind === "query" && <QueryTool serverId={t.serverId!} dbId={t.dbId!} schema={t.schema} initialSql={t.initialSql} autorun={t.autorun} visible={active === t.id} />}
                   {t.kind === "data" && <DataView serverId={t.serverId!} dbId={t.dbId!} otype={t.otype!} name={t.name!} showFilter={t.initialSql === "filter"} />}
                   {t.kind === "monitor" && <Monitor serverId={t.serverId!} dbId={t.dbId!} visible={active === t.id} />}
                   {t.kind === "jobs" && <JobsPanel visible={active === t.id} />}

@@ -36,6 +36,8 @@ export interface Selection {
   otype?: string; // tables, views, ...
   name?: string; // object name
   column?: string;
+  /** Firebird 6 SQL schema the node belongs to. */
+  schema?: string;
 }
 
 export interface ColumnInfo {
@@ -82,6 +84,8 @@ export interface SessionOptions {
   statement_timeout: number;
   engine_major: number;
   attachment_id: number | null;
+  /** Firebird 6: the session's search path, e.g. "APP", "SYSTEM" */
+  search_path?: string | null;
 }
 
 export interface Completion {

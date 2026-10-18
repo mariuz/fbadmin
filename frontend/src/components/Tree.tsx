@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState, type ReactElement } from "react";
-import { api } from "../api";
+import { api, withSchema } from "../api";
 import { errMsg, keys, selectionKey, useApp } from "../context";
 import { OBJECT_TYPES, type Selection, type Server } from "../types";
 import {
-  IconChevron, IconChevronDown, IconColumn, IconDatabase, IconFolder, IconKey, IconServer, IconSpinner, TYPE_ICONS,
+  IconChevron, IconChevronDown, IconColumn, IconDatabase, IconFolder, IconKey, IconSchema, IconServer, IconSpinner, TYPE_ICONS,
 } from "./Icons";
 import { ContextMenu, type MenuItem } from "./ContextMenu";
 import { buildMenu } from "./menus";
@@ -34,7 +34,8 @@ function TreeNode(props: {
   const [error, setError] = useState<string | null>(null);
   const version = app.versions[spec.key] ?? 0;
   const firstVersion = useRef(version);
-  const selected = selectionKey(app.selection) === spec.key;
+  // keys are schema-agnostic (so refreshing a folder refreshes it in every schema); compare the schema too
+  const selected = selectionKey(app.selection) === spec.key.split("@")[0] && app.selection?.schema === spec.selection.schema;
 
   const load = async () => {
     if (!spec.load) return;
@@ -112,7 +113,7 @@ function TreeNode(props: {
 
 const RELATIONS = new Set(["tables", "views", "system_tables"]);
 
-function objectNodes(sid: string, dbid: string, otype: string, items: Array<Record<string, any>>): NodeSpec[] {
+function objectNodes(sid: string, dbid: string, otype: string, items: Array<Record<string, any>>, schema?: string): NodeSpec[] {
   return items.map((it) => {
     let sub: string | undefined;
     let dim = false;
@@ -132,16 +133,16 @@ function objectNodes(sid: string, dbid: string, otype: string, items: Array<Reco
       dim,
       title: it.description ?? undefined,
       icon: TYPE_ICONS[otype],
-      selection: { kind: "object", serverId: sid, dbId: dbid, otype, name: it.name },
+      selection: { kind: "object", serverId: sid, dbId: dbid, otype, name: it.name, schema },
       load: RELATIONS.has(otype)
         ? async () => {
-            const o = await api.object(sid, dbid, otype, it.name);
+            const o = await withSchema(sid, dbid, schema, () => api.object(sid, dbid, otype, it.name));
             return (o.columns ?? []).map((c: any) => ({
               key: keys.object(sid, dbid, otype, it.name) + ":" + c.name,
               label: c.name,
               sub: c.computed ? "computed" : c.data_type + (c.not_null ? " not null" : ""),
               icon: c.primary_key ? IconKey : IconColumn,
-              selection: { kind: "column", serverId: sid, dbId: dbid, otype, name: it.name, column: c.name },
+              selection: { kind: "column", serverId: sid, dbId: dbid, otype, name: it.name, column: c.name, schema },
             }));
           }
         : undefined,
@@ -149,14 +150,34 @@ function objectNodes(sid: string, dbid: string, otype: string, items: Array<Reco
   });
 }
 
-export function databaseFolders(sid: string, dbid: string, counts: Record<string, number>): NodeSpec[] {
-  return OBJECT_TYPES.map((t) => ({
-    key: keys.folder(sid, dbid, t.type),
+// server-wide objects, not part of a schema
+const GLOBAL_TYPES = new Set(["users", "roles", "shadows", "blob_filters"]);
+
+export function databaseFolders(sid: string, dbid: string, counts: Record<string, number>, schema?: string): NodeSpec[] {
+  return OBJECT_TYPES.filter((t) => !schema || schema === "PUBLIC" || !GLOBAL_TYPES.has(t.type)).map((t) => ({
+    // "@schema" keeps React keys unique; it is stripped when matching the selection
+    key: keys.folder(sid, dbid, t.type) + (schema ? "@" + schema : ""),
     label: t.label,
     count: counts[t.type],
     icon: IconFolder,
-    selection: { kind: "folder", serverId: sid, dbId: dbid, otype: t.type },
-    load: async () => objectNodes(sid, dbid, t.type, await api.objects(sid, dbid, t.type)),
+    selection: { kind: "folder", serverId: sid, dbId: dbid, otype: t.type, schema },
+    load: async () => objectNodes(sid, dbid, t.type, await withSchema(sid, dbid, schema, () => api.objects(sid, dbid, t.type)), schema),
+  }));
+}
+
+/** Firebird 6: one node per SQL schema, each with its own object folders. */
+function schemaNodes(sid: string, dbid: string, schemas: Array<{ name: string; system_flag: number; description?: string }>): NodeSpec[] {
+  return schemas.map((sc) => ({
+    key: keys.db(sid, dbid) + "@" + sc.name,
+    label: sc.name,
+    sub: sc.system_flag ? "system" : undefined,
+    title: sc.description ?? undefined,
+    icon: IconSchema,
+    selection: { kind: "database", serverId: sid, dbId: dbid, schema: sc.name },
+    load: async () => {
+      const info = await withSchema(sid, dbid, sc.name, () => api.databaseInfo(sid, dbid));
+      return databaseFolders(sid, dbid, info.counts, sc.name);
+    },
   }));
 }
 
@@ -183,8 +204,10 @@ export function Tree() {
         selection: { kind: "database", serverId: srv.id, dbId: d.id },
         load: async () => {
           await api.connectDatabase(srv.id, d.id);
-          const info = await api.databaseInfo(srv.id, d.id);
           const extra = (await Promise.all(getTreeNodes("database").map((t) => t.build(srv.id, d.id).catch(() => [])))).flat();
+          const sc = await api.schemas(srv.id, d.id).catch(() => ({ supported: false, schemas: [] }));
+          if (sc.supported) return [...schemaNodes(srv.id, d.id, sc.schemas), ...extra];
+          const info = await api.databaseInfo(srv.id, d.id);
           return [...databaseFolders(srv.id, d.id, info.counts), ...extra];
         },
       }));
