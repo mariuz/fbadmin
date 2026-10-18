@@ -17,6 +17,7 @@ from .api.deps import get_state
 from .config import settings
 from .connections import PasswordRequired
 from .metadata import OBJECT_TYPES
+from .monitoring.history import start_sampler
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -33,7 +34,9 @@ def _reaper(stop: threading.Event) -> None:
 async def lifespan(app: FastAPI):
     stop = threading.Event()
     threading.Thread(target=_reaper, args=(stop,), daemon=True).start()
+    sampler = start_sampler()
     yield
+    sampler.stop()
     stop.set()
     get_state().manager.close_all()
 
