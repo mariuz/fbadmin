@@ -60,7 +60,10 @@ def split_sql(script: str) -> list[Statement]:
         word.clear()
         if len(lead) < 5:
             lead.append(w)
-        if w in ("BEGIN", "CASE"):
+        if w in ("BEGIN", "CASE") and lead[:2] in (["CREATE", "COLLATION"], ["ALTER", "DATABASE"]):
+            # "CASE INSENSITIVE" / "BEGIN BACKUP" are not blocks (found by the firebird-qa tests)
+            pass
+        elif w in ("BEGIN", "CASE"):
             depth += 1
             if w == "BEGIN":
                 flags["begin"] = True
@@ -88,7 +91,8 @@ def split_sql(script: str) -> list[Statement]:
         lead.clear()
         flags.update({"as": False, "begin": False, "external": False})
         if text:
-            m = _SET_TERM.match(text)
+            # comments may precede SET TERM (found by the firebird-qa tests)
+            m = _SET_TERM.match(strip_comments(text))
             if m:
                 term = m.group(1)
             else:
