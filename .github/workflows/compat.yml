@@ -31,7 +31,7 @@ jobs:
       - run: pip install -e "backend[dev]"
       - run: git clone --depth 1 https://github.com/FirebirdSQL/firebird-qa "$RUNNER_TEMP/firebird-qa"
       - name: Wait for Firebird
-        run: for i in $(seq 1 30); do (echo > /dev/tcp/127.0.0.1/3050) 2>/dev/null && break; sleep 1; done
+        run: for _ in $(seq 1 30); do (echo > /dev/tcp/127.0.0.1/3050) 2>/dev/null && break; sleep 1; done
       - run: pytest -q -s backend/tests/test_firebird_qa.py
         env:
           FBADMIN_QA_DIR: ${{ runner.temp }}/firebird-qa

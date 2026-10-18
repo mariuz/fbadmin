@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import itertools
 import os
+import re
 import uuid
 
 import pytest
@@ -70,7 +71,11 @@ def default_for(t: str):
     if u.startswith(("DOUBLE", "FLOAT", "DECFLOAT")):
         return st.sampled_from([None, "DEFAULT 0", "DEFAULT 1.5"])
     if u.startswith(("VARCHAR", "CHAR")) and "OCTETS" not in u:
-        return st.sampled_from([None, "DEFAULT 'x'", "DEFAULT ''", "DEFAULT 'it''s'", "DEFAULT USER"])
+        # a literal default must fit the column (Firebird checks it at CREATE time)
+        m = re.match(r"\w+\((\d+)\)", u)
+        length = int(m.group(1)) if m else 1
+        options = [None, "DEFAULT 'x'", "DEFAULT ''", "DEFAULT USER"] + (["DEFAULT 'it''s'"] if length >= 4 else [])
+        return st.sampled_from(options)
     if u == "BOOLEAN":
         return st.sampled_from([None, "DEFAULT TRUE", "DEFAULT FALSE"])
     if u == "TIMESTAMP":

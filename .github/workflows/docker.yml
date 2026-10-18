@@ -64,6 +64,6 @@ jobs:
         run: |
           image="ghcr.io/${{ github.repository_owner }}/fbadmin:sha-${GITHUB_SHA::7}"
           docker run -d --name fbadmin -p 5050:5050 "$image"
-          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:5050/api/health && break; sleep 1; done
+          for _ in $(seq 1 30); do curl -fsS http://127.0.0.1:5050/api/health && break; sleep 1; done
           curl -fsS http://127.0.0.1:5050/ | grep -q '<div id="root">'
           docker inspect --format '{{.State.Health.Status}}' fbadmin || true

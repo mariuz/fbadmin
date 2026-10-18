@@ -30,7 +30,7 @@ jobs:
       - run: pip install -e "backend[dev]"
       - run: ruff check backend
       - name: Wait for Firebird
-        run: for i in $(seq 1 30); do (echo > /dev/tcp/127.0.0.1/3050) 2>/dev/null && break; sleep 1; done
+        run: for _ in $(seq 1 30); do (echo > /dev/tcp/127.0.0.1/3050) 2>/dev/null && break; sleep 1; done
       # includes the hypothesis fuzz tests of the SQL splitter and the generated-schema DDL round trips
       - run: pytest -q backend/tests
         env:
@@ -133,7 +133,7 @@ jobs:
         working-directory: e2e
         run: npm ci && npx playwright install --with-deps chromium
       - name: Wait for Firebird
-        run: for i in $(seq 1 30); do (echo > /dev/tcp/127.0.0.1/3050) 2>/dev/null && break; sleep 1; done
+        run: for _ in $(seq 1 30); do (echo > /dev/tcp/127.0.0.1/3050) 2>/dev/null && break; sleep 1; done
       - name: Run the e2e tests
         working-directory: e2e
         run: npx playwright test

@@ -102,7 +102,7 @@ jobs:
         run: |
           exe=dist/fbadmin/fbadmin; [ -f dist/fbadmin/fbadmin.exe ] && exe=dist/fbadmin/fbadmin.exe
           FBADMIN_DATA_DIR="$RUNNER_TEMP/fbadmin" BROWSER=true "$exe" --browser --port 5106 &
-          for i in $(seq 1 60); do curl -fsS http://127.0.0.1:5106/api/health && break; sleep 1; done
+          for _ in $(seq 1 60); do curl -fsS http://127.0.0.1:5106/api/health && break; sleep 1; done
           curl -fsS http://127.0.0.1:5106/ | grep -q 'id="root"'
       - uses: actions/upload-artifact@v4
         with:
