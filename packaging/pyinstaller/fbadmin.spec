@@ -39,6 +39,9 @@ a = Analysis(  # noqa: F821
     hiddenimports=hidden,
     excludes=["tkinter", "pytest", "hypothesis", "IPython"],
     noarchive=False,
+    # fbadmin.driver_patches reads the driver's source (inspect.getsource) to patch
+    # params_to_blr, so ship firebirdsql's .py files next to the compiled modules.
+    module_collection_mode={"firebirdsql": "pyz+py"},
 )
 pyz = PYZ(a.pure)  # noqa: F821
 exe = EXE(  # noqa: F821

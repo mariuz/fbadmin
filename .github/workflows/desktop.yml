@@ -9,6 +9,13 @@ name: Desktop app
 on:
   push:
     tags: ["v*"]
+    # also build (and smoke-test the installers) when packaging changes on main; only tags publish
+    branches: [main]
+    paths:
+      - packaging/**
+      - backend/fbadmin/desktop.py
+      - backend/fbadmin/updater.py
+      - .github/workflows/desktop.yml
   pull_request:
     paths:
       - packaging/**
@@ -74,7 +81,6 @@ jobs:
           Compress-Archive -Path dist/fbadmin -DestinationPath "dist/packages/fbadmin-${{ steps.v.outputs.version }}-windows-x64.zip"
       - name: MSI (Windows, WiX)
         if: matrix.kind == 'windows'
-        continue-on-error: true   # the zip above is the primary artifact
         shell: pwsh
         run: |
           dotnet tool install --global wix --version 5.0.2
@@ -101,9 +107,52 @@ jobs:
         shell: bash
         run: |
           exe=dist/fbadmin/fbadmin; [ -f dist/fbadmin/fbadmin.exe ] && exe=dist/fbadmin/fbadmin.exe
-          FBADMIN_DATA_DIR="$RUNNER_TEMP/fbadmin" BROWSER=true "$exe" --browser --port 5106 &
+          FBADMIN_DATA_DIR="$RUNNER_TEMP/fbadmin" BROWSER=true "$exe" --browser --port 5106 > frozen.log 2>&1 &
           for _ in $(seq 1 60); do curl -fsS http://127.0.0.1:5106/api/health && break; sleep 1; done
           curl -fsS http://127.0.0.1:5106/ | grep -q 'id="root"'
+          # the driver patches must apply in the frozen build too (they read firebirdsql's source)
+          if grep -q "could not patch" frozen.log; then cat frozen.log; exit 1; fi
+      # --- install the packages and start the installed app ------------------------
+      - name: Install the MSI and run the installed app (Windows)
+        if: matrix.kind == 'windows'
+        shell: pwsh
+        run: |
+          $msi = Get-ChildItem dist/packages/*.msi | Select-Object -First 1
+          $p = Start-Process msiexec -ArgumentList "/i `"$($msi.FullName)`" /qn /l*v msi.log" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { Get-Content msi.log -Tail 50; exit $p.ExitCode }
+          $exe = "$env:ProgramFiles\fbadmin\fbadmin.exe"
+          if (-not (Test-Path $exe)) { throw "not installed: $exe" }
+          $env:FBADMIN_DATA_DIR = "$env:RUNNER_TEMP\fbmsi"
+          Start-Process $exe -ArgumentList "--browser --port 5107"
+          for ($i = 0; $i -lt 60; $i++) { try { Invoke-RestMethod http://127.0.0.1:5107/api/health | Out-Null; break } catch { Start-Sleep 1 } }
+          (Invoke-WebRequest http://127.0.0.1:5107/ -UseBasicParsing).Content | Select-String 'id="root"' | Out-Null
+          if (-not $?) { throw "UI not served" }
+          $p = Start-Process msiexec -ArgumentList "/x `"$($msi.FullName)`" /qn" -Wait -PassThru
+          Write-Host "uninstall exit $($p.ExitCode)"
+      - name: Mount the dmg and run the app (macOS)
+        if: matrix.kind == 'macos'
+        run: |
+          dmg=$(ls dist/packages/*.dmg | head -1)
+          hdiutil attach "$dmg" -mountpoint /Volumes/fbadmin -nobrowse
+          FBADMIN_DATA_DIR="$RUNNER_TEMP/fbdmg" BROWSER=true /Volumes/fbadmin/fbadmin.app/Contents/MacOS/fbadmin --browser --port 5107 &
+          for _ in $(seq 1 90); do curl -fsS http://127.0.0.1:5107/api/health && break; sleep 1; done
+          curl -fsS http://127.0.0.1:5107/ | grep -q 'id="root"'
+          kill %1 || true
+          hdiutil detach /Volumes/fbadmin || true
+      - name: Install the deb, run the AppImage, inspect the rpm (Linux)
+        if: matrix.kind == 'linux'
+        run: |
+          sudo apt-get install -y ./dist/packages/fbadmin_*.deb
+          FBADMIN_DATA_DIR="$RUNNER_TEMP/fbdeb" BROWSER=true fbadmin-desktop --browser --port 5107 &
+          for _ in $(seq 1 60); do curl -fsS http://127.0.0.1:5107/api/health && break; sleep 1; done
+          curl -fsS http://127.0.0.1:5107/ | grep -q 'id="root"'
+          kill %1 || true
+          app=$(ls dist/packages/*.AppImage | head -1); chmod +x "$app"
+          FBADMIN_DATA_DIR="$RUNNER_TEMP/fbai" BROWSER=true APPIMAGE_EXTRACT_AND_RUN=1 "$app" --browser --port 5108 &
+          for _ in $(seq 1 60); do curl -fsS http://127.0.0.1:5108/api/health && break; sleep 1; done
+          curl -fsS http://127.0.0.1:5108/api/version | grep -q '"version"'
+          kill %2 || true
+          rpm -qip dist/packages/*.rpm && rpm -qlp dist/packages/*.rpm | grep -q /opt/fbadmin/fbadmin
       - uses: actions/upload-artifact@v4
         with:
           name: desktop-${{ matrix.kind }}-${{ matrix.arch || 'x64' }}
