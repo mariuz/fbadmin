@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { errMsg, keys, useApp } from "../../context";
+import { t } from "../../i18n";
 import type { Job } from "../../types";
 import { IconDownload, IconRefresh, IconTrash, IconUpload } from "../../components/Icons";
 import { browserDownload, fmtBytes, fmtTime, mapi, uploadRestore, type ArchiveItem } from "./api";
@@ -24,21 +25,21 @@ export function BackupPanel(props: { serverId: string; dbId: string; onArchiveCh
   const download = () => run(async () => {
     const r = await mapi.prepareDownload(props.serverId, props.dbId, backupPayload(opts));
     browserDownload(r.url, r.filename);
-    app.toast(`Downloading ${r.filename} — the backup streams from the server`, "info");
+    app.toast(t("Downloading {file} — the backup streams from the server", { file: r.filename }), "info");
   });
   return (
-    <Section title="Backup" hint="gbak through the Services API. “Download” streams the backup (gbak to stdout) straight to your browser — no shared filesystem with the server needed.">
+    <Section title={t("Backup")} hint={t("gbak through the Services API. “Download” streams the backup (gbak to stdout) straight to your browser — no shared filesystem with the server needed.")}>
       <BackupOptionsForm value={opts} onChange={setOpts} caps={caps} />
       <div className="mt-row" style={{ marginTop: 12 }}>
-        <button className="btn primary" disabled={busy} onClick={download}><IconDownload /> Download .fbk</button>
+        <button className="btn primary" disabled={busy} onClick={download}><IconDownload /> {t("Download .fbk")}</button>
         <button className="btn" disabled={busy} onClick={() => run(async () => {
           setJob(await mapi.backupJob(props.serverId, props.dbId, { target: "archive", options: backupPayload(opts) }));
-        })}>Backup to fbadmin archive</button>
+        })}>{t("Backup to fbadmin archive")}</button>
         <span className="sep" style={{ width: 1, height: 20, background: "var(--border)" }} />
-        <input className="text" style={{ flex: 1, minWidth: 220 }} value={serverFile} onChange={(e) => setServerFile(e.target.value)} title="Path on the Firebird server" />
+        <input className="text" style={{ flex: 1, minWidth: 220 }} value={serverFile} onChange={(e) => setServerFile(e.target.value)} title={t("Path on the Firebird server")} />
         <button className="btn" disabled={busy || !serverFile} onClick={() => run(async () => {
           setJob(await mapi.backupJob(props.serverId, props.dbId, { target: "server", backup_file: serverFile, options: backupPayload(opts) }));
-        })}>Backup to server file</button>
+        })}>{t("Backup to server file")}</button>
       </div>
       {error && <div className="err" style={{ marginTop: 8, whiteSpace: "pre-wrap" }}>{error}</div>}
       <JobLog job={job} onDone={() => props.onArchiveChange?.()} />
@@ -69,7 +70,7 @@ export function RestorePanel(props: { serverId: string; defaultPath?: string; ar
   const start = () => run(async () => {
     const o = restorePayload(opts);
     if (source === "upload") {
-      if (!file) throw new Error("Choose a .fbk file to upload");
+      if (!file) throw new Error(t("Choose a .fbk file to upload"));
       await mapi.capabilities(props.serverId); // asks for the password first if needed
       setProgress(0);
       const j = await uploadRestore(props.serverId, file, { database_path: target, register_as: registerAs || null, keep, ...o as Record<string, any> }, setProgress);
@@ -83,11 +84,11 @@ export function RestorePanel(props: { serverId: string; defaultPath?: string; ar
   return (
     <div>
       <div className="form mform">
-        <label className="l">Source</label>
+        <label className="l">{t("Source")}</label>
         <div className="seg">
           {(["upload", "archive", "server"] as const).map((s) => (
             <button key={s} className={source === s ? "on" : ""} onClick={() => setSource(s)}>
-              {s === "upload" ? "Upload from this computer" : s === "archive" ? "fbadmin archive" : "File on the server"}
+              {s === "upload" ? t("Upload from this computer") : s === "archive" ? t("fbadmin archive") : t("File on the server")}
             </button>
           ))}
         </div>
@@ -96,35 +97,35 @@ export function RestorePanel(props: { serverId: string; defaultPath?: string; ar
           <div className={"dropzone" + (over ? " over" : "")} onClick={() => input.current?.click()}
             onDragOver={(e) => { e.preventDefault(); setOver(true); }} onDragLeave={() => setOver(false)}
             onDrop={(e) => { e.preventDefault(); setOver(false); const f = e.dataTransfer.files[0]; if (f) setFile(f); }}>
-            <IconUpload /> {file ? <b>{file.name} · {fmtBytes(file.size)}</b> : "Drop a .fbk here or click to choose"}
+            <IconUpload /> {file ? <b>{file.name} · {fmtBytes(file.size)}</b> : t("Drop a .fbk here or click to choose")}
             <input ref={input} type="file" accept=".fbk,.gbk,.fbz,application/octet-stream" style={{ display: "none" }}
               onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
             {progress !== null && <div className="progress"><div style={{ width: `${Math.round(progress * 100)}%` }} /></div>}
           </div>
           <span />
-          <label className="check"><input type="checkbox" checked={keep} onChange={(e) => setKeep(e.target.checked)} /> Keep the uploaded file in the fbadmin archive</label>
+          <label className="check"><input type="checkbox" checked={keep} onChange={(e) => setKeep(e.target.checked)} /> {t("Keep the uploaded file in the fbadmin archive")}</label>
         </>}
         {source === "archive" && <>
-          <label className="l">Backup</label>
+          <label className="l">{t("Backup")}</label>
           <select className="text" value={archivePath} onChange={(e) => setArchivePath(e.target.value)}>
-            <option value="">(choose)</option>
+            <option value="">{t("(choose)")}</option>
             {archive.map((a) => <option key={a.path} value={a.path}>{a.path} · {fmtBytes(a.size)}</option>)}
           </select>
         </>}
         {source === "server" && <>
-          <label className="l">Backup file</label>
+          <label className="l">{t("Backup file")}</label>
           <input className="text" placeholder="/path/on/server/db.fbk" value={serverFile} onChange={(e) => setServerFile(e.target.value)} />
         </>}
-        <label className="l">Target database</label>
+        <label className="l">{t("Target database")}</label>
         <input className="text" placeholder="/var/lib/firebird/data/restored.fdb" value={target} onChange={(e) => setTarget(e.target.value)} />
-        <label className="l">Register as</label>
-        <input className="text" placeholder="optional display name" value={registerAs} onChange={(e) => setRegisterAs(e.target.value)} />
+        <label className="l">{t("Register as")}</label>
+        <input className="text" placeholder={t("optional display name")} value={registerAs} onChange={(e) => setRegisterAs(e.target.value)} />
       </div>
-      <h3>Restore options</h3>
+      <h3>{t("Restore options")}</h3>
       <RestoreOptionsForm value={opts} onChange={setOpts} caps={caps} />
       <div className="mt-row" style={{ marginTop: 12 }}>
-        <button className="btn primary" disabled={busy || !target} onClick={start}><IconUpload /> Start restore</button>
-        {props.onClose && <button className="btn" onClick={props.onClose}>Close</button>}
+        <button className="btn primary" disabled={busy || !target} onClick={start}><IconUpload /> {t("Start restore")}</button>
+        {props.onClose && <button className="btn" onClick={props.onClose}>{t("Close")}</button>}
         {error && <span className="err" style={{ whiteSpace: "pre-wrap" }}>{error}</span>}
       </div>
       <JobLog job={job} onDone={(j) => {
@@ -144,21 +145,21 @@ export function ArchivePanel(props: { serverId: string; version: number; onResto
   const load = () => mapi.archive(props.serverId).then(setItems).catch((e) => app.toast(errMsg(e), "error"));
   useEffect(() => { load(); }, [props.serverId, props.version]);
   return (
-    <Section title="fbadmin archive" hint="Backups stored on the fbadmin host (manual archive backups, scheduled backups and kept uploads)."
-      right={<button className="btn small" onClick={load}><IconRefresh size={12} /> Refresh</button>}>
-      {!items ? <div className="muted">Loading…</div> : items.length === 0 ? <div className="muted">No archived backups yet.</div> : (
+    <Section title={t("fbadmin archive")} hint={t("Backups stored on the fbadmin host (manual archive backups, scheduled backups and kept uploads).")}
+      right={<button className="btn small" onClick={load}><IconRefresh size={12} /> {t("Refresh")}</button>}>
+      {!items ? <div className="muted">{t("Loading…")}</div> : items.length === 0 ? <div className="muted">{t("No archived backups yet.")}</div> : (
         <div className="grid-wrap">
           <table className="grid">
-            <thead><tr><th>Folder</th><th>File</th><th>Size</th><th>Created</th><th /></tr></thead>
+            <thead><tr><th>{t("Folder")}</th><th>{t("File")}</th><th>{t("Size")}</th><th>{t("Created")}</th><th /></tr></thead>
             <tbody>
               {items.map((a) => (
                 <tr key={a.path}>
                   <td>{a.folder}</td><td>{a.name}</td><td className="num">{fmtBytes(a.size)}</td><td>{fmtTime(a.modified)}</td>
                   <td>
                     <button className="btn small" onClick={() => browserDownload(mapi.archiveUrl(props.serverId, a.path), a.name)}><IconDownload size={12} /></button>{" "}
-                    <button className="btn small" onClick={() => props.onRestore(a.path)}>Restore…</button>{" "}
+                    <button className="btn small" onClick={() => props.onRestore(a.path)}>{t("Restore…")}</button>{" "}
                     <button className="btn small danger" onClick={async () => {
-                      if (!confirm(`Delete ${a.path}?`)) return;
+                      if (!confirm(t("Delete {path}?", { path: a.path }))) return;
                       await mapi.deleteArchive(props.serverId, a.path).catch((e) => app.toast(errMsg(e), "error"));
                       load();
                     }}><IconTrash size={12} /></button>
@@ -183,7 +184,7 @@ export function BackupRestoreSection(props: { serverId: string; dbId: string }) 
     <>
       <BackupPanel serverId={props.serverId} dbId={props.dbId} onArchiveChange={() => setVersion((v) => v + 1)} />
       <div ref={restoreRef}>
-        <Section title="Restore" hint="Upload a .fbk from your computer (streamed to gbak via stdin), restore one from the fbadmin archive, or from a file on the server.">
+        <Section title={t("Restore")} hint={t("Upload a .fbk from your computer (streamed to gbak via stdin), restore one from the fbadmin archive, or from a file on the server.")}>
           <RestorePanel serverId={props.serverId} archivePath={restoreFrom}
             defaultPath={db ? dirOf(db.path) + (db.path.split(/[\\/]/).pop() ?? "db.fdb").replace(/\.(fdb|gdb)$/i, "") + "_restored.fdb" : ""} />
         </Section>

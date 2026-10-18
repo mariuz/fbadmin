@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { errMsg, useApp } from "../../context";
+import { t } from "../../i18n";
 import type { Job } from "../../types";
 import { mapi, waitJob, type Capabilities } from "./api";
 
@@ -110,27 +111,27 @@ export function BackupOptionsForm(props: { value: BackupOpts; onChange: (v: Back
   return (
     <>
       <div className="mt-grid" style={{ marginBottom: 10 }}>
-        <Check label="Metadata only" checked={o.metadata_only} onChange={(v) => set({ metadata_only: v })} />
-        <Check label="Garbage collection" checked={o.garbage_collect} onChange={(v) => set({ garbage_collect: v })} />
-        <Check label="Transportable format" checked={o.transportable} onChange={(v) => set({ transportable: v })} />
-        <Check label="Ignore checksums" checked={o.ignore_checksums} onChange={(v) => set({ ignore_checksums: v })} />
-        <Check label="Ignore limbo transactions" checked={o.ignore_limbo} onChange={(v) => set({ ignore_limbo: v })} />
-        <Check label="Compress (zip)" checked={o.zip} disabled={!f.zip} note="Firebird 4+" onChange={(v) => set({ zip: v })} />
+        <Check label={t("Metadata only")} checked={o.metadata_only} onChange={(v) => set({ metadata_only: v })} />
+        <Check label={t("Garbage collection")} checked={o.garbage_collect} onChange={(v) => set({ garbage_collect: v })} />
+        <Check label={t("Transportable format")} checked={o.transportable} onChange={(v) => set({ transportable: v })} />
+        <Check label={t("Ignore checksums")} checked={o.ignore_checksums} onChange={(v) => set({ ignore_checksums: v })} />
+        <Check label={t("Ignore limbo transactions")} checked={o.ignore_limbo} onChange={(v) => set({ ignore_limbo: v })} />
+        <Check label={t("Compress (zip)")} checked={o.zip} disabled={!f.zip} note={t("Firebird 4+")} onChange={(v) => set({ zip: v })} />
       </div>
       <div className="form mform">
-        <label className="l">Parallel workers</label>
-        <input className="text" type="number" min={1} disabled={!f.parallel_workers} placeholder={f.parallel_workers ? "1" : "Firebird 5+"}
+        <label className="l">{t("Parallel workers")}</label>
+        <input className="text" type="number" min={1} disabled={!f.parallel_workers} placeholder={f.parallel_workers ? "1" : t("Firebird 5+")}
           value={o.parallel_workers} onChange={(e) => set({ parallel_workers: e.target.value })} />
-        <label className="l">Skip data of tables</label>
-        <input className="text" placeholder="SIMILAR TO pattern, e.g. LOG|AUDIT_%" value={o.skip_data} onChange={(e) => set({ skip_data: e.target.value })} />
-        <label className="l">Include data of tables</label>
-        <input className="text" disabled={!f.include_data} placeholder={f.include_data ? "SIMILAR TO pattern" : "Firebird 4+"} value={o.include_data} onChange={(e) => set({ include_data: e.target.value })} />
-        <label className="l">Crypt plugin</label>
-        <input className="text" disabled={!f.crypt_backup} placeholder={f.crypt_backup ? "encrypt the backup with plugin" : "Firebird 4+"} value={o.crypt_plugin} onChange={(e) => set({ crypt_plugin: e.target.value })} />
-        <label className="l">Key holder / key name</label>
+        <label className="l">{t("Skip data of tables")}</label>
+        <input className="text" placeholder={t("SIMILAR TO pattern, e.g. LOG|AUDIT_%")} value={o.skip_data} onChange={(e) => set({ skip_data: e.target.value })} />
+        <label className="l">{t("Include data of tables")}</label>
+        <input className="text" disabled={!f.include_data} placeholder={f.include_data ? t("SIMILAR TO pattern") : t("Firebird 4+")} value={o.include_data} onChange={(e) => set({ include_data: e.target.value })} />
+        <label className="l">{t("Crypt plugin")}</label>
+        <input className="text" disabled={!f.crypt_backup} placeholder={f.crypt_backup ? t("encrypt the backup with plugin") : t("Firebird 4+")} value={o.crypt_plugin} onChange={(e) => set({ crypt_plugin: e.target.value })} />
+        <label className="l">{t("Key holder / key name")}</label>
         <div className="mt-row">
-          <input className="text" style={{ flex: 1 }} disabled={!f.crypt_backup} placeholder="key holder plugin" value={o.keyholder} onChange={(e) => set({ keyholder: e.target.value })} />
-          <input className="text" style={{ flex: 1 }} disabled={!f.crypt_backup} placeholder="key name" value={o.key_name} onChange={(e) => set({ key_name: e.target.value })} />
+          <input className="text" style={{ flex: 1 }} disabled={!f.crypt_backup} placeholder={t("key holder plugin")} value={o.keyholder} onChange={(e) => set({ keyholder: e.target.value })} />
+          <input className="text" style={{ flex: 1 }} disabled={!f.crypt_backup} placeholder={t("key name")} value={o.key_name} onChange={(e) => set({ key_name: e.target.value })} />
         </div>
       </div>
     </>
@@ -165,37 +166,37 @@ export function RestoreOptionsForm(props: { value: RestoreOpts; onChange: (v: Re
   return (
     <>
       <div className="mt-grid" style={{ marginBottom: 10 }}>
-        <Check label="Replace existing database" checked={o.replace} onChange={(v) => set({ replace: v })} />
-        <Check label="Deactivate indices" checked={o.deactivate_indexes} onChange={(v) => set({ deactivate_indexes: v })} />
-        <Check label="Skip validity constraints" checked={o.no_validity} onChange={(v) => set({ no_validity: v })} />
-        <Check label="Commit after each table" checked={o.one_at_a_time} onChange={(v) => set({ one_at_a_time: v })} />
-        <Check label="Use all page space" checked={o.use_all_space} onChange={(v) => set({ use_all_space: v })} />
-        <Check label="Metadata only" checked={o.metadata_only} onChange={(v) => set({ metadata_only: v })} />
-        <Check label="Restore as read-only" checked={o.read_only} onChange={(v) => set({ read_only: v })} />
+        <Check label={t("Replace existing database")} checked={o.replace} onChange={(v) => set({ replace: v })} />
+        <Check label={t("Deactivate indices")} checked={o.deactivate_indexes} onChange={(v) => set({ deactivate_indexes: v })} />
+        <Check label={t("Skip validity constraints")} checked={o.no_validity} onChange={(v) => set({ no_validity: v })} />
+        <Check label={t("Commit after each table")} checked={o.one_at_a_time} onChange={(v) => set({ one_at_a_time: v })} />
+        <Check label={t("Use all page space")} checked={o.use_all_space} onChange={(v) => set({ use_all_space: v })} />
+        <Check label={t("Metadata only")} checked={o.metadata_only} onChange={(v) => set({ metadata_only: v })} />
+        <Check label={t("Restore as read-only")} checked={o.read_only} onChange={(v) => set({ read_only: v })} />
       </div>
       <div className="form mform">
-        <label className="l">Page size</label>
+        <label className="l">{t("Page size")}</label>
         <select className="text" value={o.page_size} onChange={(e) => set({ page_size: e.target.value })}>
-          <option value="">(keep)</option>
+          <option value="">{t("(keep)")}</option>
           {[4096, 8192, 16384, 32768].map((p) => <option key={p} value={p}>{p}</option>)}
         </select>
-        <label className="l">Page buffers</label>
-        <input className="text" type="number" placeholder="(default)" value={o.buffers} onChange={(e) => set({ buffers: e.target.value })} />
-        <label className="l">Parallel workers</label>
-        <input className="text" type="number" min={1} disabled={!f.parallel_workers} placeholder={f.parallel_workers ? "1" : "Firebird 5+"}
+        <label className="l">{t("Page buffers")}</label>
+        <input className="text" type="number" placeholder={t("(default)")} value={o.buffers} onChange={(e) => set({ buffers: e.target.value })} />
+        <label className="l">{t("Parallel workers")}</label>
+        <input className="text" type="number" min={1} disabled={!f.parallel_workers} placeholder={f.parallel_workers ? "1" : t("Firebird 5+")}
           value={o.parallel_workers} onChange={(e) => set({ parallel_workers: e.target.value })} />
-        <label className="l">Skip data of tables</label>
-        <input className="text" placeholder="SIMILAR TO pattern" value={o.skip_data} onChange={(e) => set({ skip_data: e.target.value })} />
-        <label className="l">Include data of tables</label>
-        <input className="text" disabled={!f.include_data} placeholder={f.include_data ? "SIMILAR TO pattern" : "Firebird 4+"} value={o.include_data} onChange={(e) => set({ include_data: e.target.value })} />
-        <label className="l">Crypt plugin / key</label>
+        <label className="l">{t("Skip data of tables")}</label>
+        <input className="text" placeholder={t("SIMILAR TO pattern")} value={o.skip_data} onChange={(e) => set({ skip_data: e.target.value })} />
+        <label className="l">{t("Include data of tables")}</label>
+        <input className="text" disabled={!f.include_data} placeholder={f.include_data ? t("SIMILAR TO pattern") : t("Firebird 4+")} value={o.include_data} onChange={(e) => set({ include_data: e.target.value })} />
+        <label className="l">{t("Crypt plugin / key")}</label>
         <div className="mt-row">
-          <input className="text" style={{ flex: 1 }} disabled={!f.crypt_backup} placeholder={f.crypt_backup ? "crypt plugin" : "Firebird 4+"} value={o.crypt_plugin} onChange={(e) => set({ crypt_plugin: e.target.value })} />
-          <input className="text" style={{ flex: 1 }} disabled={!f.crypt_backup} placeholder="key holder" value={o.keyholder} onChange={(e) => set({ keyholder: e.target.value })} />
-          <input className="text" style={{ flex: 1 }} disabled={!f.crypt_backup} placeholder="key name" value={o.key_name} onChange={(e) => set({ key_name: e.target.value })} />
+          <input className="text" style={{ flex: 1 }} disabled={!f.crypt_backup} placeholder={f.crypt_backup ? t("crypt plugin") : t("Firebird 4+")} value={o.crypt_plugin} onChange={(e) => set({ crypt_plugin: e.target.value })} />
+          <input className="text" style={{ flex: 1 }} disabled={!f.crypt_backup} placeholder={t("key holder")} value={o.keyholder} onChange={(e) => set({ keyholder: e.target.value })} />
+          <input className="text" style={{ flex: 1 }} disabled={!f.crypt_backup} placeholder={t("key name")} value={o.key_name} onChange={(e) => set({ key_name: e.target.value })} />
         </div>
-        <label className="l">Fix UNICODE_FSS data</label>
-        <input className="text" placeholder="charset of the stored data, e.g. WIN1252" value={o.fix_fss_data} onChange={(e) => set({ fix_fss_data: e.target.value })} />
+        <label className="l">{t("Fix UNICODE_FSS data")}</label>
+        <input className="text" placeholder={t("charset of the stored data, e.g. WIN1252")} value={o.fix_fss_data} onChange={(e) => set({ fix_fss_data: e.target.value })} />
       </div>
     </>
   );

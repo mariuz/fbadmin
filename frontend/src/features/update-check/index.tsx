@@ -6,11 +6,12 @@
  * anonymous request to the GitHub Releases API (cached for 6 hours on the server).
  * Administrators can disable it entirely with FBADMIN_UPDATE_CHECK=off.
  */
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState, type ReactNode } from "react";
 import { request } from "../../api";
 import { useApp, type AppApi } from "../../context";
 import { Modal } from "../../components/Modal";
 import { registerTopbar } from "../../registry";
+import { t } from "../../i18n";
 
 interface LatestInfo {
   current: string;
@@ -59,6 +60,14 @@ function useLatest(): [LatestInfo | null, boolean] {
   return [info, on];
 }
 
+/** Replaces {key} placeholders in an already translated text with React nodes. */
+function rich(text: string, parts: Record<string, ReactNode>): ReactNode[] {
+  return text.split(/(\{\w+\})/).map((seg, i) => {
+    const m = /^\{(\w+)\}$/.exec(seg);
+    return m && m[1] in parts ? <Fragment key={i}>{parts[m[1]]}</Fragment> : seg;
+  });
+}
+
 function AboutDialog() {
   const app = useApp();
   const [on, setOn] = useState(optedIn);
@@ -72,26 +81,25 @@ function AboutDialog() {
   };
   const close = () => app.showDialog(null);
   return (
-    <Modal title="About fbadmin" onClose={close} footer={<button className="btn" onClick={close}>Close</button>}>
-      <p><b>fbadmin {version?.version ?? ""}</b> — web administration for Firebird.{" "}
-        <a href="https://github.com/mariuz/fbadmin" target="_blank" rel="noreferrer">Project page</a></p>
-      <p style={{ color: "var(--muted)" }}>fbadmin sends no telemetry. The optional update check below makes one
-        anonymous request to the GitHub Releases API and nothing else.</p>
+    <Modal title={t("About fbadmin")} onClose={close} footer={<button className="btn" onClick={close}>{t("Close")}</button>}>
+      <p><b>fbadmin {version?.version ?? ""}</b> — {t("web administration for Firebird.")}{" "}
+        <a href="https://github.com/mariuz/fbadmin" target="_blank" rel="noreferrer">{t("Project page")}</a></p>
+      <p style={{ color: "var(--muted)" }}>{t("fbadmin sends no telemetry. The optional update check below makes one anonymous request to the GitHub Releases API and nothing else.")}</p>
       {version && !version.update_check ? (
-        <p>The update check is disabled by the administrator.</p>
+        <p>{t("The update check is disabled by the administrator.")}</p>
       ) : (
         <>
           <label className="check">
             <input type="checkbox" checked={on} onChange={(e) => { setOn(e.target.checked); setOptIn(e.target.checked); }} />{" "}
-            Check GitHub for new releases
+            {t("Check GitHub for new releases")}
           </label>
           {on && (
             <div style={{ marginTop: 8 }}>
-              <button className="btn small" disabled={busy} onClick={check}>Check now</button>{" "}
+              <button className="btn small" disabled={busy} onClick={check}>{t("Check now")}</button>{" "}
               {info?.error && <span style={{ color: "var(--danger, #c00)" }}>{info.error}</span>}
               {info && !info.error && (info.update_available
-                ? <span>Version <b>{info.latest}</b> is available: <a href={info.url ?? "#"} target="_blank" rel="noreferrer">release notes</a></span>
-                : <span>You have the latest version ({info.latest}).</span>)}
+                ? <span>{rich(t("Version {version} is available: {link}"), { version: <b>{info.latest}</b>, link: <a href={info.url ?? "#"} target="_blank" rel="noreferrer">{t("release notes")}</a> })}</span>
+                : <span>{t("You have the latest version ({version}).", { version: String(info.latest) })}</span>)}
             </div>
           )}
         </>
@@ -104,9 +112,9 @@ function UpdateBadge(props: { app: AppApi }) {
   const [info, on] = useLatest();
   const show = on && info?.update_available;
   return (
-    <button className="tb" title={show ? `fbadmin ${info!.latest} is available` : "About fbadmin"}
+    <button className="tb" title={show ? t("fbadmin {version} is available", { version: String(info!.latest) }) : t("About fbadmin")}
       onClick={() => props.app.showDialog(<AboutDialog />)}>
-      {show ? <span className="badge">Update {info!.latest}</span> : <span style={{ fontSize: 12 }}>About</span>}
+      {show ? <span className="badge">{t("Update {version}", { version: String(info!.latest) })}</span> : <span style={{ fontSize: 12 }}>{t("About")}</span>}
     </button>
   );
 }

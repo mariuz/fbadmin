@@ -7,6 +7,7 @@ import "./maintenance.css";
 import { registerDashboardSection, registerMenu, registerTabKind, registerTopbar } from "../../registry";
 import type { AppApi } from "../../context";
 import { useApp } from "../../context";
+import { N_, t } from "../../i18n";
 import type { Selection } from "../../types";
 import { Modal } from "../../components/Modal";
 import { IconActivity, IconDownload, IconInfo, IconLog, IconUpload } from "../../components/Icons";
@@ -18,15 +19,15 @@ import { TracePanel } from "./trace";
 import { SchedulesPanel } from "./schedules";
 
 const SECTIONS = [
-  ["backup", "Backup & restore"],
-  ["nbackup", "nbackup"],
-  ["repair", "Validate & repair"],
-  ["shutdown", "Shutdown / online"],
-  ["properties", "Properties"],
-  ["gstat", "Statistics (gstat)"],
-  ["encryption", "Encryption"],
-  ["config", "Configuration"],
-  ["schedules", "Schedules"],
+  ["backup", N_("Backup & restore")],
+  ["nbackup", N_("nbackup")],
+  ["repair", N_("Validate & repair")],
+  ["shutdown", N_("Shutdown / online")],
+  ["properties", N_("Properties")],
+  ["gstat", N_("Statistics (gstat)")],
+  ["encryption", N_("Encryption")],
+  ["config", N_("Configuration")],
+  ["schedules", N_("Schedules")],
 ] as const;
 type SectionId = (typeof SECTIONS)[number][0];
 
@@ -35,15 +36,15 @@ function MaintenanceTab(props: { serverId: string; dbId: string; section?: Secti
   useEffect(() => { if (props.section) setSection(props.section); }, [props.section]);
   const app = useApp();
   const db = app.servers.find((s) => s.id === props.serverId)?.databases.find((d) => d.id === props.dbId);
-  if (!db) return <div className="pad muted">The database is no longer registered.</div>;
+  if (!db) return <div className="pad muted">{t("The database is no longer registered.")}</div>;
   const p = { serverId: props.serverId, dbId: props.dbId };
   return (
     <div className="mt">
       <div className="mt-nav">
         {SECTIONS.map(([id, label]) => (
-          <button key={id} className={section === id ? "active" : ""} onClick={() => setSection(id)}>{label}</button>
+          <button key={id} className={section === id ? "active" : ""} onClick={() => setSection(id)}>{t(label)}</button>
         ))}
-        <button onClick={() => app.openTab({ kind: "trace", title: `${app.servers.find((s) => s.id === props.serverId)?.name} · trace`, serverId: props.serverId, props: { dbId: props.dbId } })}>Trace ↗</button>
+        <button onClick={() => app.openTab({ kind: "trace", title: t("{name} · trace", { name: String(app.servers.find((s) => s.id === props.serverId)?.name) }), serverId: props.serverId, props: { dbId: props.dbId } })}>{t("Trace ↗")}</button>
       </div>
       {section === "schedules" ? <SchedulesPanel visible={props.visible} serverId={props.serverId} dbId={props.dbId} /> : (
         <div className="mt-body">
@@ -64,13 +65,13 @@ function MaintenanceTab(props: { serverId: string; dbId: string; section?: Secti
 
 function openMaintenance(app: AppApi, sid: string, dbid: string, section: SectionId) {
   const db = app.servers.find((s) => s.id === sid)?.databases.find((d) => d.id === dbid);
-  app.openTab({ kind: "maintenance", title: `${db?.name ?? "db"} · maintenance`, serverId: sid, dbId: dbid, props: { section, nonce: Date.now() } });
+  app.openTab({ kind: "maintenance", title: t("{name} · maintenance", { name: db?.name ?? "db" }), serverId: sid, dbId: dbid, props: { section, nonce: Date.now() } });
 }
 
 function RestoreDialog(props: { serverId: string }) {
   const app = useApp();
   return (
-    <Modal title={`Restore on ${app.servers.find((s) => s.id === props.serverId)?.name}`} wide onClose={() => app.showDialog(null)}>
+    <Modal title={t("Restore on {name}", { name: String(app.servers.find((s) => s.id === props.serverId)?.name) })} wide onClose={() => app.showDialog(null)}>
       <RestorePanel serverId={props.serverId} onClose={() => app.showDialog(null)} />
     </Modal>
   );
@@ -94,7 +95,7 @@ registerTabKind("schedules", {
 
 registerTopbar({
   id: "schedules",
-  render: (app) => <button className="tb" onClick={() => app.openTab({ kind: "schedules", title: "Schedules" })}>⏱ Schedules</button>,
+  render: (app) => <button className="tb" onClick={() => app.openTab({ kind: "schedules", title: t("Schedules") })}>⏱ {t("Schedules")}</button>,
 });
 
 registerMenu((app: AppApi, sel: Selection) => {
@@ -102,27 +103,27 @@ registerMenu((app: AppApi, sel: Selection) => {
   if (!srv) return [];
   if (sel.kind === "server") {
     return [
-      { header: "Server tools" },
-      { label: "Upload & restore backup…", icon: <IconUpload />, onClick: () => app.showDialog(<RestoreDialog serverId={srv.id} />) },
-      { label: "Trace sessions", icon: <IconLog />, onClick: () => app.openTab({ kind: "trace", title: `${srv.name} · trace`, serverId: srv.id }) },
-      { label: "Scheduled jobs", icon: <IconActivity />, onClick: () => app.openTab({ kind: "schedules", title: "Schedules" }) },
+      { header: t("Server tools") },
+      { label: t("Upload & restore backup…"), icon: <IconUpload />, onClick: () => app.showDialog(<RestoreDialog serverId={srv.id} />) },
+      { label: t("Trace sessions"), icon: <IconLog />, onClick: () => app.openTab({ kind: "trace", title: t("{name} · trace", { name: srv.name }), serverId: srv.id }) },
+      { label: t("Scheduled jobs"), icon: <IconActivity />, onClick: () => app.openTab({ kind: "schedules", title: t("Schedules") }) },
     ];
   }
   if (sel.kind !== "database") return [];
   const dbid = sel.dbId!;
   const m = (section: SectionId) => () => openMaintenance(app, srv.id, dbid, section);
   return [
-    { header: "Maintenance tools" },
-    { label: "Backup & download / restore…", icon: <IconDownload />, onClick: m("backup") },
-    { label: "nbackup…", onClick: m("nbackup") },
-    { label: "Validate, sweep & limbo…", onClick: m("repair") },
-    { label: "Shutdown / bring online…", onClick: m("shutdown") },
-    { label: "Database properties…", onClick: m("properties") },
-    { label: "Statistics charts (gstat)", onClick: m("gstat") },
-    { label: "Encryption…", onClick: m("encryption") },
-    { label: "Configuration (RDB$CONFIG)", onClick: m("config") },
-    { label: "Schedule backups / sweeps…", onClick: m("schedules") },
-    { label: "Trace…", icon: <IconLog />, onClick: () => app.openTab({ kind: "trace", title: `${srv.name} · trace`, serverId: srv.id, props: { dbId: dbid } }) },
+    { header: t("Maintenance tools") },
+    { label: t("Backup & download / restore…"), icon: <IconDownload />, onClick: m("backup") },
+    { label: t("nbackup…"), onClick: m("nbackup") },
+    { label: t("Validate, sweep & limbo…"), onClick: m("repair") },
+    { label: t("Shutdown / bring online…"), onClick: m("shutdown") },
+    { label: t("Database properties…"), onClick: m("properties") },
+    { label: t("Statistics charts (gstat)"), onClick: m("gstat") },
+    { label: t("Encryption…"), onClick: m("encryption") },
+    { label: t("Configuration (RDB$CONFIG)"), onClick: m("config") },
+    { label: t("Schedule backups / sweeps…"), onClick: m("schedules") },
+    { label: t("Trace…"), icon: <IconLog />, onClick: () => app.openTab({ kind: "trace", title: t("{name} · trace", { name: srv.name }), serverId: srv.id, props: { dbId: dbid } }) },
   ];
 });
 
@@ -139,17 +140,17 @@ function DashboardMaintenance(props: { sel: Selection }) {
   const go = (s: SectionId) => () => openMaintenance(app, serverId, dbId!, s);
   return (
     <>
-      <h3>Maintenance</h3>
+      <h3>{t("Maintenance")}</h3>
       <div className="mt-row" style={{ marginBottom: 8 }}>
-        {err ? <span className="muted">{err}</span> : state ? <StatePills state={state} /> : <span className="muted">Loading state…</span>}
+        {err ? <span className="muted">{err}</span> : state ? <StatePills state={state} /> : <span className="muted">{t("Loading state…")}</span>}
       </div>
       <div className="mt-row">
-        <button className="btn" onClick={go("backup")}><IconDownload /> Backup / restore</button>
-        <button className="btn" onClick={go("gstat")}>Statistics charts</button>
-        <button className="btn" onClick={go("repair")}>Validate & sweep</button>
-        <button className="btn" onClick={go("shutdown")}>Shutdown / online</button>
-        <button className="btn" onClick={go("properties")}>Properties</button>
-        <button className="btn" onClick={go("schedules")}>Schedules</button>
+        <button className="btn" onClick={go("backup")}><IconDownload /> {t("Backup / restore")}</button>
+        <button className="btn" onClick={go("gstat")}>{t("Statistics charts")}</button>
+        <button className="btn" onClick={go("repair")}>{t("Validate & sweep")}</button>
+        <button className="btn" onClick={go("shutdown")}>{t("Shutdown / online")}</button>
+        <button className="btn" onClick={go("properties")}>{t("Properties")}</button>
+        <button className="btn" onClick={go("schedules")}>{t("Schedules")}</button>
       </div>
     </>
   );

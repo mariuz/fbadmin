@@ -1,4 +1,5 @@
 import { ApiError, request } from "../../api";
+import { t } from "../../i18n";
 import type { Job } from "../../types";
 
 const srv = (sid: string) => `/api/servers/${sid}`;
@@ -149,7 +150,7 @@ export function uploadRestore(
       if (xhr.status >= 200 && xhr.status < 300) resolve(data as Job);
       else reject(new ApiError(xhr.status, typeof data.detail === "string" ? data.detail : xhr.statusText, data.code));
     };
-    xhr.onerror = () => reject(new Error("Upload failed"));
+    xhr.onerror = () => reject(new Error(t("Upload failed")));
     xhr.send(file);
   });
 }
