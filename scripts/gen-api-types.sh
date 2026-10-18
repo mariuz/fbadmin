@@ -15,7 +15,7 @@ tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
 # Import the app from this checkout (not an installed copy) without touching ~/.fbadmin.
-(cd "$root/backend" && FBADMIN_DATA_DIR="$tmp/data" "$PY" -c '
+(cd "$root/backend" && FBADMIN_PLUGINS=off FBADMIN_DATA_DIR="$tmp/data" "$PY" -c '
 import json, sys
 from fbadmin.app import create_app
 json.dump(create_app().openapi(), sys.stdout, indent=1, sort_keys=True)

@@ -16,6 +16,7 @@ A frontend module exports ``default function (fbadmin) {...}`` and receives the 
 from __future__ import annotations
 
 import logging
+import os
 from importlib.metadata import entry_points
 from pathlib import Path
 
@@ -31,8 +32,16 @@ def _entry_points():
     return entry_points(group="fbadmin.plugins")
 
 
+def plugins_disabled() -> bool:
+    """``FBADMIN_PLUGINS=off``: load no plugins (safe mode; also used to generate the API types)."""
+    return os.environ.get("FBADMIN_PLUGINS", "").lower() in ("off", "0", "false", "no", "none")
+
+
 def load_plugins(app: FastAPI) -> list[dict]:
     loaded: list[dict] = []
+    if plugins_disabled():
+        log.info("plugins disabled (FBADMIN_PLUGINS=off)")
+        return loaded
     for ep in _entry_points():
         info: dict = {"name": ep.name, "source": "package", "frontend": None}
         try:

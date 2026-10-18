@@ -66,7 +66,16 @@ objectClass: groupOfNames
 cn: fbadmins
 member: uid=alice,ou=people,dc=example,dc=org
 LDIF
-"$SLAPD" -f "$dir/slapd.conf" -h "ldap://127.0.0.1:$PORT/"
-for _ in $(seq 1 30); do (echo >/dev/tcp/127.0.0.1/"$PORT") 2>/dev/null && break; sleep 0.2; done
+"$SLAPD" -f "$dir/slapd.conf" -h "ldap://127.0.0.1:$PORT/" || true
+up=0
+for _ in $(seq 1 50); do (echo >/dev/tcp/127.0.0.1/"$PORT") 2>/dev/null && up=1 && break; sleep 0.2; done
+if [ "$up" != 1 ]; then
+  # On Ubuntu an AppArmor profile confines slapd to /etc/ldap and /var/lib/ldap: unload it
+  # (sudo apparmor_parser -R /etc/apparmor.d/usr.sbin.slapd) or set LDAP_DIR below /var/lib/ldap.
+  echo "slapd did not start; configuration test and debug output:" >&2
+  "$SLAPD" -T test -f "$dir/slapd.conf" >&2 || true
+  timeout 3 "$SLAPD" -d 256 -f "$dir/slapd.conf" -h "ldap://127.0.0.1:$PORT/" >&2 || true
+  exit 1
+fi
 ldapadd -x -H "ldap://127.0.0.1:$PORT" -D cn=admin,dc=example,dc=org -w adminpw -f "$dir/seed.ldif" >/dev/null
 echo "slapd on ldap://127.0.0.1:$PORT (dc=example,dc=org)"

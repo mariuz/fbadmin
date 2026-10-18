@@ -29,6 +29,7 @@ fbadmin-desktop [--port PORT] [--browser] [--log-level LEVEL]
 | `FBADMIN_FBCLIENT` | | Path of `libfbclient` for the native driver |
 | `FBADMIN_UPDATE_CHECK` | `ask` | `off` forbids the opt-in update check (see [Privacy](../PRIVACY.md)) |
 | `FBADMIN_SERVERS_FILE` | unset | YAML/JSON file of Firebird servers to register at startup; see [Deployment](deployment.md#preconfigured-servers) |
+| `FBADMIN_PLUGINS` | on | `off` loads no plugins: a safe mode for troubleshooting, also used when generating the API types |
 
 ## Logging
 

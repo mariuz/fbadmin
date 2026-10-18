@@ -66,6 +66,8 @@ jobs:
         run: |
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends slapd ldap-utils
           sudo systemctl stop slapd || true
+          # Ubuntu's AppArmor profile keeps slapd out of the temporary directory used below
+          sudo apparmor_parser -R /etc/apparmor.d/usr.sbin.slapd 2>/dev/null || true
           scripts/ldap-test-server.sh
       - name: Dex OpenID Connect provider (port 5556)
         run: scripts/oidc-test-server.sh

@@ -25,6 +25,10 @@ A plugin that fails to import is reported in `GET /api/plugins` with an `error` 
 
 The AI assistant has its own extension point: providers in the `fbadmin.ai_providers` entry point group (see QUERY_TOOL.md).
 
+### Disabling plugins
+
+Start fbadmin with `FBADMIN_PLUGINS=off` to load no plugins. Use it as a safe mode when a plugin breaks the app.
+
 ## Frontend plugins (JavaScript)
 
 There are two ways to add one:
