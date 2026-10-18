@@ -3,10 +3,14 @@
 from fastapi import APIRouter
 
 from . import databases, jobs, query, servers
+from . import maintenance, schedules, trace
 
 ROUTERS: list[APIRouter] = [
     servers.router,
     databases.router,
     query.router,
     jobs.router,
+    maintenance.router,
+    trace.router,
+    schedules.router,
 ]
