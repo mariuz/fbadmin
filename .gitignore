@@ -12,3 +12,4 @@ backend/fbadmin/static/
 .env
 build/
 .claude/worktrees/
+*.tsbuildinfo
