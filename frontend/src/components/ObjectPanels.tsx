@@ -173,6 +173,7 @@ export function Dashboard(props: { sel: Selection | null }) {
     );
   }
   if (error) return <div className="pad err" style={{ whiteSpace: "pre-wrap" }}>{error}</div>;
+  // data may still belong to the previous selection on the first render after a change
   if (!data || data.__scope !== scope) return <div className="pad muted">Loading…</div>;
 
   if (sel.kind === "server") {

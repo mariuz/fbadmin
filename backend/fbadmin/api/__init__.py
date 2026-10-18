@@ -10,6 +10,9 @@ from . import query
 from . import schedules
 from . import servers
 from . import trace
+from . import metrics
+from . import monitoring
+from . import replication
 
 ROUTERS: list[APIRouter] = [
     servers.router,
@@ -20,4 +23,9 @@ ROUTERS: list[APIRouter] = [
     maintenance.router,
     trace.router,
     schedules.router,
+    monitoring.router,
+    monitoring.settings_router,
+    metrics.router,
+    replication.router,
+    replication.conf_router,
 ]
