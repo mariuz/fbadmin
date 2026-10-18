@@ -6,10 +6,11 @@ import { IconCopy, IconDownload, IconPlay, IconSpinner, IconTerminal, IconUpload
 import { typeInfo } from "../../types";
 import { saveBlob, schemaApi, type DiffItem, type DiffResult, type DiffSide } from "./api";
 import { DbPicker, SideBySide } from "./common";
+import { N_, t } from "../../i18n";
 
 type SideState = { mode: "db" | "sql"; server_id: string; db_id: string; sql: string; file: string };
 
-const STATUS_LABEL: Record<string, string> = { create: "Only in source", alter: "Different", drop: "Only in target" };
+const STATUS_LABEL: Record<string, string> = { create: N_("Only in source"), alter: N_("Different"), drop: N_("Only in target") };
 
 function SidePicker(props: { title: string; value: SideState; onChange: (v: SideState) => void; allowSql: boolean }) {
   const v = props.value;
@@ -22,18 +23,18 @@ function SidePicker(props: { title: string; value: SideState; onChange: (v: Side
       <div className="sch-side-title">{props.title}</div>
       {props.allowSql && (
         <div className="seg" style={{ marginBottom: 6 }}>
-          <button className={v.mode === "db" ? "on" : ""} onClick={() => props.onChange({ ...v, mode: "db" })}>Database</button>
-          <button className={v.mode === "sql" ? "on" : ""} onClick={() => props.onChange({ ...v, mode: "sql" })}>DDL script</button>
+          <button className={v.mode === "db" ? "on" : ""} onClick={() => props.onChange({ ...v, mode: "db" })}>{t("Database")}</button>
+          <button className={v.mode === "sql" ? "on" : ""} onClick={() => props.onChange({ ...v, mode: "sql" })}>{t("DDL script")}</button>
         </div>
       )}
       {v.mode === "db" ? (
         <DbPicker value={v} onChange={(x) => props.onChange({ ...v, ...x })} />
       ) : (
         <div className="sch-ddl-input">
-          <label className="btn small"><IconUpload /> {v.file || "Choose .sql file…"}
+          <label className="btn small"><IconUpload /> {v.file || t("Choose .sql file…")}
             <input type="file" accept=".sql,.ddl,.txt" style={{ display: "none" }} onChange={(e) => readFile(e.target.files?.[0])} />
           </label>
-          <textarea className="text" placeholder="…or paste a DDL script. It is run in a temporary database on the server of the other side."
+          <textarea className="text" placeholder={t("…or paste a DDL script. It is run in a temporary database on the server of the other side.")}
             value={v.sql} onChange={(e) => props.onChange({ ...v, sql: e.target.value, file: "" })} />
         </div>
       )}
@@ -83,12 +84,12 @@ export function DiffTab({ tab }: { tab: WorkTab }) {
   return (
     <div className="sch-col">
       <div className="sch-diff-head">
-        <SidePicker title="Source (desired schema)" value={source} onChange={setSource} allowSql />
+        <SidePicker title={t("Source (desired schema)")} value={source} onChange={setSource} allowSql />
         <div className="sch-arrow">→</div>
-        <SidePicker title="Target (database to update)" value={target} onChange={setTarget} allowSql />
+        <SidePicker title={t("Target (database to update)")} value={target} onChange={setTarget} allowSql />
         <div className="sch-diff-actions">
-          <label className="check"><input type="checkbox" checked={setTerm} onChange={(e) => setSetTerm(e.target.checked)} /> SET TERM in script</label>
-          <button className="btn primary" disabled={busy || !canRun} onClick={run}>{busy ? <IconSpinner /> : <IconPlay />} Compare</button>
+          <label className="check"><input type="checkbox" checked={setTerm} onChange={(e) => setSetTerm(e.target.checked)} /> {t("SET TERM in script")}</label>
+          <button className="btn primary" disabled={busy || !canRun} onClick={run}>{busy ? <IconSpinner /> : <IconPlay />} {t("Compare")}</button>
         </div>
       </div>
       {error && <div className="pad err">{error}</div>}
@@ -96,27 +97,27 @@ export function DiffTab({ tab }: { tab: WorkTab }) {
         <>
           <div className="toolbar">
             <div className="seg">
-              <button className={view === "objects" ? "on" : ""} onClick={() => setView("objects")}>Differences ({res.items.length})</button>
-              <button className={view === "script" ? "on" : ""} onClick={() => setView("script")}>Migration script</button>
+              <button className={view === "objects" ? "on" : ""} onClick={() => setView("objects")}>{t("Differences ({n})", { n: res.items.length })}</button>
+              <button className={view === "script" ? "on" : ""} onClick={() => setView("script")}>{t("Migration script")}</button>
             </div>
             {(["create", "alter", "drop"] as const).map((k) => (
               <label key={k} className={"sch-status " + k}>
                 <input type="checkbox" checked={filter[k]} onChange={(e) => setFilter({ ...filter, [k]: e.target.checked })} />
-                {STATUS_LABEL[k]} <b>{res.summary[k] ?? 0}</b>
+                {t(STATUS_LABEL[k])} <b>{res.summary[k] ?? 0}</b>
               </label>
             ))}
             <span className="grow" />
-            <button className="btn" onClick={() => saveBlob(new Blob([res.script], { type: "application/sql" }), "migration.sql")}><IconDownload /> Download</button>
-            <button className="btn" onClick={() => { navigator.clipboard?.writeText(res.script); app.toast("Script copied", "info"); }}><IconCopy /> Copy</button>
-            <button className="btn" disabled={!targetIsDb} title={targetIsDb ? "Review and run the script on the target" : "The target is a DDL script"}
-              onClick={() => app.openQueryTool(target.server_id, target.db_id, res.script)}><IconTerminal /> Open in Query Tool (target)</button>
+            <button className="btn" onClick={() => saveBlob(new Blob([res.script], { type: "application/sql" }), "migration.sql")}><IconDownload /> {t("Download")}</button>
+            <button className="btn" onClick={() => { navigator.clipboard?.writeText(res.script); app.toast(t("Script copied"), "info"); }}><IconCopy /> {t("Copy")}</button>
+            <button className="btn" disabled={!targetIsDb} title={targetIsDb ? t("Review and run the script on the target") : t("The target is a DDL script")}
+              onClick={() => app.openQueryTool(target.server_id, target.db_id, res.script)}><IconTerminal /> {t("Open in Query Tool (target)")}</button>
           </div>
           {res.warnings.length > 0 && <div className="sch-warnings">{res.warnings.map((w, i) => <div key={i}>⚠ {w}</div>)}</div>}
           {view === "script" ? (
             <div className="sch-fill"><SqlEditor value={res.script} readOnly /></div>
           ) : res.items.length === 0 ? (
-            <div className="empty-state"><div className="big">The schemas are identical</div>
-              <div>{res.source_name} and {res.target_name} have the same objects.</div></div>
+            <div className="empty-state"><div className="big">{t("The schemas are identical")}</div>
+              <div>{t("{source} and {target} have the same objects.", { source: res.source_name, target: res.target_name })}</div></div>
           ) : (
             <div className="sch-split">
               <div className="sch-list">
@@ -136,11 +137,11 @@ export function DiffTab({ tab }: { tab: WorkTab }) {
                 {sel ? (
                   <>
                     <div className="sch-detail-title"><b>{typeInfo(sel.type)?.singular ?? sel.type} {sel.name}</b>
-                      <span className={"sch-status " + sel.status}>{STATUS_LABEL[sel.status]}</span></div>
+                      <span className={"sch-status " + sel.status}>{t(STATUS_LABEL[sel.status])}</span></div>
                     <SideBySide left={sel.source_ddl} right={sel.target_ddl}
-                      leftTitle={`Source: ${res.source_name}`} rightTitle={`Target: ${res.target_name}`} />
+                      leftTitle={t("Source: {name}", { name: res.source_name })} rightTitle={t("Target: {name}", { name: res.target_name })} />
                   </>
-                ) : <div className="empty-state">Select an object</div>}
+                ) : <div className="empty-state">{t("Select an object")}</div>}
               </div>
             </div>
           )}
@@ -148,8 +149,8 @@ export function DiffTab({ tab }: { tab: WorkTab }) {
       )}
       {!res && !error && (
         <div className="empty-state">
-          <div className="big">Schema diff</div>
-          <div>Compare two databases, or a database and a DDL script, and get a migration script<br />that makes the target match the source.</div>
+          <div className="big">{t("Schema diff")}</div>
+          <div>{t("Compare two databases, or a database and a DDL script, and get a migration script")}<br />{t("that makes the target match the source.")}</div>
         </div>
       )}
     </div>

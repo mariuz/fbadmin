@@ -6,8 +6,9 @@ import { SqlEditor } from "../../components/SqlEditor";
 import { IconColumn, IconSpinner, IconTable, IconTerminal, TYPE_ICONS } from "../../components/Icons";
 import { OBJECT_TYPES, typeInfo, type Selection } from "../../types";
 import { schemaApi, type SearchItem } from "./api";
+import { N_, t } from "../../i18n";
 
-const SCOPES: Array<[string, string]> = [["name", "Name"], ["comment", "Comment"], ["source", "PSQL / view source"]];
+const SCOPES: Array<[string, string]> = [["name", N_("Name")], ["comment", N_("Comment")], ["source", N_("PSQL / view source")]];
 const TYPES = ["tables", "views", "columns", "procedures", "functions", "packages", "triggers", "sequences", "domains", "exceptions", "indices", "roles"];
 
 function selectionFor(sid: string, dbid: string, it: SearchItem): Selection {
@@ -51,7 +52,7 @@ export function SearchTab({ tab }: { tab: WorkTab }) {
     setCurrent(it);
     const sel = selectionFor(sid, dbid, it);
     app.select(sel);
-    setDdl("-- loading…");
+    setDdl(t("-- loading…"));
     try {
       setDdl((await api.object(sid, dbid, sel.otype!, sel.name!)).ddl);
     } catch (e) {
@@ -67,36 +68,36 @@ export function SearchTab({ tab }: { tab: WorkTab }) {
   return (
     <div className="sch-col">
       <div className="toolbar">
-        <input ref={input} className="text" style={{ width: 280 }} placeholder="Search objects…" value={q}
+        <input ref={input} className="text" style={{ width: 280 }} placeholder={t("Search objects…")} value={q}
           onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === "Enter" && run()} />
-        <button className="btn primary" onClick={run} disabled={busy || !q.trim()}>{busy ? <IconSpinner /> : null} Search</button>
+        <button className="btn primary" onClick={run} disabled={busy || !q.trim()}>{busy ? <IconSpinner /> : null} {t("Search")}</button>
         {SCOPES.map(([k, label]) => (
           <label key={k}><input type="checkbox" checked={scopes.includes(k)}
-            onChange={(e) => setScopes(e.target.checked ? [...scopes, k] : scopes.filter((s) => s !== k))} /> {label}</label>
+            onChange={(e) => setScopes(e.target.checked ? [...scopes, k] : scopes.filter((s) => s !== k))} /> {t(label)}</label>
         ))}
         <select className="text" value={type} onChange={(e) => setType(e.target.value)}>
-          <option value="">All types</option>
-          {TYPES.map((t) => <option key={t} value={t}>{typeInfo(t)?.label ?? "Columns"}</option>)}
+          <option value="">{t("All types")}</option>
+          {TYPES.map((ty) => <option key={ty} value={ty}>{typeInfo(ty)?.label ?? t("Columns")}</option>)}
         </select>
         <span className="grow" />
-        {items && <span className="muted">{items.length}{truncated ? "+" : ""} result(s)</span>}
+        {items && <span className="muted">{t("{n} result(s)", { n: items.length + (truncated ? "+" : "") })}</span>}
       </div>
       {error && <div className="pad err">{error}</div>}
       <div className="sch-split">
         <div className="sch-results">
-          {items === null ? <div className="empty-state"><div className="big">Search objects</div><div>by name, comment or PSQL / view source</div></div>
-            : items.length === 0 ? <div className="empty-state">No objects found.</div> : (
+          {items === null ? <div className="empty-state"><div className="big">{t("Search objects")}</div><div>{t("by name, comment or PSQL / view source")}</div></div>
+            : items.length === 0 ? <div className="empty-state">{t("No objects found.")}</div> : (
               <table className="grid sch-search-grid">
-                <thead><tr><th>Type</th><th>Name</th><th>Parent</th><th>Found in</th><th>Match</th></tr></thead>
+                <thead><tr><th>{t("Type")}</th><th>{t("Name")}</th><th>{t("Parent")}</th><th>{t("Found in")}</th><th>{t("Match")}</th></tr></thead>
                 <tbody>
                   {items.map((it, i) => {
                     const Icon = it.type === "columns" ? IconColumn : TYPE_ICONS[it.type] ?? IconTable;
                     return (
-                      <tr key={i} className={current === it ? "sel" : ""} onClick={() => open(it)} title="Select in the object explorer">
-                        <td><Icon size={13} /> {OBJECT_TYPES.find((t) => t.type === it.type)?.singular ?? "Column"}</td>
+                      <tr key={i} className={current === it ? "sel" : ""} onClick={() => open(it)} title={t("Select in the object explorer")}>
+                        <td><Icon size={13} /> {OBJECT_TYPES.find((ot) => ot.type === it.type)?.singular ?? t("Column")}</td>
                         <td><a href="#" onClick={(e) => e.preventDefault()}>{it.match === "name" ? highlight(it.name) : it.name}</a></td>
                         <td>{it.parent ?? it.package ?? ""}</td>
-                        <td>{it.match}{it.line ? ` (line ${it.line})` : ""}</td>
+                        <td>{it.match}{it.line ? " " + t("(line {n})", { n: it.line }) : ""}</td>
                         <td className="sch-snippet">{it.snippet ? highlight(it.snippet) : ""}</td>
                       </tr>
                     );
@@ -110,7 +111,7 @@ export function SearchTab({ tab }: { tab: WorkTab }) {
             <div className="toolbar">
               <b>{current.package ?? (current.type === "columns" ? current.parent : current.name)}</b>
               <span className="grow" />
-              <button className="btn" onClick={() => app.openQueryTool(sid, dbid, ddl)}><IconTerminal /> Open in Query Tool</button>
+              <button className="btn" onClick={() => app.openQueryTool(sid, dbid, ddl)}><IconTerminal /> {t("Open in Query Tool")}</button>
             </div>
             <div className="sch-fill"><SqlEditor value={ddl} readOnly /></div>
           </div>

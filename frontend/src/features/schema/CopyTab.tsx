@@ -5,6 +5,7 @@ import type { WorkTab } from "../../context";
 import { IconPlay, IconSpinner } from "../../components/Icons";
 import { schemaApi } from "./api";
 import { DbPicker, JobStatus, useJob } from "./common";
+import { t } from "../../i18n";
 
 export function CopyTab({ tab }: { tab: WorkTab }) {
   const app = useApp();
@@ -43,20 +44,19 @@ export function CopyTab({ tab }: { tab: WorkTab }) {
     <div className="sch-col sch-scroll">
       <div className="sch-steps">
         <section>
-          <h3>Copy data between databases</h3>
+          <h3>{t("Copy data between databases")}</h3>
           <div className="sch-row">
-            <DbPicker label="From" value={source} onChange={setSource} />
+            <DbPicker label={t("From")} value={source} onChange={setSource} />
             <span className="sch-arrow">→</span>
-            <DbPicker label="To" value={target} onChange={setTarget} />
+            <DbPicker label={t("To")} value={target} onChange={setTarget} />
           </div>
-          <p className="muted">The databases can be on different servers. Tables are copied parents first (by foreign keys), in batches committed
-            as they go; progress is shown in Processes.</p>
+          <p className="muted">{t("The databases can be on different servers. Tables are copied parents first (by foreign keys), in batches committed as they go; progress is shown in Processes.")}</p>
         </section>
         <section>
-          <h3>Tables <span className="muted">{chosen.length} of {tables.length}</span></h3>
+          <h3>{t("Tables")} <span className="muted">{t("{n} of {total}", { n: chosen.length, total: tables.length })}</span></h3>
           <div className="sch-row">
-            <button className="btn small" onClick={() => setTables(tables.map((t) => ({ ...t, checked: true })))}>All</button>
-            <button className="btn small" onClick={() => setTables(tables.map((t) => ({ ...t, checked: false })))}>None</button>
+            <button className="btn small" onClick={() => setTables(tables.map((t) => ({ ...t, checked: true })))}>{t("All")}</button>
+            <button className="btn small" onClick={() => setTables(tables.map((t) => ({ ...t, checked: false })))}>{t("None")}</button>
           </div>
           <div className="sch-checklist">
             {tables.map((t, i) => (
@@ -66,16 +66,16 @@ export function CopyTab({ tab }: { tab: WorkTab }) {
           </div>
         </section>
         <section>
-          <h3>Options</h3>
+          <h3>{t("Options")}</h3>
           <div className="sch-row">
-            <label><input type="checkbox" checked={create} onChange={(e) => setCreate(e.target.checked)} /> Create missing tables (with keys, domains, indices and foreign keys)</label>
-            <label><input type="checkbox" checked={truncate} onChange={(e) => setTruncate(e.target.checked)} /> Delete existing rows in the target first</label>
-            <label>Batch size <input className="text" type="number" min={1} style={{ width: 90 }} value={batch} onChange={(e) => setBatch(Number(e.target.value) || 1000)} /></label>
+            <label><input type="checkbox" checked={create} onChange={(e) => setCreate(e.target.checked)} /> {t("Create missing tables (with keys, domains, indices and foreign keys)")}</label>
+            <label><input type="checkbox" checked={truncate} onChange={(e) => setTruncate(e.target.checked)} /> {t("Delete existing rows in the target first")}</label>
+            <label>{t("Batch size")} <input className="text" type="number" min={1} style={{ width: 90 }} value={batch} onChange={(e) => setBatch(Number(e.target.value) || 1000)} /></label>
           </div>
           <div className="sch-row">
             <button className="btn primary" disabled={!chosen.length || !target.db_id || same || job.running} onClick={start}>
-              {job.running ? <IconSpinner /> : <IconPlay />} Copy {chosen.length} table(s)</button>
-            {same && <span className="err">Source and target are the same database</span>}
+              {job.running ? <IconSpinner /> : <IconPlay />} {t("Copy {n} table(s)", { n: chosen.length })}</button>
+            {same && <span className="err">{t("Source and target are the same database")}</span>}
             {error && <span className="err">{error}</span>}
           </div>
           <JobStatus result={job.result} log={job.log} />

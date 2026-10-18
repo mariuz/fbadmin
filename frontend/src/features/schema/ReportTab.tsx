@@ -3,6 +3,7 @@ import { errMsg, useApp } from "../../context";
 import type { WorkTab } from "../../context";
 import { IconRefresh, IconSpinner } from "../../components/Icons";
 import { schemaApi, type ReportSection } from "./api";
+import { t } from "../../i18n";
 
 export function ReportTab({ tab }: { tab: WorkTab }) {
   const app = useApp();
@@ -28,8 +29,8 @@ export function ReportTab({ tab }: { tab: WorkTab }) {
   return (
     <div className="sch-col sch-scroll">
       <div className="toolbar">
-        <button className="btn" onClick={load} disabled={busy}>{busy ? <IconSpinner /> : <IconRefresh />} Refresh</button>
-        <span className="muted">{secs ? (total ? `${total} finding(s)` : "Nothing to report") : ""}</span>
+        <button className="btn" onClick={load} disabled={busy}>{busy ? <IconSpinner /> : <IconRefresh />} {t("Refresh")}</button>
+        <span className="muted">{secs ? (total ? t("{n} finding(s)", { n: total }) : t("Nothing to report")) : ""}</span>
       </div>
       {error && <div className="pad err">{error}</div>}
       <div className="sch-report">

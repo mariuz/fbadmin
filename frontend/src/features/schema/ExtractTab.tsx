@@ -4,12 +4,13 @@ import type { WorkTab } from "../../context";
 import { SqlEditor } from "../../components/SqlEditor";
 import { IconCopy, IconDownload, IconPlay, IconSpinner, IconTerminal } from "../../components/Icons";
 import { saveUrl, schemaApi } from "./api";
+import { N_, t } from "../../i18n";
 
 const OPTIONS: Array<[string, string]> = [
-  ["set_term", "SET TERM around PSQL"],
-  ["grants", "Grants"],
-  ["comments", "Comments"],
-  ["sequence_values", "Sequence values"],
+  ["set_term", N_("SET TERM around PSQL")],
+  ["grants", N_("Grants")],
+  ["comments", N_("Comments")],
+  ["sequence_values", N_("Sequence values")],
 ];
 
 export function ExtractTab({ tab }: { tab: WorkTab }) {
@@ -37,22 +38,21 @@ export function ExtractTab({ tab }: { tab: WorkTab }) {
   return (
     <div className="sch-col">
       <div className="toolbar">
-        <button className="btn primary" onClick={run} disabled={busy}>{busy ? <IconSpinner /> : <IconPlay />} Extract</button>
+        <button className="btn primary" onClick={run} disabled={busy}>{busy ? <IconSpinner /> : <IconPlay />} {t("Extract")}</button>
         {OPTIONS.map(([k, label]) => (
-          <label key={k}><input type="checkbox" checked={opts[k]} onChange={(e) => setOpts({ ...opts, [k]: e.target.checked })} /> {label}</label>
+          <label key={k}><input type="checkbox" checked={opts[k]} onChange={(e) => setOpts({ ...opts, [k]: e.target.checked })} /> {t(label)}</label>
         ))}
         <span className="grow" />
-        <button className="btn" disabled={!sql} onClick={() => saveUrl(schemaApi.extractUrl(sid, dbid, opts))}><IconDownload /> Download .sql</button>
-        <button className="btn" disabled={!sql} onClick={() => { navigator.clipboard?.writeText(sql); app.toast("Script copied", "info"); }}><IconCopy /> Copy</button>
-        <button className="btn" disabled={!sql} onClick={() => app.openQueryTool(sid, dbid, sql)}><IconTerminal /> Open in Query Tool</button>
+        <button className="btn" disabled={!sql} onClick={() => saveUrl(schemaApi.extractUrl(sid, dbid, opts))}><IconDownload /> {t("Download .sql")}</button>
+        <button className="btn" disabled={!sql} onClick={() => { navigator.clipboard?.writeText(sql); app.toast(t("Script copied"), "info"); }}><IconCopy /> {t("Copy")}</button>
+        <button className="btn" disabled={!sql} onClick={() => app.openQueryTool(sid, dbid, sql)}><IconTerminal /> {t("Open in Query Tool")}</button>
       </div>
       {error && <div className="pad err">{error}</div>}
       <div className="sch-hint muted">
-        Objects in dependency order like <code>isql -x</code>: domains, sequences, exceptions, tables, keys, PSQL headers
-        with empty bodies, views, PSQL bodies, checks, indices, triggers, grants and comments.
-        {sql && <> · {sql.split("\n").length.toLocaleString()} lines, ~{stmts.toLocaleString()} statements</>}
+        {t("Objects in dependency order like")} <code>isql -x</code>{t(": domains, sequences, exceptions, tables, keys, PSQL headers with empty bodies, views, PSQL bodies, checks, indices, triggers, grants and comments.")}
+        {sql && <> · {t("{lines} lines, ~{n} statements", { lines: sql.split("\n").length.toLocaleString(), n: stmts.toLocaleString() })}</>}
       </div>
-      <div className="sch-fill"><SqlEditor value={sql || (busy ? "-- extracting…" : "")} readOnly /></div>
+      <div className="sch-fill"><SqlEditor value={sql || (busy ? t("-- extracting…") : "")} readOnly /></div>
     </div>
   );
 }
