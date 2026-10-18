@@ -6,6 +6,7 @@ import {
   Area, Check, CollationSelect, DependentsNote, Field, ObjectDialog, Select, Text, TypePicker, parseType,
   useDependents, useLookups, useSpec,
 } from "./common";
+import { t } from "../../i18n";
 
 interface P { serverId: string; dbId: string; name?: string }
 
@@ -20,22 +21,22 @@ export function ViewDialog(props: P) {
   const set = (p: Partial<ViewSpec>) => setSpec((x) => (x ? { ...x, ...p } : x));
   const tabs = !v ? [] : [
     {
-      id: "general", title: "General", render: () => (
+      id: "general", title: t("General"), render: () => (
         <div className="form">
-          <Field label="Name" hint={props.name ? "Views cannot be renamed." : undefined}><Text value={v.name} upper disabled={!!props.name} onChange={(x) => set({ name: x })} autoFocus /></Field>
+          <Field label={t("Name")} hint={props.name ? t("Views cannot be renamed.") : undefined}><Text value={v.name} upper disabled={!!props.name} onChange={(x) => set({ name: x })} autoFocus /></Field>
           <span />
           <Check checked={v.check_option} onChange={(x) => set({ check_option: x })}
-            label={<>WITH CHECK OPTION <span className="muted">— inserts/updates through the view must satisfy its WHERE</span></>} />
-          <Field label="Comment"><Area value={v.comment} onChange={(x) => set({ comment: x })} /></Field>
+            label={<>WITH CHECK OPTION <span className="muted">{t("— inserts/updates through the view must satisfy its WHERE")}</span></>} />
+          <Field label={t("Comment")}><Area value={v.comment} onChange={(x) => set({ comment: x })} /></Field>
         </div>
       ),
     },
     {
-      id: "definition", title: "Definition", render: () => (
+      id: "definition", title: t("Definition"), render: () => (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {props.name && <DependentsNote deps={deps} />}
           <div className="form">
-            <Field label="Column list" hint="Optional, comma separated. Leave empty to use the SELECT's column names.">
+            <Field label={t("Column list")} hint={t("Optional, comma separated. Leave empty to use the SELECT's column names.")}>
               <Text mono value={v.columns.join(", ")} onChange={(x) => set({ columns: x.trim() ? x.split(",").map((s) => s.trim().toUpperCase()) : [] })} />
             </Field>
           </div>
@@ -45,7 +46,7 @@ export function ViewDialog(props: P) {
     },
   ];
   return (
-    <ObjectDialog title={props.name ? `View ${props.name}` : "Create view"} serverId={sid} dbId={dbid} kind="view" otype="views"
+    <ObjectDialog title={props.name ? t("View {name}", { name: props.name! }) : t("Create view")} serverId={sid} dbId={dbid} kind="view" otype="views"
       spec={v} original={original} loadError={error} tabs={tabs} dependents={deps} selectName={props.name ? undefined : v?.name}
       initialTab={props.name ? "definition" : "general"} />
   );
@@ -61,32 +62,32 @@ export function SequenceDialog(props: P) {
   const set = (p: Partial<SeqSpec>) => setSpec((x) => (x ? { ...x, ...p } : x));
   const editing = !!props.name;
   const tabs = !s ? [] : [{
-    id: "general", title: "General", render: () => (
+    id: "general", title: t("General"), render: () => (
       <div className="form">
-        <Field label="Name" hint={editing ? "Firebird has no rename for sequences (ALTER SEQUENCE cannot rename)." : undefined}>
+        <Field label={t("Name")} hint={editing ? t("Firebird has no rename for sequences (ALTER SEQUENCE cannot rename).") : undefined}>
           <Text value={s.name} upper disabled={editing} onChange={(x) => set({ name: x })} autoFocus />
         </Field>
         {editing ? (
           <>
-            <Field label="Current value"><span className="mono">{s.current_value ?? "—"}</span></Field>
-            <Field label="Initial value"><span className="mono">{s.start ?? 0}</span></Field>
-            <Field label="Restart with" hint="ALTER SEQUENCE … RESTART WITH (FB4+: the next value returned is this value)">
-              <Text value={s.restart_with} onChange={(x) => set({ restart_with: x || null })} placeholder="(unchanged)" />
+            <Field label={t("Current value")}><span className="mono">{s.current_value ?? "—"}</span></Field>
+            <Field label={t("Initial value")}><span className="mono">{s.start ?? 0}</span></Field>
+            <Field label={t("Restart with")} hint={t("ALTER SEQUENCE … RESTART WITH (FB4+: the next value returned is this value)")}>
+              <Text value={s.restart_with} onChange={(x) => set({ restart_with: x || null })} placeholder={t("(unchanged)")} />
             </Field>
-            <Field label="Set current value" hint="SET GENERATOR … TO (the next value is this + increment)">
-              <Text value={s.set_value} onChange={(x) => set({ set_value: x || null })} placeholder="(unchanged)" />
+            <Field label={t("Set current value")} hint={t("SET GENERATOR … TO (the next value is this + increment)")}>
+              <Text value={s.set_value} onChange={(x) => set({ set_value: x || null })} placeholder={t("(unchanged)")} />
             </Field>
           </>
         ) : (
-          <Field label="Start with"><Text value={s.start == null ? "" : String(s.start)} onChange={(x) => set({ start: x })} /></Field>
+          <Field label={t("Start with")}><Text value={s.start == null ? "" : String(s.start)} onChange={(x) => set({ start: x })} /></Field>
         )}
-        <Field label="Increment by"><Text value={s.increment == null ? "" : String(s.increment)} onChange={(x) => set({ increment: x })} /></Field>
-        <Field label="Comment"><Area value={s.comment} onChange={(x) => set({ comment: x })} /></Field>
+        <Field label={t("Increment by")}><Text value={s.increment == null ? "" : String(s.increment)} onChange={(x) => set({ increment: x })} /></Field>
+        <Field label={t("Comment")}><Area value={s.comment} onChange={(x) => set({ comment: x })} /></Field>
       </div>
     ),
   }];
   return (
-    <ObjectDialog title={editing ? `Sequence ${props.name}` : "Create sequence"} size="" serverId={sid} dbId={dbid} kind="sequence" otype="sequences"
+    <ObjectDialog title={editing ? t("Sequence {name}", { name: props.name! }) : t("Create sequence")} size="" serverId={sid} dbId={dbid} kind="sequence" otype="sequences"
       spec={s} original={original} loadError={error} tabs={tabs} selectName={editing ? undefined : s?.name} />
   );
 }
@@ -103,31 +104,31 @@ export function DomainDialog(props: P) {
   const editing = !!props.name;
   const tabs = !d ? [] : [
     {
-      id: "general", title: "General", render: () => (
+      id: "general", title: t("General"), render: () => (
         <div className="form">
-          <Field label="Name" hint={editing ? "Renaming uses ALTER DOMAIN … TO" : undefined}><Text value={d.name} upper onChange={(x) => set({ name: x })} autoFocus /></Field>
-          <Field label="Data type"><TypePicker value={d.data_type} lk={lk} onChange={(x) => set({ data_type: x })} /></Field>
-          <Field label="Collation" hint={editing ? "Cannot be changed after creation." : undefined}>
+          <Field label={t("Name")} hint={editing ? t("Renaming uses ALTER DOMAIN … TO") : undefined}><Text value={d.name} upper onChange={(x) => set({ name: x })} autoFocus /></Field>
+          <Field label={t("Data type")}><TypePicker value={d.data_type} lk={lk} onChange={(x) => set({ data_type: x })} /></Field>
+          <Field label={t("Collation")} hint={editing ? t("Cannot be changed after creation.") : undefined}>
             <CollationSelect value={d.collation} lk={lk} charset={parseType(d.data_type).charset || null} onChange={(x) => set({ collation: x })} />
           </Field>
-          <Field label="Comment"><Area value={d.comment} onChange={(x) => set({ comment: x })} /></Field>
+          <Field label={t("Comment")}><Area value={d.comment} onChange={(x) => set({ comment: x })} /></Field>
         </div>
       ),
     },
     {
-      id: "constraints", title: "Constraints", render: () => (
+      id: "constraints", title: t("Constraints"), render: () => (
         <div className="form">
-          <Field label="Default"><Text mono value={d.default} onChange={(x) => set({ default: x || null })} placeholder="e.g. 0" /></Field>
+          <Field label={t("Default")}><Text mono value={d.default} onChange={(x) => set({ default: x || null })} placeholder={t("e.g. 0")} /></Field>
           <span />
           <Check checked={!!d.not_null} onChange={(x) => set({ not_null: x })} label="NOT NULL" />
-          <Field label="Check" hint="Use VALUE for the value being checked."><Area mono value={d.check} onChange={(x) => set({ check: x || null })} placeholder="VALUE > 0" /></Field>
-          {editing && d.used_by && d.used_by.length > 0 && <Field label="Used by"><span className="small">{d.used_by.map((u) => u.name).join(", ")}</span></Field>}
+          <Field label={t("Check")} hint={t("Use VALUE for the value being checked.")}><Area mono value={d.check} onChange={(x) => set({ check: x || null })} placeholder="VALUE > 0" /></Field>
+          {editing && d.used_by && d.used_by.length > 0 && <Field label={t("Used by")}><span className="small">{d.used_by.map((u) => u.name).join(", ")}</span></Field>}
         </div>
       ),
     },
   ];
   return (
-    <ObjectDialog title={editing ? `Domain ${props.name}` : "Create domain"} serverId={sid} dbId={dbid} kind="domain" otype="domains"
+    <ObjectDialog title={editing ? t("Domain {name}", { name: props.name! }) : t("Create domain")} serverId={sid} dbId={dbid} kind="domain" otype="domains"
       spec={d} original={original} loadError={error} tabs={tabs} selectName={d?.name !== props.name ? d?.name : undefined} />
   );
 }
@@ -140,17 +141,17 @@ export function ExceptionDialog(props: P) {
   const { spec: x, setSpec, original, error } = useSpec<ExcSpec>(sid, dbid, "exceptions", props.name, () => ({ name: "NEW_EXCEPTION", message: "Something went wrong: @1" }));
   const set = (p: Partial<ExcSpec>) => setSpec((o) => (o ? { ...o, ...p } : o));
   const tabs = !x ? [] : [{
-    id: "general", title: "General", render: () => (
+    id: "general", title: t("General"), render: () => (
       <div className="form">
-        <Field label="Name" hint={props.name ? "Exceptions cannot be renamed." : undefined}><Text value={x.name} upper disabled={!!props.name} onChange={(v) => set({ name: v })} autoFocus /></Field>
-        {x.number !== undefined && <Field label="Number"><span className="mono">{x.number}</span></Field>}
-        <Field label="Message" hint="@1, @2 … are replaced by the arguments of EXCEPTION name USING (…)"><Area value={x.message} onChange={(v) => set({ message: v })} /></Field>
-        <Field label="Comment"><Area value={x.comment} onChange={(v) => set({ comment: v })} /></Field>
+        <Field label={t("Name")} hint={props.name ? t("Exceptions cannot be renamed.") : undefined}><Text value={x.name} upper disabled={!!props.name} onChange={(v) => set({ name: v })} autoFocus /></Field>
+        {x.number !== undefined && <Field label={t("Number")}><span className="mono">{x.number}</span></Field>}
+        <Field label={t("Message")} hint={t("@1, @2 … are replaced by the arguments of EXCEPTION name USING (…)")}><Area value={x.message} onChange={(v) => set({ message: v })} /></Field>
+        <Field label={t("Comment")}><Area value={x.comment} onChange={(v) => set({ comment: v })} /></Field>
       </div>
     ),
   }];
   return (
-    <ObjectDialog title={props.name ? `Exception ${props.name}` : "Create exception"} size="" serverId={sid} dbId={dbid} kind="exception" otype="exceptions"
+    <ObjectDialog title={props.name ? t("Exception {name}", { name: props.name! }) : t("Create exception")} size="" serverId={sid} dbId={dbid} kind="exception" otype="exceptions"
       spec={x} original={original} loadError={error} tabs={tabs} selectName={props.name ? undefined : x?.name} />
   );
 }
@@ -168,36 +169,36 @@ export function RoleDialog(props: P) {
   const engine = lk?.engine_major ?? 5;
   const tabs = !r ? [] : [
     {
-      id: "general", title: "General", render: () => (
+      id: "general", title: t("General"), render: () => (
         <div className="form">
-          <Field label="Name" hint={props.name ? "Roles cannot be renamed." : undefined}><Text value={r.name} upper disabled={!!props.name} onChange={(x) => set({ name: x })} autoFocus /></Field>
-          <Field label="Comment"><Area value={r.comment} onChange={(x) => set({ comment: x })} /></Field>
+          <Field label={t("Name")} hint={props.name ? t("Roles cannot be renamed.") : undefined}><Text value={r.name} upper disabled={!!props.name} onChange={(x) => set({ name: x })} autoFocus /></Field>
+          <Field label={t("Comment")}><Area value={r.comment} onChange={(x) => set({ comment: x })} /></Field>
         </div>
       ),
     },
     {
-      id: "members", title: `Members (${r.members.length})`, render: () => (
+      id: "members", title: t("Members ({count})", { count: r.members.length }), render: () => (
         <>
           <datalist id="role-grantees">{[...(grantees.users ?? []), ...(grantees.roles ?? [])].map((g) => <option key={g} value={g} />)}</datalist>
           <table className="coltable" style={{ width: "100%" }}>
-            <thead><tr className="muted"><td>Grantee</td><td style={{ width: 120 }}>Type</td><td>WITH ADMIN OPTION</td><td /></tr></thead>
+            <thead><tr className="muted"><td>{t("Grantee")}</td><td style={{ width: 120 }}>{t("Type")}</td><td>WITH ADMIN OPTION</td><td /></tr></thead>
             <tbody>
               {r.members.map((m, i) => (
                 <tr key={i}>
                   <td><Text value={m.name} upper list="role-grantees" onChange={(x) => set({ members: r.members.map((y, j) => (j === i ? { ...y, name: x } : y)) })} /></td>
                   <td><Select value={m.type} options={engine >= 4 ? ["USER", "ROLE"] : ["USER"]} onChange={(x) => set({ members: r.members.map((y, j) => (j === i ? { ...y, type: x } : y)) })} /></td>
                   <td style={{ textAlign: "center" }}><input type="checkbox" checked={m.admin} onChange={(e) => set({ members: r.members.map((y, j) => (j === i ? { ...y, admin: e.target.checked } : y)) })} /></td>
-                  <td><button className="btn icon small" title="Revoke" onClick={() => set({ members: r.members.filter((_, j) => j !== i) })}><IconTrash size={13} /></button></td>
+                  <td><button className="btn icon small" title={t("Revoke")} onClick={() => set({ members: r.members.filter((_, j) => j !== i) })}><IconTrash size={13} /></button></td>
                 </tr>
               ))}
             </tbody>
           </table>
-          <button className="btn small" style={{ marginTop: 8 }} onClick={() => set({ members: [...r.members, { name: "", type: "USER", admin: false }] })}><IconPlus size={13} /> Add member</button>
+          <button className="btn small" style={{ marginTop: 8 }} onClick={() => set({ members: [...r.members, { name: "", type: "USER", admin: false }] })}><IconPlus size={13} /> {t("Add member")}</button>
         </>
       ),
     },
     {
-      id: "sysprivs", title: "System privileges", render: () => engine < 4 ? <div className="muted">System privileges need Firebird 4 or newer.</div> : (
+      id: "sysprivs", title: t("System privileges"), render: () => engine < 4 ? <div className="muted">{t("System privileges need Firebird 4 or newer.")}</div> : (
         <div className="sysprivs">
           {(lk?.system_privileges ?? []).map((p) => (
             <Check key={p} label={p} checked={(r.system_privileges ?? []).includes(p)}
@@ -208,7 +209,7 @@ export function RoleDialog(props: P) {
     },
   ];
   return (
-    <ObjectDialog title={props.name ? `Role ${props.name}` : "Create role"} serverId={sid} dbId={dbid} kind="role" otype="roles"
+    <ObjectDialog title={props.name ? t("Role {name}", { name: props.name! }) : t("Create role")} serverId={sid} dbId={dbid} kind="role" otype="roles"
       spec={r} original={original} loadError={error} tabs={tabs} selectName={props.name ? undefined : r?.name} />
   );
 }
@@ -226,26 +227,26 @@ export function CollationDialog(props: P) {
   const editing = !!props.name;
   const bases = (lk?.collations ?? []).filter((x) => x.charset === c?.charset).map((x) => x.name);
   const tabs = !c ? [] : [{
-    id: "general", title: "General", render: () => (
+    id: "general", title: t("General"), render: () => (
       <div className="form">
-        {editing && <><span /><div className="warn-box">Collations cannot be altered; only the comment can be changed. Drop and re-create the collation to change it.</div></>}
-        <Field label="Name"><Text value={c.name} upper disabled={editing} onChange={(x) => set({ name: x })} autoFocus /></Field>
-        <Field label="Character set"><Select value={c.charset} disabled={editing} onChange={(x) => set({ charset: x, base: null })} options={lk?.charsets ?? [c.charset]} /></Field>
-        <Field label="From collation"><Select value={c.base} disabled={editing || !!c.external} onChange={(x) => set({ base: x || null })} options={bases} empty="(none)" /></Field>
-        <Field label="From external" hint="FROM EXTERNAL ('name') — a collation from fbintl.conf"><Text value={c.external} disabled={editing} onChange={(x) => set({ external: x || null })} /></Field>
+        {editing && <><span /><div className="warn-box">{t("Collations cannot be altered; only the comment can be changed. Drop and re-create the collation to change it.")}</div></>}
+        <Field label={t("Name")}><Text value={c.name} upper disabled={editing} onChange={(x) => set({ name: x })} autoFocus /></Field>
+        <Field label={t("Character set")}><Select value={c.charset} disabled={editing} onChange={(x) => set({ charset: x, base: null })} options={lk?.charsets ?? [c.charset]} /></Field>
+        <Field label={t("From collation")}><Select value={c.base} disabled={editing || !!c.external} onChange={(x) => set({ base: x || null })} options={bases} empty={t("(none)")} /></Field>
+        <Field label={t("From external")} hint={t("FROM EXTERNAL ('name') — a collation from fbintl.conf")}><Text value={c.external} disabled={editing} onChange={(x) => set({ external: x || null })} /></Field>
         <span />
         <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
           <Check disabled={editing} checked={!!c.pad_space} onChange={(x) => set({ pad_space: x })} label="PAD SPACE" />
-          <Check disabled={editing} checked={!!c.case_insensitive} onChange={(x) => set({ case_insensitive: x })} label="Case insensitive" />
-          <Check disabled={editing} checked={!!c.accent_insensitive} onChange={(x) => set({ accent_insensitive: x })} label="Accent insensitive" />
+          <Check disabled={editing} checked={!!c.case_insensitive} onChange={(x) => set({ case_insensitive: x })} label={t("Case insensitive")} />
+          <Check disabled={editing} checked={!!c.accent_insensitive} onChange={(x) => set({ accent_insensitive: x })} label={t("Accent insensitive")} />
         </div>
-        <Field label="Attributes" hint="ICU specific attributes, e.g. NUMERIC-SORT=1;LOCALE=de_DE"><Text mono value={c.attributes} disabled={editing} onChange={(x) => set({ attributes: x || null })} /></Field>
-        <Field label="Comment"><Area value={c.comment} onChange={(x) => set({ comment: x })} /></Field>
+        <Field label={t("Attributes")} hint={t("ICU specific attributes, e.g. NUMERIC-SORT=1;LOCALE=de_DE")}><Text mono value={c.attributes} disabled={editing} onChange={(x) => set({ attributes: x || null })} /></Field>
+        <Field label={t("Comment")}><Area value={c.comment} onChange={(x) => set({ comment: x })} /></Field>
       </div>
     ),
   }];
   return (
-    <ObjectDialog title={editing ? `Collation ${props.name}` : "Create collation"} serverId={sid} dbId={dbid} kind="collation" otype="collations"
+    <ObjectDialog title={editing ? t("Collation {name}", { name: props.name! }) : t("Create collation")} serverId={sid} dbId={dbid} kind="collation" otype="collations"
       spec={c} original={original} loadError={error} tabs={tabs} selectName={editing ? undefined : c?.name} />
   );
 }

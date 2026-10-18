@@ -1,13 +1,23 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { api } from "../../api";
 import { errMsg, useApp } from "../../context";
 import { IconPlus, IconRefresh } from "../../components/Icons";
 import { typeInfo, type Selection } from "../../types";
 import { oapi, type Grant } from "./api";
 import { SqlTab, useDdl } from "./common";
+import { N_, t } from "../../i18n";
 
 const ALL_PRIVS = ["SELECT", "INSERT", "UPDATE", "DELETE", "REFERENCES", "EXECUTE", "USAGE", "MEMBER"];
-const SHORT: Record<string, string> = { SELECT: "Select", INSERT: "Insert", UPDATE: "Update", DELETE: "Delete", REFERENCES: "References", EXECUTE: "Execute", USAGE: "Usage", MEMBER: "Member" };
+const SHORT: Record<string, string> = {
+  SELECT: N_("Select"), INSERT: N_("Insert"), UPDATE: N_("Update"), DELETE: N_("Delete"), REFERENCES: N_("References"),
+  EXECUTE: N_("Execute"), USAGE: N_("Usage"), MEMBER: N_("Member"),
+};
+
+/** Render a translated sentence with {name} shown in bold. */
+function withBold(text: string, bold: ReactNode) {
+  const [a, b = ""] = text.split("{name}");
+  return <>{a}<b>{bold}</b>{b}</>;
+}
 export const APPLICABLE: Record<string, string[]> = {
   tables: ["SELECT", "INSERT", "UPDATE", "DELETE", "REFERENCES"],
   views: ["SELECT", "INSERT", "UPDATE", "DELETE", "REFERENCES"],
@@ -17,6 +27,11 @@ export const APPLICABLE: Record<string, string[]> = {
 const COLUMN_PRIVS = new Set(["UPDATE", "REFERENCES"]);
 const GRANTEE_TYPES = ["USER", "ROLE", "PROCEDURE", "FUNCTION", "PACKAGE", "TRIGGER", "VIEW"];
 const GRANTEE_LIST: Record<string, string> = { USER: "users", ROLE: "roles", PROCEDURE: "procedures", FUNCTION: "functions", PACKAGE: "packages", TRIGGER: "triggers", VIEW: "views" };
+
+const typeLabel = (type: string) => {
+  const ti = typeInfo(type);
+  return ti ? t(ti.singular) : type;
+};
 
 export const privilegesApplies = (sel: Selection | null) =>
   !!sel && sel.kind === "object" && (sel.otype! in APPLICABLE || sel.otype === "users");
@@ -30,11 +45,11 @@ export function PrivilegesPanel(props: { sel: Selection }) {
   return (
     <div className="pad privs">
       <h2 style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        Privileges · {sel.name}
+        {t("Privileges · {name}", { name: sel.name ?? "" })}
         {sel.otype === "roles" && (
           <span className="seg" style={{ fontSize: 12, fontWeight: 400 }}>
-            <button className={mode === "object" ? "on" : ""} onClick={() => setMode("object")}>Members of the role</button>
-            <button className={mode === "grantee" ? "on" : ""} onClick={() => setMode("grantee")}>Privileges held by the role</button>
+            <button className={mode === "object" ? "on" : ""} onClick={() => setMode("object")}>{t("Members of the role")}</button>
+            <button className={mode === "grantee" ? "on" : ""} onClick={() => setMode("grantee")}>{t("Privileges held by the role")}</button>
           </span>
         )}
       </h2>
@@ -124,7 +139,7 @@ function PrivilegeEditor(props: { sel: Selection; mode: "object" | "grantee" }) 
       if (s.sql.trim()) {
         const r = await api.execute(sid, dbid, s.sql);
         if (r.error) throw new Error(r.error.message);
-        app.toast(`${s.statements.length} GRANT/REVOKE statement(s) applied`);
+        app.toast(t("{count} GRANT/REVOKE statement(s) applied", { count: s.statements.length }));
       }
       setShowSql(false);
       await load();
@@ -147,28 +162,30 @@ function PrivilegeEditor(props: { sel: Selection; mode: "object" | "grantee" }) 
   };
 
   if (error && !orig) return <div className="err">{error}</div>;
-  if (!orig) return <div className="muted">Loading…</div>;
+  if (!orig) return <div className="muted">{t("Loading…")}</div>;
   const listId = `privs-list-${mode}`;
   const addOptions = mode === "object" ? grantees[GRANTEE_LIST[add.type]] ?? [] : objects[add.type] ?? [];
   return (
     <>
       <div className="muted small" style={{ marginBottom: 8 }}>
         {mode === "object"
-          ? <>Who has which privilege on {typeInfo(objType)?.singular.toLowerCase()} <b>{name}</b>. "G" = WITH {objType === "roles" ? "ADMIN" : "GRANT"} OPTION. Column privileges: use “cols”.</>
-          : <>What <b>{name}</b> may do. Cells that do not apply to an object type are disabled.</>}
+          ? withBold(t("Who has which privilege on {object} {name}. \"G\" = WITH {option} OPTION. Column privileges: use “cols”.", {
+            object: typeLabel(objType).toLowerCase(), option: objType === "roles" ? "ADMIN" : "GRANT",
+          }), name)
+          : withBold(t("What {name} may do. Cells that do not apply to an object type are disabled."), name)}
       </div>
       <div className="grid-wrap" style={{ maxHeight: "none" }}>
         <table className="grid privs-grid">
           <thead><tr>
-            <th>{mode === "object" ? "Grantee" : "Object"}</th>
-            <th>{mode === "object" ? "Type" : "Kind"}</th>
-            {privs.map((p) => <th key={p} style={{ textAlign: "center" }}>{SHORT[p]}</th>)}
+            <th>{mode === "object" ? t("Grantee") : t("Object")}</th>
+            <th>{mode === "object" ? t("Type") : t("Kind")}</th>
+            {privs.map((p) => <th key={p} style={{ textAlign: "center" }}>{t(SHORT[p])}</th>)}
           </tr></thead>
           <tbody>
             {rows.map((r) => (
               <tr key={rkey(r)}>
                 <td className="mono">{mode === "object" ? r.grantee : r.object}</td>
-                <td className="muted">{mode === "object" ? r.gtype.toLowerCase() : typeInfo(r.otype)?.singular.toLowerCase() ?? r.otype}</td>
+                <td className="muted">{mode === "object" ? r.gtype.toLowerCase() : typeLabel(r.otype).toLowerCase()}</td>
                 {privs.map((p) => {
                   const applicable = (APPLICABLE[r.otype] ?? []).includes(p);
                   const cs = cell(r, p);
@@ -179,13 +196,13 @@ function PrivilegeEditor(props: { sel: Selection; mode: "object" | "grantee" }) 
                     <td key={p} className="pcell" style={{ textAlign: "center" }}>
                       {applicable && (
                         <span className="pcell-inner">
-                          <input type="checkbox" title={`${p}${whole ? " (granted)" : ""}`} checked={whole} onChange={(e) => toggle(r, p, e.target.checked)} />
+                          <input type="checkbox" title={p + (whole ? " " + t("(granted)") : "")} checked={whole} onChange={(e) => toggle(r, p, e.target.checked)} />
                           <label className="gopt" title={`WITH ${p === "MEMBER" ? "ADMIN" : "GRANT"} OPTION`}>
                             <input type="checkbox" disabled={!cs.length} checked={opt} onChange={(e) => setOpt(r, p, e.target.checked)} />G
                           </label>
                           {COLUMN_PRIVS.has(p) && (r.otype === "tables" || r.otype === "views") && (
-                            <button className="btn small cols" title="Column-level privilege" onClick={() => openCols(r, p)}>
-                              {colNames.length ? `(${colNames.join(", ")})` : "cols"}
+                            <button className="btn small cols" title={t("Column-level privilege")} onClick={() => openCols(r, p)}>
+                              {colNames.length ? `(${colNames.join(", ")})` : t("cols")}
                             </button>
                           )}
                         </span>
@@ -195,13 +212,13 @@ function PrivilegeEditor(props: { sel: Selection; mode: "object" | "grantee" }) 
                 })}
               </tr>
             ))}
-            {!rows.length && <tr><td colSpan={privs.length + 2} className="muted">No privileges granted.</td></tr>}
+            {!rows.length && <tr><td colSpan={privs.length + 2} className="muted">{t("No privileges granted.")}</td></tr>}
           </tbody>
         </table>
       </div>
       {colPick && (
         <div className="col-pick">
-          <b>{colPick.priv}</b> on columns of {colPick.row.object} for {colPick.row.grantee}:
+          <b>{colPick.priv}</b>{" " + t("on columns of {object} for {grantee}:", { object: colPick.row.object, grantee: colPick.row.grantee })}
           <div className="sysprivs" style={{ marginTop: 6 }}>
             {colPick.cols.map((c) => {
               const cur = cell(colPick.row, colPick.priv).filter((g) => g.column).map((g) => g.column!);
@@ -211,31 +228,31 @@ function PrivilegeEditor(props: { sel: Selection; mode: "object" | "grantee" }) 
               );
             })}
           </div>
-          <button className="btn small" style={{ marginTop: 6 }} onClick={() => setColPick(null)}>Done</button>
+          <button className="btn small" style={{ marginTop: 6 }} onClick={() => setColPick(null)}>{t("Done")}</button>
         </div>
       )}
       <div className="toolbar" style={{ border: 0, background: "none", padding: "10px 0" }}>
         <select className="text" value={add.type} onChange={(e) => setAdd({ type: e.target.value, name: "" })}>
-          {(mode === "object" ? GRANTEE_TYPES : Object.keys(APPLICABLE)).map((t) => <option key={t} value={t}>{mode === "object" ? t.toLowerCase() : typeInfo(t)?.singular ?? t}</option>)}
+          {(mode === "object" ? GRANTEE_TYPES : Object.keys(APPLICABLE)).map((ty) => <option key={ty} value={ty}>{mode === "object" ? ty.toLowerCase() : typeLabel(ty)}</option>)}
         </select>
-        <input className="text" list={listId} value={add.name} placeholder={mode === "object" ? "grantee name or PUBLIC" : "object name"}
+        <input className="text" list={listId} value={add.name} placeholder={mode === "object" ? t("grantee name or PUBLIC") : t("object name")}
           onChange={(e) => setAdd({ ...add, name: e.target.value.toUpperCase() })} onKeyDown={(e) => e.key === "Enter" && addRow()} />
         <datalist id={listId}>{addOptions.map((o) => <option key={o} value={o} />)}</datalist>
-        <button className="btn small" onClick={addRow}><IconPlus size={13} /> Add {mode === "object" ? "grantee" : "object"}</button>
+        <button className="btn small" onClick={addRow}><IconPlus size={13} /> {mode === "object" ? t("Add grantee") : t("Add object")}</button>
         <span className="grow" />
-        <button className="btn" onClick={load}><IconRefresh /> Reload</button>
-        <button className="btn" disabled={!changed} onClick={() => { setGrants(orig); setExtraRows([]); }}>Revert</button>
-        <button className="btn" disabled={!changed} onClick={() => setShowSql(!showSql)}>{showSql ? "Hide SQL" : "Preview SQL"}</button>
-        <button className="btn primary" disabled={!changed || busy} onClick={apply}>Apply</button>
+        <button className="btn" onClick={load}><IconRefresh /> {t("Reload")}</button>
+        <button className="btn" disabled={!changed} onClick={() => { setGrants(orig); setExtraRows([]); }}>{t("Revert")}</button>
+        <button className="btn" disabled={!changed} onClick={() => setShowSql(!showSql)}>{showSql ? t("Hide SQL") : t("Preview SQL")}</button>
+        <button className="btn primary" disabled={!changed || busy} onClick={apply}>{t("Apply")}</button>
       </div>
       {error && <div className="err" style={{ whiteSpace: "pre-wrap", marginBottom: 8 }}>{error}</div>}
       {showSql && <SqlTab ddl={ddl} />}
       {readonly.length > 0 && (
         <>
-          <h3>Other privileges (read-only)</h3>
+          <h3>{t("Other privileges (read-only)")}</h3>
           <div className="grid-wrap">
-            <table className="grid"><thead><tr><th>Grantee</th><th>Privilege</th><th>Object</th><th>Column</th><th>Grantor</th></tr></thead>
-              <tbody>{readonly.map((g, i) => <tr key={i}><td>{g.grantee_type.toLowerCase()} {g.grantee}</td><td>{g.privilege}{g.grant_option ? " (with grant option)" : ""}</td><td>{g.object_type === "ddl" ? `${g.privilege} ${g.object.replace(/^SQL\$/, "")}` : `${g.object} (${g.object_type})`}</td><td>{g.column ?? ""}</td><td>{g.grantor ?? ""}</td></tr>)}</tbody>
+            <table className="grid"><thead><tr><th>{t("Grantee")}</th><th>{t("Privilege")}</th><th>{t("Object")}</th><th>{t("Column")}</th><th>{t("Grantor")}</th></tr></thead>
+              <tbody>{readonly.map((g, i) => <tr key={i}><td>{g.grantee_type.toLowerCase()} {g.grantee}</td><td>{g.privilege}{g.grant_option ? " " + t("(with grant option)") : ""}</td><td>{g.object_type === "ddl" ? `${g.privilege} ${g.object.replace(/^SQL\$/, "")}` : `${g.object} (${g.object_type})`}</td><td>{g.column ?? ""}</td><td>{g.grantor ?? ""}</td></tr>)}</tbody>
             </table>
           </div>
         </>

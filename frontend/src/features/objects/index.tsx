@@ -16,6 +16,7 @@ import { FunctionDialog, PackageDialog, ProcedureDialog, PsqlEditor, TriggerDial
 import { CommentsDialog, DropDialog, RenameDialog } from "./manage";
 import { PrivilegesPanel, privilegesApplies } from "./privileges";
 import { IconCharset, IconCollation, IconFilterBlob, IconShadow } from "./icons";
+import { N_, t } from "../../i18n";
 import "./objects.css";
 
 Object.assign(TYPE_ICONS, { collations: IconCollation, charsets: IconCharset, shadows: IconShadow, blob_filters: IconFilterBlob });
@@ -41,49 +42,50 @@ const NO_RENAME = new Set(["charsets", "shadows", "blob_filters", "system_tables
 
 function objectItems(app: AppApi, sel: Selection): MenuItem[] {
   const sid = sel.serverId, dbid = sel.dbId!, otype = sel.otype!, name = sel.name!;
-  const single = typeInfo(otype)?.singular.toLowerCase() ?? otype;
+  const ti = typeInfo(otype);
+  const single = ti ? t(ti.singular).toLowerCase() : otype;
   const items: MenuItem[] = [];
   if (sel.kind === "column") {
     const col = sel.column!;
     if (otype === "tables") {
       items.push(
-        { label: "Edit column…", onClick: () => app.showDialog(<ColumnDialog serverId={sid} dbId={dbid} table={name} column={col} />) },
-        { label: "Rename column…", onClick: () => app.showDialog(<RenameDialog serverId={sid} dbId={dbid} otype={otype} name={name} column={col} />) },
+        { label: t("Edit column…"), onClick: () => app.showDialog(<ColumnDialog serverId={sid} dbId={dbid} table={name} column={col} />) },
+        { label: t("Rename column…"), onClick: () => app.showDialog(<RenameDialog serverId={sid} dbId={dbid} otype={otype} name={name} column={col} />) },
       );
     }
-    if (!NO_COMMENT.has(otype)) items.push({ label: "Comment…", onClick: () => app.showDialog(<CommentsDialog serverId={sid} dbId={dbid} otype={otype} name={name} focus={col} />) });
-    if (otype === "tables") items.push({ label: "Drop column…", danger: true, onClick: () => app.showDialog(<DropDialog serverId={sid} dbId={dbid} otype={otype} name={name} column={col} />) });
+    if (!NO_COMMENT.has(otype)) items.push({ label: t("Comment…"), onClick: () => app.showDialog(<CommentsDialog serverId={sid} dbId={dbid} otype={otype} name={name} focus={col} />) });
+    if (otype === "tables") items.push({ label: t("Drop column…"), danger: true, onClick: () => app.showDialog(<DropDialog serverId={sid} dbId={dbid} otype={otype} name={name} column={col} />) });
     return items;
   }
   const dlg = DIALOGS[otype];
   if (dlg) {
-    const edit = otype === "tables" ? "Table designer…" : PSQL.has(otype) ? `${typeInfo(otype)?.singular} dialog…` : `Edit ${single}…`;
+    const edit = otype === "tables" ? t("Table designer…") : PSQL.has(otype) ? t("{object} dialog…", { object: ti ? t(ti.singular) : otype }) : t("Edit {object}…", { object: single });
     items.push({ label: edit, onClick: () => app.showDialog(dlg(sid, dbid, name)) });
   }
-  if (PSQL.has(otype)) items.push({ label: "Edit source (PSQL editor)", icon: <IconProc />, onClick: () => openPsqlEditor(app, sid, dbid, otype, name) });
+  if (PSQL.has(otype)) items.push({ label: t("Edit source (PSQL editor)"), icon: <IconProc />, onClick: () => openPsqlEditor(app, sid, dbid, otype, name) });
   if (otype === "tables") {
     items.push(
-      { label: "Add column…", icon: <IconPlus />, onClick: () => app.showDialog(<ColumnDialog serverId={sid} dbId={dbid} table={name} />) },
-      { label: "Add constraint…", onClick: () => app.showDialog(<ConstraintDialog serverId={sid} dbId={dbid} table={name} />) },
-      { label: "Add index…", onClick: () => app.showDialog(<IndexDialog serverId={sid} dbId={dbid} table={name} />) },
-      { label: "Create trigger…", onClick: () => app.showDialog(<TriggerDialog serverId={sid} dbId={dbid} relation={name} />) },
+      { label: t("Add column…"), icon: <IconPlus />, onClick: () => app.showDialog(<ColumnDialog serverId={sid} dbId={dbid} table={name} />) },
+      { label: t("Add constraint…"), onClick: () => app.showDialog(<ConstraintDialog serverId={sid} dbId={dbid} table={name} />) },
+      { label: t("Add index…"), onClick: () => app.showDialog(<IndexDialog serverId={sid} dbId={dbid} table={name} />) },
+      { label: t("Create trigger…"), onClick: () => app.showDialog(<TriggerDialog serverId={sid} dbId={dbid} relation={name} />) },
     );
   }
-  if (otype === "views") items.push({ label: "Create trigger…", onClick: () => app.showDialog(<TriggerDialog serverId={sid} dbId={dbid} relation={name} />) });
+  if (otype === "views") items.push({ label: t("Create trigger…"), onClick: () => app.showDialog(<TriggerDialog serverId={sid} dbId={dbid} relation={name} />) });
   if (otype === "indices") {
     items.push({
-      label: "Recompute selectivity", onClick: async () => {
+      label: t("Recompute selectivity"), onClick: async () => {
         try {
           const r = await api.execute(sid, dbid, `SET STATISTICS INDEX ${name.match(/^[A-Z][A-Z0-9_$]*$/) ? name : `"${name.replace(/"/g, '""')}"`}`);
           if (r.error) throw new Error(r.error.message);
-          app.toast(`Selectivity of ${name} recomputed`);
+          app.toast(t("Selectivity of {name} recomputed", { name }));
           app.select({ ...sel });
         } catch (e) { app.toast(errMsg(e), "error"); }
       },
     });
   }
-  if (!NO_COMMENT.has(otype)) items.push({ label: "Comments…", onClick: () => app.showDialog(<CommentsDialog serverId={sid} dbId={dbid} otype={otype} name={name} />) });
-  if (!NO_RENAME.has(otype)) items.push({ label: "Rename…", onClick: () => app.showDialog(<RenameDialog serverId={sid} dbId={dbid} otype={otype} name={name} />) });
+  if (!NO_COMMENT.has(otype)) items.push({ label: t("Comments…"), onClick: () => app.showDialog(<CommentsDialog serverId={sid} dbId={dbid} otype={otype} name={name} />) });
+  if (!NO_RENAME.has(otype)) items.push({ label: t("Rename…"), onClick: () => app.showDialog(<RenameDialog serverId={sid} dbId={dbid} otype={otype} name={name} />) });
   return items;
 }
 
@@ -91,8 +93,10 @@ function folderItems(app: AppApi, sel: Selection): MenuItem[] {
   const sid = sel.serverId, dbid = sel.dbId!, otype = sel.otype!;
   const dlg = DIALOGS[otype];
   const items: MenuItem[] = [];
-  if (dlg) items.push({ label: `Create ${typeInfo(otype)?.singular.toLowerCase()}…`, icon: <IconPlus />, onClick: () => app.showDialog(dlg(sid, dbid)) });
-  if (PSQL.has(otype)) items.push({ label: `New ${typeInfo(otype)?.singular.toLowerCase()} in PSQL editor`, onClick: () => openPsqlEditor(app, sid, dbid, otype) });
+  const ti = typeInfo(otype);
+  const single = ti ? t(ti.singular).toLowerCase() : otype;
+  if (dlg) items.push({ label: t("Create {object}…", { object: single }), icon: <IconPlus />, onClick: () => app.showDialog(dlg(sid, dbid)) });
+  if (PSQL.has(otype)) items.push({ label: t("New {object} in PSQL editor", { object: single }), onClick: () => openPsqlEditor(app, sid, dbid, otype) });
   return items;
 }
 
@@ -105,7 +109,7 @@ registerMenu((app, sel) => {
 
 registerObjectTab({
   id: "privileges",
-  title: "Privileges",
+  title: N_("Privileges"),
   applies: privilegesApplies,
   render: (sel) => <PrivilegesPanel sel={sel} />,
 });

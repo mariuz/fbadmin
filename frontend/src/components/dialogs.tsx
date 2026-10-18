@@ -4,6 +4,7 @@ import { errMsg, keys, useApp } from "../context";
 import type { DatabaseEntry, Server } from "../types";
 import { Modal } from "./Modal";
 import { canShareServers } from "../features/security/state";
+import { t } from "../i18n";
 
 function useSubmit() {
   const [busy, setBusy] = useState(false);
@@ -65,62 +66,62 @@ export function ServerDialog(props: { server?: Server }) {
         if (f.password) await api.connectServer(created.id, f.password);
       }
       await app.reloadServers();
-      app.toast(s ? "Server updated" : "Server registered");
+      app.toast(s ? t("Server updated") : t("Server registered"));
       close();
     });
   return (
     <Modal
-      title={s ? `Edit server – ${s.name}` : "Register server"}
+      title={s ? t("Edit server – {name}", { name: s.name }) : t("Register server")}
       onClose={close}
       footer={
         <>
           {error && <span className="err">{error}</span>}
-          <button className="btn" onClick={close}>Cancel</button>
-          <button className="btn primary" disabled={busy} onClick={submit}>{s ? "Save" : "Register"}</button>
+          <button className="btn" onClick={close}>{t("Cancel")}</button>
+          <button className="btn primary" disabled={busy} onClick={submit}>{s ? t("Save") : t("Register")}</button>
         </>
       }
     >
       <div className="form">
-        <label className="l">Name</label>
-        <input className="text" autoFocus value={f.name} placeholder="e.g. Production" onChange={(e) => set("name", e.target.value)} />
-        <label className="l">Host</label>
+        <label className="l">{t("Name")}</label>
+        <input className="text" autoFocus value={f.name} placeholder={t("e.g. Production")} onChange={(e) => set("name", e.target.value)} />
+        <label className="l">{t("Host")}</label>
         <input className="text" value={f.host} onChange={(e) => set("host", e.target.value)} />
-        <label className="l">Port</label>
+        <label className="l">{t("Port")}</label>
         <input className="text" type="number" value={f.port} onChange={(e) => set("port", Number(e.target.value))} />
-        <label className="l">User</label>
+        <label className="l">{t("User")}</label>
         <input className="text" value={f.user} onChange={(e) => set("user", e.target.value)} />
-        <label className="l">Password</label>
-        <input className="text" type="password" value={f.password} placeholder={s?.has_password ? "(unchanged)" : ""} onChange={(e) => set("password", e.target.value)} />
+        <label className="l">{t("Password")}</label>
+        <input className="text" type="password" value={f.password} placeholder={s?.has_password ? t("(unchanged)") : ""} onChange={(e) => set("password", e.target.value)} />
         <span />
-        <label className="check"><input type="checkbox" checked={f.save_password} onChange={(e) => set("save_password", e.target.checked)} /> Save password</label>
-        <label className="l">Role</label>
+        <label className="check"><input type="checkbox" checked={f.save_password} onChange={(e) => set("save_password", e.target.checked)} /> {t("Save password")}</label>
+        <label className="l">{t("Role")}</label>
         <input className="text" value={f.role} onChange={(e) => set("role", e.target.value)} />
-        <label className="l">Connection charset</label>
+        <label className="l">{t("Connection charset")}</label>
         <select className="text" value={f.charset} onChange={(e) => set("charset", e.target.value)}>
           {["UTF8", "NONE", "WIN1250", "WIN1251", "WIN1252", "ISO8859_1", "ISO8859_2"].map((c) => <option key={c}>{c}</option>)}
         </select>
         <span />
-        <label className="check"><input type="checkbox" checked={f.wire_crypt} onChange={(e) => set("wire_crypt", e.target.checked)} /> Wire encryption</label>
+        <label className="check"><input type="checkbox" checked={f.wire_crypt} onChange={(e) => set("wire_crypt", e.target.checked)} /> {t("Wire encryption")}</label>
         <span />
-        <label className="check" title="zlib compression of the wire protocol (Firebird 3+); helps on slow links">
-          <input type="checkbox" checked={f.wire_compress} onChange={(e) => set("wire_compress", e.target.checked)} /> Wire compression</label>
-        <label className="l">Authentication plugin</label>
+        <label className="check" title={t("zlib compression of the wire protocol (Firebird 3+); helps on slow links")}>
+          <input type="checkbox" checked={f.wire_compress} onChange={(e) => set("wire_compress", e.target.checked)} /> {t("Wire compression")}</label>
+        <label className="l">{t("Authentication plugin")}</label>
         <select className="text" value={f.auth_plugin} onChange={(e) => set("auth_plugin", e.target.value)}>
-          <option value="">default (Srp256)</option>
+          <option value="">{t("default (Srp256)")}</option>
           {["Srp256", "Srp", "Legacy_Auth"].map((p) => <option key={p} value={p}>{p}</option>)}
         </select>
         <span />
-        <label className="check" title="Production safety: only queries are allowed; data edits, DDL and other changes are refused">
-          <input type="checkbox" checked={f.read_only} onChange={(e) => set("read_only", e.target.checked)} /> Read-only (block everything but SELECT)</label>
+        <label className="check" title={t("Production safety: only queries are allowed; data edits, DDL and other changes are refused")}>
+          <input type="checkbox" checked={f.read_only} onChange={(e) => set("read_only", e.target.checked)} /> {t("Read-only (block everything but SELECT)")}</label>
         {(canShareServers() || s?.shared) && <>
           <span />
-          <label className="check" title="Visible to every fbadmin user; each user enters their own Firebird password">
-            <input type="checkbox" checked={f.shared} disabled={!canShareServers()} onChange={(e) => set("shared", e.target.checked)} /> Shared with all fbadmin users</label>
+          <label className="check" title={t("Visible to every fbadmin user; each user enters their own Firebird password")}>
+            <input type="checkbox" checked={f.shared} disabled={!canShareServers()} onChange={(e) => set("shared", e.target.checked)} /> {t("Shared with all fbadmin users")}</label>
         </>}
         {!s && (
           <>
-            <label className="l">First database</label>
-            <input className="text" value={f.database} placeholder="optional: /path/to/db.fdb or alias" onChange={(e) => set("database", e.target.value)} />
+            <label className="l">{t("First database")}</label>
+            <input className="text" value={f.database} placeholder={t("optional: /path/to/db.fdb or alias")} onChange={(e) => set("database", e.target.value)} />
           </>
         )}
       </div>
@@ -136,7 +137,7 @@ export function DatabaseDialog(props: { server: Server; mode: "register" | "crea
   const set = (k: string, v: unknown) => setF((o) => ({ ...o, [k]: v }));
   const { busy, error, run } = useSubmit();
   const close = () => app.showDialog(null);
-  const titles = { register: "Register database", create: "Create database", edit: "Edit database registration" };
+  const titles = { register: t("Register database"), create: t("Create database"), edit: t("Edit database registration") };
   const submit = () =>
     run(async () => {
       const name = f.name || f.path.split(/[\\/]/).pop()!.replace(/\.(fdb|gdb)$/i, "") || f.path;
@@ -145,38 +146,38 @@ export function DatabaseDialog(props: { server: Server; mode: "register" | "crea
       else await api.addDatabase(props.server.id, { name, path: f.path });
       await app.reloadServers();
       app.invalidate(keys.server(props.server.id));
-      app.toast(props.mode === "create" ? `Database ${name} created` : "Saved");
+      app.toast(props.mode === "create" ? t("Database {name} created", { name }) : t("Saved"));
       close();
     });
   return (
     <Modal
-      title={`${titles[props.mode]} on ${props.server.name}`}
+      title={t("{title} on {server}", { title: titles[props.mode], server: props.server.name })}
       onClose={close}
       footer={
         <>
           {error && <span className="err">{error}</span>}
-          <button className="btn" onClick={close}>Cancel</button>
-          <button className="btn primary" disabled={busy || !f.path} onClick={submit}>{props.mode === "create" ? "Create" : "Save"}</button>
+          <button className="btn" onClick={close}>{t("Cancel")}</button>
+          <button className="btn primary" disabled={busy || !f.path} onClick={submit}>{props.mode === "create" ? t("Create") : t("Save")}</button>
         </>
       }
     >
       <div className="form">
-        <label className="l">Path or alias</label>
+        <label className="l">{t("Path or alias")}</label>
         <input className="text" autoFocus value={f.path} placeholder="/var/lib/firebird/data/mydb.fdb" onChange={(e) => set("path", e.target.value)} />
-        <label className="l">Display name</label>
-        <input className="text" value={f.name} placeholder="defaults to file name" onChange={(e) => set("name", e.target.value)} />
+        <label className="l">{t("Display name")}</label>
+        <input className="text" value={f.name} placeholder={t("defaults to file name")} onChange={(e) => set("name", e.target.value)} />
         {props.mode === "create" && (
           <>
-            <label className="l">Page size</label>
+            <label className="l">{t("Page size")}</label>
             <select className="text" value={f.page_size} onChange={(e) => set("page_size", Number(e.target.value))}>
               {[4096, 8192, 16384, 32768].map((p) => <option key={p} value={p}>{p}</option>)}
             </select>
-            <label className="l">Default charset</label>
+            <label className="l">{t("Default charset")}</label>
             <select className="text" value={f.charset} onChange={(e) => set("charset", e.target.value)}>
               {["UTF8", "NONE", "WIN1250", "WIN1251", "WIN1252", "ISO8859_1"].map((c) => <option key={c}>{c}</option>)}
             </select>
             <span />
-            <span className="muted">The path is on the Firebird server's file system.</span>
+            <span className="muted">{t("The path is on the Firebird server's file system.")}</span>
           </>
         )}
       </div>
@@ -201,20 +202,20 @@ export function PasswordDialog(props: { server: Server; resolve: (ok: boolean) =
     });
   return (
     <Modal
-      title={`Connect to ${props.server.name}`}
+      title={t("Connect to {name}", { name: props.server.name })}
       onClose={cancel}
       footer={
         <>
           {error && <span className="err">{error}</span>}
-          <button className="btn" onClick={cancel}>Cancel</button>
-          <button className="btn primary" disabled={busy} onClick={submit}>Connect</button>
+          <button className="btn" onClick={cancel}>{t("Cancel")}</button>
+          <button className="btn primary" disabled={busy} onClick={submit}>{t("Connect")}</button>
         </>
       }
     >
       <div className="form">
-        <label className="l">User</label>
+        <label className="l">{t("User")}</label>
         <span>{props.server.user}</span>
-        <label className="l">Password</label>
+        <label className="l">{t("Password")}</label>
         <input className="text" type="password" autoFocus value={pw} onChange={(e) => setPw(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submit()} />
       </div>
     </Modal>
@@ -233,6 +234,7 @@ export function ConfirmDialog(props: {
   const [typed, setTyped] = useState("");
   const { busy, error, run } = useSubmit();
   const close = () => app.showDialog(null);
+  const [typePre, typePost = ""] = t("Type {text} to confirm.").split("{text}");
   return (
     <Modal
       title={props.title}
@@ -240,7 +242,7 @@ export function ConfirmDialog(props: {
       footer={
         <>
           {error && <span className="err">{error}</span>}
-          <button className="btn" onClick={close}>Cancel</button>
+          <button className="btn" onClick={close}>{t("Cancel")}</button>
           <button
             className="btn danger solid"
             disabled={busy || (!!props.confirmText && typed !== props.confirmText)}
@@ -254,7 +256,7 @@ export function ConfirmDialog(props: {
       <p style={{ whiteSpace: "pre-wrap", marginTop: 0 }}>{props.message}</p>
       {props.confirmText && (
         <>
-          <p className="muted">Type <b>{props.confirmText}</b> to confirm.</p>
+          <p className="muted">{typePre}<b>{props.confirmText}</b>{typePost}</p>
           <input className="text" autoFocus value={typed} onChange={(e) => setTyped(e.target.value)} style={{ width: "100%" }} />
         </>
       )}
@@ -277,32 +279,32 @@ export function BackupDialog(props: { server: Server; dbId: string }) {
   const close = () => app.showDialog(null);
   return (
     <Modal
-      title={`Backup ${db.name}`}
+      title={t("Backup {name}", { name: db.name })}
       onClose={close}
       footer={
         <>
           {error && <span className="err">{error}</span>}
-          <button className="btn" onClick={close}>Cancel</button>
+          <button className="btn" onClick={close}>{t("Cancel")}</button>
           <button className="btn primary" disabled={busy} onClick={() => run(async () => {
             await api.backup(props.server.id, { database_id: props.dbId, ...f });
             app.jobStarted();
-            app.toast("Backup started — see Processes", "info");
+            app.toast(t("Backup started — see Processes"), "info");
             close();
-          })}>Start backup</button>
+          })}>{t("Start backup")}</button>
         </>
       }
     >
       <div className="form">
-        <label className="l">Backup file</label>
+        <label className="l">{t("Backup file")}</label>
         <input className="text" value={f.backup_file} onChange={(e) => setF({ ...f, backup_file: e.target.value })} />
         <span />
-        <span className="muted">Path on the server. Uses the Services API (gbak -se).</span>
+        <span className="muted">{t("Path on the server. Uses the Services API (gbak -se).")}</span>
         <span />
-        <label className="check"><input type="checkbox" checked={f.metadata_only} onChange={(e) => setF({ ...f, metadata_only: e.target.checked })} /> Metadata only</label>
+        <label className="check"><input type="checkbox" checked={f.metadata_only} onChange={(e) => setF({ ...f, metadata_only: e.target.checked })} /> {t("Metadata only")}</label>
         <span />
-        <label className="check"><input type="checkbox" checked={f.garbage_collect} onChange={(e) => setF({ ...f, garbage_collect: e.target.checked })} /> Garbage collection</label>
+        <label className="check"><input type="checkbox" checked={f.garbage_collect} onChange={(e) => setF({ ...f, garbage_collect: e.target.checked })} /> {t("Garbage collection")}</label>
         <span />
-        <label className="check"><input type="checkbox" checked={f.transportable} onChange={(e) => setF({ ...f, transportable: e.target.checked })} /> Transportable format</label>
+        <label className="check"><input type="checkbox" checked={f.transportable} onChange={(e) => setF({ ...f, transportable: e.target.checked })} /> {t("Transportable format")}</label>
       </div>
     </Modal>
   );
@@ -316,12 +318,12 @@ export function RestoreDialog(props: { server: Server }) {
   const close = () => app.showDialog(null);
   return (
     <Modal
-      title={`Restore on ${props.server.name}`}
+      title={t("Restore on {name}", { name: props.server.name })}
       onClose={close}
       footer={
         <>
           {error && <span className="err">{error}</span>}
-          <button className="btn" onClick={close}>Cancel</button>
+          <button className="btn" onClick={close}>{t("Cancel")}</button>
           <button className="btn primary" disabled={busy || !f.backup_file || !f.database_path} onClick={() => run(async () => {
             await api.restore(props.server.id, {
               ...f,
@@ -329,28 +331,28 @@ export function RestoreDialog(props: { server: Server }) {
               register_as: f.register_as || null,
             });
             app.jobStarted();
-            app.toast("Restore started — see Processes", "info");
+            app.toast(t("Restore started — see Processes"), "info");
             close();
-          })}>Start restore</button>
+          })}>{t("Start restore")}</button>
         </>
       }
     >
       <div className="form">
-        <label className="l">Backup file (.fbk)</label>
+        <label className="l">{t("Backup file (.fbk)")}</label>
         <input className="text" autoFocus value={f.backup_file} onChange={(e) => setF({ ...f, backup_file: e.target.value })} />
-        <label className="l">Target database</label>
+        <label className="l">{t("Target database")}</label>
         <input className="text" value={f.database_path} onChange={(e) => setF({ ...f, database_path: e.target.value })} />
-        <label className="l">Page size</label>
+        <label className="l">{t("Page size")}</label>
         <select className="text" value={f.page_size} onChange={(e) => setF({ ...f, page_size: e.target.value })}>
-          <option value="">(keep)</option>
+          <option value="">{t("(keep)")}</option>
           {[4096, 8192, 16384, 32768].map((p) => <option key={p} value={p}>{p}</option>)}
         </select>
-        <label className="l">Register as</label>
-        <input className="text" value={f.register_as} placeholder="optional display name" onChange={(e) => setF({ ...f, register_as: e.target.value })} />
+        <label className="l">{t("Register as")}</label>
+        <input className="text" value={f.register_as} placeholder={t("optional display name")} onChange={(e) => setF({ ...f, register_as: e.target.value })} />
         <span />
-        <label className="check"><input type="checkbox" checked={f.replace} onChange={(e) => setF({ ...f, replace: e.target.checked })} /> Replace existing database</label>
+        <label className="check"><input type="checkbox" checked={f.replace} onChange={(e) => setF({ ...f, replace: e.target.checked })} /> {t("Replace existing database")}</label>
         <span />
-        <label className="check"><input type="checkbox" checked={f.deactivate_indexes} onChange={(e) => setF({ ...f, deactivate_indexes: e.target.checked })} /> Deactivate indices</label>
+        <label className="check"><input type="checkbox" checked={f.deactivate_indexes} onChange={(e) => setF({ ...f, deactivate_indexes: e.target.checked })} /> {t("Deactivate indices")}</label>
       </div>
     </Modal>
   );
@@ -382,42 +384,42 @@ export function UserDialog(props: { serverId: string; dbId: string; name?: strin
   const shownSql = f.password ? sql.replace(str(f.password), "'********'") : sql;
   return (
     <Modal
-      title={editing ? `Edit user ${props.name}` : "Create user"}
+      title={editing ? t("Edit user {name}", { name: props.name ?? "" }) : t("Create user")}
       onClose={close}
       footer={
         <>
           {error && <span className="err">{error}</span>}
-          <button className="btn" onClick={close}>Cancel</button>
+          <button className="btn" onClick={close}>{t("Cancel")}</button>
           <button className="btn primary" disabled={busy || !f.name || (!editing && !f.password)} onClick={() => run(async () => {
             const r = await api.execute(props.serverId, props.dbId, sql);
             if (r.error) throw new Error(r.error.message);
             app.invalidate(keys.folder(props.serverId, props.dbId, "users"));
-            app.toast(editing ? "User updated" : `User ${f.name} created`);
+            app.toast(editing ? t("User updated") : t("User {name} created", { name: f.name }));
             close();
-          })}>{editing ? "Save" : "Create"}</button>
+          })}>{editing ? t("Save") : t("Create")}</button>
         </>
       }
     >
       <div className="subtabs">
-        <button className={tab === "general" ? "active" : ""} onClick={() => setTab("general")}>General</button>
-        <button className={tab === "sql" ? "active" : ""} onClick={() => setTab("sql")}>SQL</button>
+        <button className={tab === "general" ? "active" : ""} onClick={() => setTab("general")}>{t("General")}</button>
+        <button className={tab === "sql" ? "active" : ""} onClick={() => setTab("sql")}>{t("SQL")}</button>
       </div>
       {tab === "general" ? (
         <div className="form">
-          <label className="l">User name</label>
+          <label className="l">{t("User name")}</label>
           <input className="text" value={f.name} disabled={editing} autoFocus onChange={(e) => setF({ ...f, name: e.target.value.toUpperCase() })} />
-          <label className="l">Password</label>
-          <input className="text" type="password" value={f.password} placeholder={editing ? "(unchanged)" : ""} onChange={(e) => setF({ ...f, password: e.target.value })} />
-          <label className="l">First name</label>
+          <label className="l">{t("Password")}</label>
+          <input className="text" type="password" value={f.password} placeholder={editing ? t("(unchanged)") : ""} onChange={(e) => setF({ ...f, password: e.target.value })} />
+          <label className="l">{t("First name")}</label>
           <input className="text" value={f.first} onChange={(e) => setF({ ...f, first: e.target.value })} />
-          <label className="l">Middle name</label>
+          <label className="l">{t("Middle name")}</label>
           <input className="text" value={f.middle} onChange={(e) => setF({ ...f, middle: e.target.value })} />
-          <label className="l">Last name</label>
+          <label className="l">{t("Last name")}</label>
           <input className="text" value={f.last} onChange={(e) => setF({ ...f, last: e.target.value })} />
           <span />
-          <label className="check"><input type="checkbox" checked={f.active} onChange={(e) => setF({ ...f, active: e.target.checked })} /> Active</label>
+          <label className="check"><input type="checkbox" checked={f.active} onChange={(e) => setF({ ...f, active: e.target.checked })} /> {t("Active")}</label>
           <span />
-          <label className="check"><input type="checkbox" checked={f.admin} onChange={(e) => setF({ ...f, admin: e.target.checked })} /> Admin (RDB$ADMIN in security database)</label>
+          <label className="check"><input type="checkbox" checked={f.admin} onChange={(e) => setF({ ...f, admin: e.target.checked })} /> {t("Admin (RDB$ADMIN in security database)")}</label>
         </div>
       ) : (
         <pre className="log">{shownSql}</pre>
