@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import socket
 import sys
 import threading
@@ -80,6 +81,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--log-level", choices=LEVELS, default=None)
     p.add_argument("--version", action="version", version=f"fbadmin {__version__}")
     args = p.parse_args(argv)
+    os.environ["FBADMIN_DESKTOP"] = "1"  # enables self-update for packaged builds (see updater.py)
 
     log_config = configure_logging(args.log_level or "warning", None)
     import logging.config

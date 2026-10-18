@@ -83,3 +83,60 @@ def latest(refresh: bool = False):
     out.update(latest=info["latest"], url=info["url"], published_at=info.get("published_at"),
                update_available=is_newer(info["latest"], __version__))
     return out
+
+
+# ---------------------------------------------------------------- desktop auto-update
+def _later(fn, delay: float = 1.0) -> None:
+    """Run ``fn`` after the HTTP response went out."""
+    t = threading.Timer(delay, fn)
+    t.daemon = True
+    t.start()
+
+
+@router.get("/update")
+def update_plan():
+    """What "Download and install" would do on this install (desktop app only)."""
+    from .. import updater
+
+    try:
+        return updater.plan()
+    except Exception as exc:  # noqa: BLE001 - offline etc.
+        return {"current": __version__, "supported": updater.install_kind() is not None, "error": str(exc)}
+
+
+@router.post("/update/download")
+def update_download():
+    from .. import updater
+    from ..config import settings
+
+    p = updater.plan()
+    if not p["supported"]:
+        raise ValueError(p.get("reason") or "This install cannot update itself.")
+    if p.get("error"):
+        raise ValueError(p["error"])
+    if not p["update_available"]:
+        raise ValueError(f"fbadmin {__version__} is up to date.")
+    d = updater.start_download(p["asset"], settings.data_dir)
+    return {**d.status(), "kind": p["kind"], "latest": p["latest"]}
+
+
+@router.get("/update/status")
+def update_status():
+    from .. import updater
+
+    d = updater.current()
+    return d.status() if d else {"state": "idle"}
+
+
+@router.post("/update/apply")
+def update_apply():
+    from .. import updater
+
+    kind = updater.install_kind()
+    d = updater.current()
+    if kind is None:
+        raise ValueError("This install cannot update itself.")
+    if not d or d.state != "done":
+        raise ValueError("Download the update first.")
+    return updater.apply(d.path, kind, restart=lambda: _later(updater.restart_appimage),
+                         quit_app=lambda: _later(lambda: os._exit(0)))

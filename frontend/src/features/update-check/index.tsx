@@ -8,7 +8,7 @@
  */
 import { Fragment, useEffect, useState, type ReactNode } from "react";
 import { request } from "../../api";
-import { useApp, type AppApi } from "../../context";
+import { errMsg, useApp, type AppApi } from "../../context";
 import { Modal } from "../../components/Modal";
 import { registerTopbar } from "../../registry";
 import { t } from "../../i18n";
@@ -68,6 +68,48 @@ function rich(text: string, parts: Record<string, ReactNode>): ReactNode[] {
   });
 }
 
+interface UpdatePlan { supported: boolean; kind?: string | null; update_available?: boolean; latest?: string | null; error?: string | null; reason?: string }
+interface DownloadStatus { state: string; received?: number; size?: number | null; error?: string | null }
+
+/** Desktop app only: download the verified package for this platform and install it. */
+function SelfUpdate(props: { latest: string }) {
+  const app = useApp();
+  const [plan, setPlan] = useState<UpdatePlan | null>(null);
+  const [dl, setDl] = useState<DownloadStatus | null>(null);
+  useEffect(() => { request<UpdatePlan>("GET", "/api/version/update").then(setPlan).catch(() => setPlan(null)); }, [props.latest]);
+  useEffect(() => {
+    if (dl?.state !== "running") return;
+    const timer = setInterval(() => request<DownloadStatus>("GET", "/api/version/update/status").then(setDl).catch(() => {}), 700);
+    return () => clearInterval(timer);
+  }, [dl?.state]);
+  if (!plan?.supported || !plan.update_available) return null;
+  if (plan.error) return <p className="muted">{plan.error}</p>;
+  const pct = dl?.size ? Math.round((100 * (dl.received ?? 0)) / dl.size) : null;
+  const install = async () => {
+    try {
+      const r = await request<{ action: string }>("POST", "/api/version/update/apply");
+      app.toast(r.action, "info");
+    } catch (e) { app.toast(errMsg(e), "error"); }
+  };
+  return (
+    <div style={{ marginTop: 8 }}>
+      {!dl || dl.state === "failed" ? (
+        <button className="btn small primary" onClick={() => request<DownloadStatus>("POST", "/api/version/update/download").then(setDl).catch((e) => app.toast(errMsg(e), "error"))}>
+          {t("Download and install {version}", { version: props.latest })}
+        </button>
+      ) : dl.state === "running" ? (
+        <span role="status">{t("Downloading… {percent}", { percent: pct === null ? "" : pct + " %" })}</span>
+      ) : (
+        <button className="btn small primary" onClick={install}>
+          {plan.kind === "dmg" ? t("Open the disk image") : t("Install and restart")}
+        </button>
+      )}
+      {dl?.state === "failed" && <div className="err">{dl.error}</div>}
+      <div className="muted small">{t("The package is checked against the release's SHA256SUMS before it is installed.")}</div>
+    </div>
+  );
+}
+
 function AboutDialog() {
   const app = useApp();
   const [on, setOn] = useState(optedIn);
@@ -98,7 +140,8 @@ function AboutDialog() {
               <button className="btn small" disabled={busy} onClick={check}>{t("Check now")}</button>{" "}
               {info?.error && <span style={{ color: "var(--danger, #c00)" }}>{info.error}</span>}
               {info && !info.error && (info.update_available
-                ? <span>{rich(t("Version {version} is available: {link}"), { version: <b>{info.latest}</b>, link: <a href={info.url ?? "#"} target="_blank" rel="noreferrer">{t("release notes")}</a> })}</span>
+                ? <><span>{rich(t("Version {version} is available: {link}"), { version: <b>{info.latest}</b>, link: <a href={info.url ?? "#"} target="_blank" rel="noreferrer">{t("release notes")}</a> })}</span>
+                  <SelfUpdate latest={String(info.latest)} /></>
                 : <span>{t("You have the latest version ({version}).", { version: String(info.latest) })}</span>)}
             </div>
           )}

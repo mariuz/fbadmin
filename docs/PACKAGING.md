@@ -86,7 +86,7 @@ wix build packaging/windows/fbadmin.wxs -arch x64 -d SourceDir=dist\fbadmin -d V
 | Windows | `.zip` (portable), `.msi` | `Compress-Archive`; WiX v5 (`packaging/windows/fbadmin.wxs`) |
 | macOS | `.dmg` with `fbadmin.app` | PyInstaller `BUNDLE` + `hdiutil` (arm64 on macos-14, x86_64 on macos-13) |
 | Linux | AppImage, `.deb`, `.rpm` | `packaging/linux/build-packages.sh` (appimagetool, fpm) on Ubuntu 22.04 |
-| Linux | Flatpak | `packaging/flatpak/io.github.mariuz.fbadmin.yml` (GNOME runtime) |
+| Linux | Flatpak | `packaging/flatpak/io.github.mariuz.fbadmin.yml` (GNOME runtime). The `flatpak` job in `desktop.yml` builds a `.flatpak` bundle, and a failure there doesn't fail the workflow. |
 
 Notes and limitations:
 
@@ -104,9 +104,27 @@ Notes and limitations:
 
 ### Updates
 
-The desktop app does not update itself silently. Users can opt in to **Check GitHub for
-new releases** in the About dialog; when a newer release exists the top bar shows
-"Update X.Y.Z" linking to the release page. See [Privacy](PRIVACY.md).
+The desktop app never updates itself silently. Users opt in to **Check GitHub for new
+releases** in the About dialog. When a newer release exists, the top bar shows "Update X.Y.Z"
+and the About dialog offers **Download and install** (`backend/fbadmin/updater.py`):
+
+1. It picks the package for this platform from the latest release: `fbadmin-X.Y.Z-x64.msi`,
+   `fbadmin-X.Y.Z-macos-<arch>.dmg` or `fbadmin-X.Y.Z-<arch>.AppImage`.
+2. It downloads the package into `<data dir>/updates` and checks it against the release's
+   `SHA256SUMS`, which the desktop workflow publishes. A package with no checksum, or a wrong
+   one, is refused.
+3. It installs the package:
+
+   | Install | What happens |
+   |---|---|
+   | Windows (MSI) | Runs `msiexec /i … /passive`, then fbadmin quits so the installer can replace it. |
+   | Linux (AppImage) | Atomically replaces the running AppImage (`$APPIMAGE`), then restarts. |
+   | macOS (dmg) | Opens the disk image; you drag fbadmin to Applications. An unsigned app cannot replace itself. |
+
+deb, rpm, Flatpak, pip, Docker and Helm installs don't update themselves. Their package
+manager does that, and the UI only links to the release. Self-update needs the desktop
+launcher (`FBADMIN_DESKTOP=1`), so a server install never offers it, and
+`FBADMIN_UPDATE_CHECK=off` turns it off together with the check. See [Privacy](PRIVACY.md).
 
 ## Helm chart and Kubernetes
 
