@@ -4,6 +4,7 @@ import { errMsg, useApp } from "../context";
 import { OBJECT_TYPES, typeInfo, type ObjectDetail, type Selection } from "../types";
 import { SqlEditor } from "./SqlEditor";
 import { ServerDialog } from "./dialogs";
+import { getDashboardSections } from "../registry";
 import { IconActivity, IconCopy, IconDatabase, IconServer, IconTerminal, TYPE_ICONS } from "./Icons";
 
 function fmt(v: unknown): string {
@@ -241,6 +242,7 @@ export function Dashboard(props: { sel: Selection | null }) {
         <tr><td>Oldest snapshot (OST)</td><td>{fmt(info.oldest_snapshot)}</td></tr>
         <tr><td>Gap (next − OIT)</td><td className={gap > 50000 ? "warn" : ""}>{gap.toLocaleString()}{gap > 50000 ? " — consider a sweep" : ""}</td></tr>
       </tbody></table>
+      {getDashboardSections().map((d) => <div key={d.id}>{d.render(sel)}</div>)}
     </div>
   );
 }

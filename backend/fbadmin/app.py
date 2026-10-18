@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import __version__
-from .api import databases, jobs, query, servers
+from .api import ROUTERS
 from .api.deps import get_state
 from .config import settings
 from .connections import PasswordRequired
@@ -74,10 +74,8 @@ def create_app() -> FastAPI:
     def object_types():
         return [{"type": k, **v} for k, v in OBJECT_TYPES.items()]
 
-    app.include_router(servers.router)
-    app.include_router(databases.router)
-    app.include_router(query.router)
-    app.include_router(jobs.router)
+    for router in ROUTERS:
+        app.include_router(router)
 
     if STATIC_DIR.exists():
         app.mount("/assets", StaticFiles(directory=STATIC_DIR / "assets"), name="assets")

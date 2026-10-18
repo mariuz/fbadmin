@@ -1,7 +1,8 @@
 import { createContext, useContext, type ReactNode } from "react";
 import type { Selection, Server } from "./types";
 
-export type WorkTabKind = "query" | "data" | "monitor" | "serverlog" | "jobs" | "serverinfo";
+/** Built-in kinds plus any kind registered by a feature (see registry.tsx). */
+export type WorkTabKind = string;
 
 export interface WorkTab {
   id: string;
@@ -13,6 +14,8 @@ export interface WorkTab {
   otype?: string;
   initialSql?: string;
   autorun?: boolean;
+  /** Feature-specific data for registered tab kinds. */
+  props?: Record<string, any>;
 }
 
 export interface AppApi {

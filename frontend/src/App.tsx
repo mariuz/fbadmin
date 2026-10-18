@@ -9,6 +9,7 @@ import { QueryTool } from "./components/QueryTool";
 import { DataView } from "./components/DataView";
 import { Monitor } from "./components/Monitor";
 import { JobsPanel, ServerLog } from "./components/Jobs";
+import { getObjectTabs, getTabKind, getTopbarItems } from "./registry";
 import { Flame, IconActivity, IconMoon, IconPlus, IconRefresh, IconSun, IconTable, IconTerminal, IconX } from "./components/Icons";
 
 const FIXED_TABS = [
@@ -63,7 +64,10 @@ export default function App() {
     let id = t.id;
     setTabs((cur) => {
       if (t.kind !== "query") {
-        const existing = cur.find((x) => x.kind === t.kind && x.serverId === t.serverId && x.dbId === t.dbId && x.name === t.name);
+        const reg = getTabKind(t.kind);
+        const existing = cur.find((x) => x.kind === t.kind && (reg?.same
+          ? reg.same(x, t)
+          : x.serverId === t.serverId && x.dbId === t.dbId && x.name === t.name));
         if (existing) {
           id = existing.id;
           return cur;
@@ -141,6 +145,8 @@ export default function App() {
     const k = selectionKey(selection);
     if (k === lastSel.current) return;
     lastSel.current = k;
+    const extra = getObjectTabs().find((t) => t.id === active);
+    if (extra && !extra.applies(selection)) { setActive("properties"); return; }
     if (!FIXED_TABS.some((t) => t.id === active)) return;
     if (selection?.kind === "object" || selection?.kind === "column") {
       if (active === "dashboard") setActive("properties");
@@ -180,6 +186,7 @@ export default function App() {
             onClick={() => selection && selIsRelation && openTab({ kind: "data", title: selection.name!, serverId: selection.serverId, dbId: selection.dbId, otype: selection.otype, name: selection.name })}>
             <IconTable /> View data
           </button>
+          {getTopbarItems().map((it) => <span key={it.id}>{it.render(app)}</span>)}
           <span className="spacer" />
           <button className="tb" onClick={() => openTab({ kind: "jobs", title: "Processes" })}>
             <IconActivity /> Processes {runningJobs > 0 && <span className="badge">{runningJobs}</span>}
@@ -205,10 +212,15 @@ export default function App() {
                   <span className="t">{t.title}</span>
                 </div>
               ))}
+              {getObjectTabs().filter((t) => t.applies(selection)).map((t) => (
+                <div key={t.id} className={"tab" + (active === t.id ? " active" : "")} onClick={() => setActive(t.id)}>
+                  <span className="t">{t.title}</span>
+                </div>
+              ))}
               {tabs.map((t) => (
                 <div key={t.id} className={"tab" + (active === t.id ? " active" : "")} onClick={() => setActive(t.id)}
                   onAuxClick={(e) => e.button === 1 && closeTab(t.id)} title={t.title}>
-                  {t.kind === "query" ? <IconTerminal size={13} /> : t.kind === "data" ? <IconTable size={13} /> : <IconActivity size={13} />}
+                  {t.kind === "query" ? <IconTerminal size={13} /> : t.kind === "data" ? <IconTable size={13} /> : getTabKind(t.kind)?.icon ?? <IconActivity size={13} />}
                   <span className="t">{t.title}</span>
                   <button className="x" onClick={(e) => { e.stopPropagation(); closeTab(t.id); }}><IconX size={12} /></button>
                 </div>
@@ -218,6 +230,11 @@ export default function App() {
               {FIXED_TABS.map((t) => (
                 <div key={t.id} className={"tab-pane" + (active === t.id ? "" : " hidden")}>{active === t.id && renderFixed(t.id)}</div>
               ))}
+              {getObjectTabs().map((t) => (
+                <div key={t.id} className={"tab-pane" + (active === t.id ? "" : " hidden")}>
+                  {active === t.id && selection && t.applies(selection) && t.render(selection, detail)}
+                </div>
+              ))}
               {tabs.map((t) => (
                 <div key={t.id} className={"tab-pane" + (active === t.id ? "" : " hidden")} style={{ overflow: "hidden" }}>
                   {t.kind === "query" && <QueryTool serverId={t.serverId!} dbId={t.dbId!} initialSql={t.initialSql} autorun={t.autorun} visible={active === t.id} />}
@@ -226,6 +243,7 @@ export default function App() {
                   {t.kind === "jobs" && <JobsPanel visible={active === t.id} />}
                   {t.kind === "serverlog" && <ServerLog serverId={t.serverId!} />}
                   {t.kind === "serverinfo" && <Dashboard sel={{ kind: "server", serverId: t.serverId! }} />}
+                  {getTabKind(t.kind)?.render(t, active === t.id)}
                 </div>
               ))}
             </div>

@@ -21,7 +21,7 @@ function serverIdFromPath(path: string): string | null {
   return m ? m[1] : null;
 }
 
-async function request<T>(method: string, path: string, body?: unknown, retry = true): Promise<T> {
+export async function request<T>(method: string, path: string, body?: unknown, retry = true): Promise<T> {
   const res = await fetch(path, {
     method,
     headers: body !== undefined ? { "Content-Type": "application/json" } : undefined,
