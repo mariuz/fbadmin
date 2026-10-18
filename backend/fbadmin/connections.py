@@ -23,6 +23,7 @@ from contextlib import contextmanager
 import firebirdsql
 from firebirdsql import services
 
+from .query import QuerySession, apply_tpb, end_transaction
 from .store import DatabaseEntry, ServerEntry, ServerStore
 
 
@@ -73,7 +74,7 @@ class ConnectionManager:
         self.store = store
         self._lock = threading.RLock()
         self._meta: dict[tuple[str, str], FbConnection] = {}
-        self._sessions: dict[str, tuple[str, str, FbConnection, dict]] = {}
+        self._sessions: dict[str, QuerySession] = {}
 
     # --- helpers -------------------------------------------------------
     def _password(self, server_id: str) -> str:
@@ -122,8 +123,9 @@ class ConnectionManager:
             keys = [k for k in self._meta if k[0] == server_id and (db_id is None or k[1] == db_id)]
             for k in keys:
                 self._meta.pop(k).close()
-            for sid in [s for s, v in self._sessions.items() if v[0] == server_id and (db_id is None or v[1] == db_id)]:
-                self._sessions.pop(sid)[2].close()
+            for sid in [s for s, v in self._sessions.items()
+                        if v.server_id == server_id and (db_id is None or v.db_id == db_id)]:
+                _close_quietly(self._sessions.pop(sid).conn)
 
     # --- services API --------------------------------------------------
     @contextmanager
@@ -146,45 +148,91 @@ class ConnectionManager:
                 pass
 
     # --- query tool sessions -------------------------------------------
-    def open_session(self, server_id: str, db_id: str) -> str:
+    def open_session(self, server_id: str, db_id: str) -> tuple[str, QuerySession]:
         fbc = self._open(server_id, db_id)
+        conn = fbc.conn
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT CURRENT_CONNECTION, RDB$GET_CONTEXT('SYSTEM', 'ENGINE_VERSION') FROM RDB$DATABASE"
+        )
+        att, version = cur.fetchone()
+        end_transaction(conn, commit=True)
+        sess = QuerySession(conn=conn, server_id=server_id, db_id=db_id, attachment_id=att,
+                            engine_major=int(str(version).split(".")[0]))
+        apply_tpb(conn, sess.tx.tpb())
         sid = uuid.uuid4().hex
         with self._lock:
-            self._sessions[sid] = (server_id, db_id, fbc, {"autocommit": True})
-        return sid
+            self._sessions[sid] = sess
+        return sid, sess
 
-    def session(self, sid: str) -> tuple[FbConnection, dict]:
+    def session(self, sid: str) -> QuerySession:
         with self._lock:
             try:
-                _, _, fbc, opts = self._sessions[sid]
+                sess = self._sessions[sid]
             except KeyError:
                 raise KeyError(f"Unknown or expired query session {sid!r}") from None
-        fbc.last_used = time.time()
-        return fbc, opts
+        sess.last_used = time.time()
+        return sess
 
     def close_session(self, sid: str) -> None:
         with self._lock:
-            entry = self._sessions.pop(sid, None)
-        if entry:
-            _safe_rollback(entry[2].conn)
-            entry[2].close()
+            sess = self._sessions.pop(sid, None)
+        if sess:
+            _safe_rollback(sess.conn)
+            _close_quietly(sess.conn)
 
     def reap_idle(self, max_idle: int) -> int:
         now = time.time()
         with self._lock:
-            stale = [s for s, v in self._sessions.items() if now - v[2].last_used > max_idle]
+            stale = [s for s, v in self._sessions.items() if now - v.last_used > max_idle and not v.lock._is_owned()]
         for sid in stale:
             self.close_session(sid)
         return len(stale)
+
+    def attachment_stats(self, server_id: str, db_id: str, attachment_id: int) -> dict | None:
+        """Cumulative I/O and record counters of one attachment (read from MON$ via the metadata connection)."""
+        with self.meta(server_id, db_id) as conn:
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT io.MON$PAGE_READS, io.MON$PAGE_WRITES, io.MON$PAGE_FETCHES, io.MON$PAGE_MARKS, "
+                "r.MON$RECORD_SEQ_READS, r.MON$RECORD_IDX_READS, r.MON$RECORD_INSERTS, r.MON$RECORD_UPDATES, "
+                "r.MON$RECORD_DELETES, r.MON$RECORD_BACKOUTS, r.MON$RECORD_PURGES, r.MON$RECORD_EXPUNGES "
+                "FROM MON$ATTACHMENTS a JOIN MON$IO_STATS io ON io.MON$STAT_ID = a.MON$STAT_ID "
+                "JOIN MON$RECORD_STATS r ON r.MON$STAT_ID = a.MON$STAT_ID WHERE a.MON$ATTACHMENT_ID = ?",
+                [attachment_id],
+            )
+            row = cur.fetchone()
+        if not row:
+            return None
+        keys = ("reads", "writes", "fetches", "marks", "seq_reads", "idx_reads", "inserts", "updates",
+                "deletes", "backouts", "purges", "expunges")
+        return dict(zip(keys, row, strict=True))
+
+    def cancel(self, sid: str) -> int:
+        """Cancel whatever the session is running, from a different attachment."""
+        sess = self.session(sid)
+        with self.meta(sess.server_id, sess.db_id) as conn:
+            cur = conn.cursor()
+            cur.execute(
+                "DELETE FROM MON$STATEMENTS WHERE MON$ATTACHMENT_ID = ? AND MON$STATE <> 0", [sess.attachment_id]
+            )
+            return cur.rowcount
 
     def close_all(self) -> None:
         with self._lock:
             for fbc in self._meta.values():
                 fbc.close()
             for v in self._sessions.values():
-                v[2].close()
+                _close_quietly(v.conn)
             self._meta.clear()
             self._sessions.clear()
+
+
+def _close_quietly(conn) -> None:
+    try:
+        conn.close()
+    except Exception:  # noqa: BLE001
+        pass
 
 
 def _safe_rollback(conn) -> None:

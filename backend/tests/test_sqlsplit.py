@@ -87,3 +87,25 @@ def test_declare_section_before_begin():
     out = sqls(script)
     assert len(out) == 3, out
     assert out[1] == "alter trigger t inactive"
+
+
+def test_start_column_and_offset():
+    script = "select 1 from rdb$database;  select 2\nfrom rdb$database;\n  -- note\n  select 3 from rdb$database"
+    st = split_sql(script)
+    assert [(s.line, s.col) for s in st] == [(1, 1), (1, 30), (3, 3)]
+    assert script[st[1].offset:].startswith("select 2")
+    assert st[2].sql.startswith("-- note")
+
+
+def test_bind_params():
+    from fbadmin.sqlsplit import bind_params, script_params
+
+    sql, names = bind_params("select * from t where a = :a and b = ? and c = ':x' and d = :a -- :y", [0])
+    assert sql == "select * from t where a = ? and b = ? and c = ':x' and d = ? -- :y"
+    assert names == ["A", "$1", "A"]
+    # PSQL modules use :vars internally
+    assert bind_params("execute block returns (x int) as begin x = :x; end", [0])[1] == []
+    assert bind_params("create procedure p as begin select 1 from t into :v; end", [0])[1] == []
+    assert script_params("select :b, ? from t; update t set x = :b, y = ?;") == ["B", "$1", "$2"]
+    assert script_params('select :"lower" from t') == ["lower"]
+    assert script_params("select q'{:not}' from t") == []

@@ -77,6 +77,36 @@ def drop_object(server_id: str, db_id: str, otype: str, name: str):
     return {"sql": sql}
 
 
+@router.get("/completion")
+def completion(server_id: str, db_id: str):
+    """Names for editor autocompletion: relations with columns, procedures, functions, packages."""
+    with get_state().manager.meta(server_id, db_id) as conn:
+        cat = Catalog(conn)
+        rels: dict[str, list[str]] = {}
+        for r in cat.rows(
+            "SELECT TRIM(rf.RDB$RELATION_NAME) AS rel, TRIM(rf.RDB$FIELD_NAME) AS col FROM RDB$RELATION_FIELDS rf "
+            "JOIN RDB$RELATIONS r ON r.RDB$RELATION_NAME = rf.RDB$RELATION_NAME "
+            "WHERE COALESCE(r.RDB$SYSTEM_FLAG, 0) = 0 OR r.RDB$RELATION_NAME STARTING WITH 'MON$' "
+            "OR r.RDB$RELATION_NAME STARTING WITH 'RDB$' OR r.RDB$RELATION_NAME STARTING WITH 'SEC$' "
+            "ORDER BY rf.RDB$RELATION_NAME, rf.RDB$FIELD_POSITION"
+        ):
+            rels.setdefault(r["rel"], []).append(r["col"])
+        procs = [r["name"] for r in cat.rows(
+            "SELECT TRIM(RDB$PROCEDURE_NAME) AS name FROM RDB$PROCEDURES "
+            "WHERE RDB$PACKAGE_NAME IS NULL AND COALESCE(RDB$SYSTEM_FLAG, 0) = 0")]
+        funcs = [r["name"] for r in cat.rows(
+            "SELECT TRIM(RDB$FUNCTION_NAME) AS name FROM RDB$FUNCTIONS "
+            "WHERE RDB$PACKAGE_NAME IS NULL AND COALESCE(RDB$SYSTEM_FLAG, 0) = 0")]
+        pkgs = {}
+        for r in cat.rows(
+            "SELECT TRIM(RDB$PACKAGE_NAME) AS pkg, TRIM(RDB$PROCEDURE_NAME) AS name FROM RDB$PROCEDURES "
+            "WHERE RDB$PACKAGE_NAME IS NOT NULL UNION ALL SELECT TRIM(RDB$PACKAGE_NAME), TRIM(RDB$FUNCTION_NAME) "
+            "FROM RDB$FUNCTIONS WHERE RDB$PACKAGE_NAME IS NOT NULL"
+        ):
+            pkgs.setdefault(r["pkg"], []).append(r["name"])
+        return {"relations": rels, "procedures": procs, "functions": funcs, "packages": pkgs}
+
+
 @router.post("/execute")
 def execute(server_id: str, db_id: str, body: ExecuteIn):
     """Run a script in autocommit mode (used by create/alter dialogs)."""
