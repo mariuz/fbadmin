@@ -10,6 +10,21 @@ from typing import Any
 
 _TABLE_RE = re.compile(r"^(\S.*?) \((\d+)\)\s*$")
 _INDEX_RE = re.compile(r"^\s+Index (.+?) \((\d+)\)\s*$")
+_QUALIFIED_RE = re.compile(r'^"((?:[^"]|"")+)"\."((?:[^"]|"")+)"$')
+
+
+def _split_name(raw: str) -> tuple[str | None, str]:
+    """Firebird 6 prints schema-qualified, quoted names: "APP"."T1". Returns (schema, name)."""
+    m = _QUALIFIED_RE.match(raw.strip())
+    if not m:
+        return None, raw
+    return m.group(1).replace('""', '"'), m.group(2).replace('""', '"')
+
+
+def _display(schema: str | None, name: str) -> str:
+    return name if schema in (None, "PUBLIC", "SYSTEM") else f"{schema}.{name}"
+
+
 _FILL_RE = re.compile(r"^\s*(\d+)\s*-\s*(\d+)%\s*=\s*(\d+)\s*$")
 _LEVEL_RE = re.compile(r"Level (\d+): (\d+)")
 
@@ -109,13 +124,16 @@ def parse(text: str) -> dict[str, Any]:
             continue
         mi = _INDEX_RE.match(line)
         if mi and table is not None:
-            index = {"name": mi.group(1), "id": int(mi.group(2)), "fill_distribution": [0] * 5}
+            sch, nm = _split_name(mi.group(1))
+            index = {"name": _display(sch, nm), "schema": sch, "id": int(mi.group(2)), "fill_distribution": [0] * 5}
             table["indices"].append(index)
             in_fill = False
             continue
         mt = _TABLE_RE.match(line)
         if mt:
-            table = {"name": mt.group(1), "id": int(mt.group(2)), "fill_distribution": [0] * 5, "indices": []}
+            sch, nm = _split_name(mt.group(1))
+            table = {"name": _display(sch, nm), "schema": sch, "id": int(mt.group(2)), "fill_distribution": [0] * 5,
+                     "indices": []}
             result["tables"].append(table)
             index = None
             in_fill = False

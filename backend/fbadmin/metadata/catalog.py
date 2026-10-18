@@ -9,6 +9,7 @@ from __future__ import annotations
 from functools import cached_property
 from typing import Any
 
+from ..schema_ctx import current_schema, inline_params, scope_sql
 from .catalog_extras import CatalogExtras, sql_security_clause
 from .types import format_type, quote_ident, sql_string
 
@@ -100,13 +101,54 @@ def _is_auto_name(name: str | None) -> bool:
 class Catalog(CatalogExtras):
     """Metadata reader bound to a single open connection."""
 
-    def __init__(self, conn):
+    def __init__(self, conn, schema: str | None = None):
         self.conn = conn
         self._seg_cache: dict[str, list[str]] = {}
         self._col_cache: dict[tuple[str, str], bool] = {}
+        self._schema_arg = schema
+
+    # ----------------------------------------------------------------- schemas (Firebird 6)
+    @cached_property
+    def schemas_supported(self) -> bool:
+        r = self.rows("SELECT COUNT(*) AS n FROM RDB$RELATIONS WHERE RDB$RELATION_NAME = 'RDB$SCHEMAS'",
+                      scoped=False)
+        return bool(r and r[0]["n"])
+
+    @cached_property
+    def inline_params(self) -> bool:
+        """Firebird 6 snapshots do not find system-table rows through their indices when the
+        name is a parameter (``WHERE RDB$RELATION_NAME = ?`` returns nothing), so metadata
+        queries inline their (quoted) parameters as literals there."""
+        return self.schemas_supported
+
+    @cached_property
+    def schema(self) -> str | None:
+        """The schema this catalog is restricted to (Firebird 6 only), or None."""
+        name = self._schema_arg if self._schema_arg is not None else current_schema.get()
+        return name if name and self.schemas_supported else None
+
+    def schema_cond(self, alias: str, column: str = "RDB$SCHEMA_NAME") -> str:
+        """`` AND alias.column = 'schema'`` when restricted to a schema, else ``""``."""
+        if not self.schema:
+            return ""
+        return f" AND {alias}.{column} = '{self.schema.replace(chr(39), chr(39) * 2)}'"
+
+    def list_schemas(self) -> list[dict[str, Any]]:
+        if not self.schemas_supported:
+            return []
+        return self.rows(
+            "SELECT TRIM(s.RDB$SCHEMA_NAME) AS name, TRIM(s.RDB$OWNER_NAME) AS owner, "
+            "TRIM(s.RDB$CHARACTER_SET_NAME) AS charset, s.RDB$SYSTEM_FLAG AS system_flag, "
+            "s.RDB$DESCRIPTION AS description FROM RDB$SCHEMAS s ORDER BY s.RDB$SYSTEM_FLAG, s.RDB$SCHEMA_NAME",
+            scoped=False,
+        )
 
     # ----------------------------------------------------------------- utils
-    def rows(self, sql: str, params: tuple | list = ()) -> list[dict[str, Any]]:
+    def rows(self, sql: str, params: tuple | list = (), scoped: bool = True) -> list[dict[str, Any]]:
+        if scoped and self.schema:  # Firebird 6: only this schema's objects
+            sql = scope_sql(sql, self.schema)
+        if params and self.inline_params:
+            sql, params = inline_params(sql, list(params)), []
         cur = self.conn.cursor()
         cur.execute(sql, list(params))
         if cur.description is None:
@@ -115,8 +157,8 @@ class Catalog(CatalogExtras):
         data = cur.fetchall() or []
         return [dict(zip(names, r, strict=True)) for r in data]
 
-    def one(self, sql: str, params: tuple | list = ()) -> dict[str, Any] | None:
-        r = self.rows(sql, params)
+    def one(self, sql: str, params: tuple | list = (), scoped: bool = True) -> dict[str, Any] | None:
+        r = self.rows(sql, params, scoped=scoped)
         return r[0] if r else None
 
     def has_column(self, relation: str, column: str) -> bool:
@@ -125,6 +167,7 @@ class Catalog(CatalogExtras):
             r = self.one(
                 "SELECT COUNT(*) AS n FROM RDB$RELATION_FIELDS WHERE RDB$RELATION_NAME = ? AND RDB$FIELD_NAME = ?",
                 (relation, column),
+                scoped=relation[:4] not in ("RDB$", "MON$", "SEC$"),
             )
             self._col_cache[key] = bool(r and r["n"])
         return self._col_cache[key]
@@ -264,7 +307,7 @@ class Catalog(CatalogExtras):
             "SELECT TRIM(f.RDB$FIELD_NAME) AS name, " + _TYPE_COLS + ", f.RDB$DESCRIPTION AS description "
             "FROM RDB$FIELDS f LEFT JOIN RDB$CHARACTER_SETS cs ON cs.RDB$CHARACTER_SET_ID = f.RDB$CHARACTER_SET_ID "
             "WHERE f.RDB$FIELD_NAME NOT STARTING WITH 'RDB$' AND COALESCE(f.RDB$SYSTEM_FLAG, 0) = 0 "
-            "ORDER BY f.RDB$FIELD_NAME"
+            + self.schema_cond("f") + " ORDER BY f.RDB$FIELD_NAME"
         )
         return [{"name": r["name"], "data_type": self._type(r), "description": r["description"]} for r in rows]
 
@@ -566,6 +609,12 @@ class Catalog(CatalogExtras):
         self.extra_properties(otype, name, obj)
         if otype not in ("users",):
             obj["dependencies"] = self.dependencies(name)
+        if self.schema and otype not in ("users", "roles"):
+            obj["schema"] = self.schema
+            obj.setdefault("properties", {})["Schema"] = self.schema
+            if self.schema != "PUBLIC" and obj.get("ddl"):
+                # unqualified names in the DDL resolve (and are created) in this schema
+                obj["ddl"] = f"SET SEARCH_PATH TO {quote_ident(self.schema)}, SYSTEM;\n\n" + obj["ddl"]
         return obj
 
     def _get_tables(self, name: str):
@@ -879,7 +928,7 @@ class Catalog(CatalogExtras):
             "TRIM(co.RDB$COLLATION_NAME) AS collation, f.RDB$DESCRIPTION AS description "
             "FROM RDB$FIELDS f LEFT JOIN RDB$CHARACTER_SETS cs ON cs.RDB$CHARACTER_SET_ID = f.RDB$CHARACTER_SET_ID "
             "LEFT JOIN RDB$COLLATIONS co ON co.RDB$COLLATION_ID = f.RDB$COLLATION_ID "
-            "  AND co.RDB$CHARACTER_SET_ID = f.RDB$CHARACTER_SET_ID WHERE f.RDB$FIELD_NAME = ?",
+            "  AND co.RDB$CHARACTER_SET_ID = f.RDB$CHARACTER_SET_ID WHERE f.RDB$FIELD_NAME = ?" + self.schema_cond("f"),
             (name,),
         )
         if not r:
@@ -1019,14 +1068,14 @@ class Catalog(CatalogExtras):
     def dependencies(self, name: str) -> dict[str, list[dict[str, Any]]]:
         uses = self.rows(
             "SELECT DISTINCT TRIM(RDB$DEPENDED_ON_NAME) AS name, RDB$DEPENDED_ON_TYPE AS dtype, "
-            "TRIM(RDB$FIELD_NAME) AS field FROM RDB$DEPENDENCIES WHERE RDB$DEPENDENT_NAME = ? "
-            "AND RDB$DEPENDED_ON_NAME <> ?",
+            "TRIM(RDB$FIELD_NAME) AS field FROM RDB$DEPENDENCIES d WHERE RDB$DEPENDENT_NAME = ? "
+            "AND RDB$DEPENDED_ON_NAME <> ?" + self.schema_cond("d", "RDB$DEPENDENT_SCHEMA_NAME"),
             (name, name),
         )
         used_by = self.rows(
             "SELECT DISTINCT TRIM(RDB$DEPENDENT_NAME) AS name, RDB$DEPENDENT_TYPE AS dtype, "
-            "TRIM(RDB$FIELD_NAME) AS field FROM RDB$DEPENDENCIES WHERE RDB$DEPENDED_ON_NAME = ? "
-            "AND RDB$DEPENDENT_NAME <> ?",
+            "TRIM(RDB$FIELD_NAME) AS field FROM RDB$DEPENDENCIES d WHERE RDB$DEPENDED_ON_NAME = ? "
+            "AND RDB$DEPENDENT_NAME <> ?" + self.schema_cond("d", "RDB$DEPENDED_ON_SCHEMA_NAME"),
             (name, name),
         )
         for r in uses + used_by:

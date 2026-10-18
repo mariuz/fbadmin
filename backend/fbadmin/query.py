@@ -121,6 +121,29 @@ class QuerySession:
             end_transaction(self.conn, commit=True)
             self.statement_timeout = statement_timeout
 
+    def set_search_path(self, schema: str) -> None:
+        """Firebird 6: make ``schema`` (then SYSTEM) the search path of this session."""
+        if self.engine_major < 6:
+            raise ValueError("SQL schemas need Firebird 6 or newer")
+        if self.dirty:
+            raise ValueError("Commit or roll back the open transaction before changing the schema")
+        self.close_cursor()
+        from .metadata.types import quote_ident
+
+        cur = self.conn.cursor()
+        cur.execute(f"SET SEARCH_PATH TO {quote_ident(schema)}, SYSTEM")
+        end_transaction(self.conn, commit=True)
+
+    def current_search_path(self) -> str | None:
+        if self.engine_major < 6:
+            return None
+        cur = self.conn.cursor()
+        cur.execute("SELECT RDB$GET_CONTEXT('SYSTEM', 'SEARCH_PATH') FROM RDB$DATABASE")
+        row = cur.fetchone()
+        if not self.dirty:
+            end_transaction(self.conn, commit=True)
+        return row[0] if row else None
+
     def options(self) -> dict:
         return {
             "isolation": self.tx.isolation,

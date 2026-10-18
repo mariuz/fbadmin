@@ -20,7 +20,7 @@ def _nolog(_line: str) -> None:
 
 # ------------------------------------------------------------------ versions
 def engine_major(svc) -> int:
-    m = re.search(r"V(\d+)\.", svc.getServerVersion())
+    m = re.search(r"-[VTB](\d+)\.", svc.getServerVersion())  # V = release, T = test (snapshot), B = beta
     return int(m.group(1)) if m else 3
 
 

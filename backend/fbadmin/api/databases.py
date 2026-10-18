@@ -45,6 +45,14 @@ def connect_database(server_id: str, db_id: str):
         return {"engine_version": cat.engine_version, "charset": cat.default_charset}
 
 
+@router.get("/schemas")
+def list_schemas(server_id: str, db_id: str):
+    """SQL schemas (Firebird 6+); an empty list on older servers."""
+    with get_state().manager.meta(server_id, db_id) as conn:
+        cat = Catalog(conn, schema="")
+        return {"supported": cat.schemas_supported, "schemas": to_json(cat.list_schemas())}
+
+
 @router.get("/objects")
 def object_types(server_id: str, db_id: str):
     return [{"type": k, **v} for k, v in OBJECT_TYPES.items()]

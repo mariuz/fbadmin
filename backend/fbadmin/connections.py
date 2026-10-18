@@ -25,7 +25,9 @@ import firebirdsql
 from firebirdsql import services
 
 from .native import connect_native, native_enabled
+from .metadata.types import quote_ident
 from .query import QuerySession, TxOptions, apply_tpb, end_transaction
+from .schema_ctx import current_schema
 from .store import DatabaseEntry, ServerEntry, ServerStore
 
 
@@ -163,6 +165,8 @@ class ConnectionManager:
         fbc = self._acquire_meta(key)
         try:
             fbc.last_used = time.time()
+            schema = current_schema.get()
+            switched = schema is not None and _set_search_path(fbc, schema)
             try:
                 yield fbc.conn
                 fbc.conn.commit()
@@ -178,6 +182,8 @@ class ConnectionManager:
                 _safe_rollback(fbc.conn)
                 raise
         finally:
+            if switched:
+                _restore_search_path(fbc)
             fbc.last_used = time.time()
             fbc.lock.release()
 
@@ -224,6 +230,9 @@ class ConnectionManager:
             "SELECT CURRENT_CONNECTION, RDB$GET_CONTEXT('SYSTEM', 'ENGINE_VERSION') FROM RDB$DATABASE"
         )
         att, version = cur.fetchone()
+        schema = current_schema.get()
+        if schema and int(str(version).split(".")[0]) >= 6:
+            cur.execute(f"SET SEARCH_PATH TO {quote_ident(schema)}, SYSTEM")  # Query Tool opened in a schema
         end_transaction(conn, commit=True)
         sess = QuerySession(conn=conn, server_id=server_id, db_id=db_id, attachment_id=att,
                             engine_major=int(str(version).split(".")[0]))
@@ -311,6 +320,38 @@ class ConnectionManager:
                 _close_quietly(v.conn)
             self._meta.clear()
             self._sessions.clear()
+
+
+def _supports_schemas(fbc) -> bool:
+    if not hasattr(fbc, "schemas"):
+        try:
+            cur = fbc.conn.cursor()
+            cur.execute("SELECT RDB$GET_CONTEXT('SYSTEM', 'SEARCH_PATH') FROM RDB$DATABASE")
+            row = cur.fetchone()
+            fbc.schemas = bool(row and row[0])
+            fbc.default_search_path = row[0] if row else None
+        except Exception:  # noqa: BLE001 - Firebird < 6: no SEARCH_PATH context variable
+            _safe_rollback(fbc.conn)
+            fbc.schemas = False
+    return fbc.schemas
+
+
+def _set_search_path(fbc, schema: str) -> bool:
+    """Firebird 6: resolve unqualified names in ``schema`` (then SYSTEM) for this request."""
+    if not _supports_schemas(fbc):
+        return False
+    cur = fbc.conn.cursor()
+    cur.execute(f"SET SEARCH_PATH TO {quote_ident(schema)}, SYSTEM")
+    return True
+
+
+def _restore_search_path(fbc) -> None:
+    try:
+        cur = fbc.conn.cursor()
+        cur.execute(f"SET SEARCH_PATH TO {fbc.default_search_path or 'PUBLIC, SYSTEM'}")
+        fbc.conn.commit()
+    except Exception:  # noqa: BLE001
+        _safe_rollback(fbc.conn)
 
 
 def _close_quietly(conn) -> None:

@@ -61,7 +61,7 @@ def db(client, database):
 
 def test_lookups_and_new_object_types(db):
     lk = db.c.get(db.b + "/designer/lookups").json()
-    assert lk["engine_major"] in (3, 4, 5)
+    assert lk["engine_major"] >= 3
     assert "UTF8" in lk["charsets"]
     assert any(c["name"] == "UNICODE_CI" for c in lk["collations"])
 

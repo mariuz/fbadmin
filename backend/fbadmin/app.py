@@ -19,6 +19,7 @@ from .connections import PasswordRequired
 from .maintenance import scheduler
 from .metadata import OBJECT_TYPES
 from .plugins import load_plugins
+from .schema_ctx import current_schema, valid_schema
 from .monitoring.history import start_sampler
 from .middleware import install_middleware
 
@@ -50,6 +51,18 @@ def create_app() -> FastAPI:
     app = FastAPI(title="fbadmin", version=__version__, lifespan=lifespan)
     # Request logging, rate limiting and request-size limits (see middleware.py; all configurable).
     install_middleware(app)
+
+    @app.middleware("http")
+    async def _schema_context(request: Request, call_next):
+        # Firebird 6 schemas: X-Fbadmin-Schema scopes metadata and search path (schema_ctx.py)
+        try:
+            token = current_schema.set(valid_schema(request.headers.get("x-fbadmin-schema")))
+        except ValueError:
+            return JSONResponse(status_code=400, content={"detail": "Invalid schema name"})
+        try:
+            return await call_next(request)
+        finally:
+            current_schema.reset(token)
 
     @app.exception_handler(PasswordRequired)
     async def _pw(request: Request, exc: PasswordRequired):

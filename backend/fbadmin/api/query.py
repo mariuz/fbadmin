@@ -44,6 +44,7 @@ class OptionsIn(BaseModel):
     wait: bool = True
     lock_timeout: int | None = None
     statement_timeout: int | None = None  # ms, 0 = none
+    search_schema: str | None = None  # Firebird 6: search path schema
 
 
 @router.get("/isolations")
@@ -60,7 +61,8 @@ def params(body: ExplainIn):
 @router.post("/sessions", status_code=201)
 def open_session(body: SessionIn):
     sid, sess = get_state().manager.open_session(body.server_id, body.database_id)
-    return {"session_id": sid, "options": sess.options()}
+    with sess.lock:
+        return {"session_id": sid, "options": {**sess.options(), "search_path": sess.current_search_path()}}
 
 
 @router.get("/sessions/{sid}/options")
@@ -77,7 +79,9 @@ def set_options(sid: str, body: OptionsIn):
                       lock_timeout=body.lock_timeout),
             body.statement_timeout,
         )
-        return sess.options()
+        if body.search_schema:
+            sess.set_search_path(body.search_schema)
+        return {**sess.options(), "search_path": sess.current_search_path()}
 
 
 @router.post("/sessions/{sid}/execute")
