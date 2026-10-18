@@ -186,8 +186,6 @@ class SecurityMiddleware:
                                                       "csrf_failed"), extra_headers)
                         return
                 tokens.append(current_principal.set(principal))
-            elif not public:
-                return
 
         # ---- read-only servers and audit (server and query-session endpoints only)
         audit_ctx: dict[str, Any] | None = None
@@ -262,6 +260,8 @@ class SecurityMiddleware:
                 srv = st.store.get(server_id)
             except KeyError:
                 srv = None
+        if db_id and (srv is None or all(d.id != db_id for d in srv.databases)):
+            db_id = None  # e.g. /databases/create
 
         # read-only enforcement
         if srv is not None and srv.read_only:
@@ -302,7 +302,7 @@ class SecurityMiddleware:
             if registry or last in _NOT_AUDITED_ACTIONS:
                 return None, None
             return None, {"kind": "action", "server_id": server_id, "db_id": db_id, "capture": True,
-                          "statement": f"{method} {path}"}
+                          "statement": f"{method} {path}" + _body_summary(body)}
         return None, None
 
     def _audit(self, sec, ctx: dict[str, Any], status: int, resp: bytes, req_body: bytes) -> None:
@@ -374,6 +374,18 @@ def _limited_receive(receive, limit: int):
         return msg
 
     return inner
+
+
+def _body_summary(body: bytes) -> str:
+    """Request body for the audit log, without secrets."""
+    try:
+        data = json.loads(body or b"null")
+    except ValueError:
+        return ""
+    if not isinstance(data, dict) or not data:
+        return ""
+    clean = {k: ("***" if "password" in k.lower() or "secret" in k.lower() else v) for k, v in data.items()}
+    return "\n" + json.dumps(clean, default=str)[:2000]
 
 
 def _json_field(body: bytes, key: str) -> Any:

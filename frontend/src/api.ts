@@ -21,10 +21,22 @@ function serverIdFromPath(path: string): string | null {
   return m ? m[1] : null;
 }
 
+// --- security (server mode): CSRF token header and handlers for auth errors -------------
+/** Error code (e.g. "auth_required", "master_password_required") -> handler; true = retry the request. */
+const errorHandlers: Record<string, () => Promise<boolean>> = {};
+export function setErrorHandler(code: string, fn: () => Promise<boolean>) {
+  errorHandlers[code] = fn;
+}
+function csrfHeaders(method: string): Record<string, string> {
+  if (method === "GET" || method === "HEAD") return {};
+  const m = document.cookie.match(/(?:^|;\s*)fbadmin_csrf=([^;]+)/);
+  return m ? { "X-CSRF-Token": decodeURIComponent(m[1]) } : {};
+}
+
 export async function request<T>(method: string, path: string, body?: unknown, retry = true): Promise<T> {
   const res = await fetch(path, {
     method,
-    headers: body !== undefined ? { "Content-Type": "application/json" } : undefined,
+    headers: { ...(body !== undefined ? { "Content-Type": "application/json" } : {}), ...csrfHeaders(method) },
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
   if (res.status === 204) return undefined as T;
@@ -33,6 +45,9 @@ export async function request<T>(method: string, path: string, body?: unknown, r
     if (res.status === 401 && data.code === "password_required" && retry && passwordHandler) {
       const sid = serverIdFromPath(path) ?? (body as any)?.server_id;
       if (sid && (await passwordHandler(sid))) return request<T>(method, path, body, false);
+    }
+    if (retry && data.code && errorHandlers[data.code] && (await errorHandlers[data.code]())) {
+      return request<T>(method, path, body, false);
     }
     const detail = typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail ?? data);
     throw new ApiError(res.status, detail || res.statusText, data.code);

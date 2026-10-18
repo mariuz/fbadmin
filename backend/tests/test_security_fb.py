@@ -183,7 +183,8 @@ def test_firebird_users_sql(audit_on, database):
     assert all(x["name"] != name for x in client.get(s + "/users").json()["users"])
     audit = client.get("/api/admin/audit", params={"q": name}).json()["rows"]
     assert any(r["statement"].startswith("DROP USER") for r in audit)
-    assert not any("pw12345" in r["statement"] for r in audit) or True  # see SECURITY.md (statements are logged)
+    assert not any("pw12345" in r["statement"] for r in audit)  # passwords are redacted
+    assert any("PASSWORD '***'" in r["statement"] for r in audit)
 
 
 def test_firebird_users_services_api(client, server):

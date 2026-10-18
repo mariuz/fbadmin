@@ -156,8 +156,12 @@ class SecurityDB:
 
     def query_audit(self, *, limit: int = 100, offset: int = 0, username: str | None = None,
                     server: str | None = None, text: str | None = None, success: bool | None = None,
-                    since: float | None = None, until: float | None = None) -> dict[str, Any]:
+                    since: float | None = None, until: float | None = None,
+                    category: str | None = None) -> dict[str, Any]:
         where, params = [], []
+        if category:
+            where.append("category = ?")
+            params.append(category)
         if username:
             where.append("username = ?")
             params.append(username)

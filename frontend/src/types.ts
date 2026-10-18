@@ -14,6 +14,10 @@ export interface Server {
   role: string | null;
   charset: string;
   wire_crypt: boolean;
+  wire_compress?: boolean;
+  auth_plugin?: string | null;
+  read_only?: boolean;
+  shared?: boolean;
   save_password: boolean;
   group: string;
   has_password: boolean;

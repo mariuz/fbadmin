@@ -75,9 +75,10 @@ def audit(
     success: bool | None = None,
     since: float | None = None,
     until: float | None = None,
+    category: str | None = None,
 ):
     require_admin()
     sec = get_state().security
     out = sec.db.query_audit(limit=limit, offset=offset, username=username, server=server, text=q,
-                             success=success, since=since, until=until) if sec.db.exists else {"total": 0, "rows": []}
+                             success=success, since=since, until=until, category=category) if sec.db.exists else {"total": 0, "rows": []}
     return {**out, "enabled": sec.audit.enabled}

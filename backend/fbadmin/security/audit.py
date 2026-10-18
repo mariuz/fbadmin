@@ -8,6 +8,7 @@ actions) and directly by the security API (user, role and mapping changes).
 from __future__ import annotations
 
 import getpass
+import re
 import time
 from typing import Any
 
@@ -15,6 +16,12 @@ from .readonly import category
 from .sessions import current_client_ip, current_principal
 
 MAX_STATEMENT = 20000
+_PASSWORD = re.compile(r"(\bPASSWORD\s+)'(?:[^']|'')*'", re.IGNORECASE)
+
+
+def redact(sql: str) -> str:
+    """Hide passwords of CREATE/ALTER USER statements."""
+    return _PASSWORD.sub(r"\1'***'", sql)
 
 
 def _who() -> str:
@@ -59,7 +66,7 @@ class AuditLog:
             "username": _who(),
             "client_ip": current_client_ip.get(),
             "category": cat or category(statement),
-            "statement": statement[:MAX_STATEMENT],
+            "statement": redact(statement)[:MAX_STATEMENT],
             "success": int(bool(success)),
             "error": (error or None) and str(error)[:4000],
             "row_count": row_count,

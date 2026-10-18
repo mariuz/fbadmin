@@ -172,6 +172,8 @@ export function Dashboard(props: { sel: Selection | null }) {
   }
   if (error) return <div className="pad err" style={{ whiteSpace: "pre-wrap" }}>{error}</div>;
   if (!data) return <div className="pad muted">Loading…</div>;
+  // stale data of the previous selection (server <-> database) for one render
+  if ((sel.kind === "server") === "info" in data) return <div className="pad muted">Loading…</div>;
 
   if (sel.kind === "server") {
     return (
