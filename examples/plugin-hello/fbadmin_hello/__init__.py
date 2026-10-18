@@ -4,7 +4,6 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from fastapi import APIRouter
-
 from fbadmin.api.deps import get_state
 
 router = APIRouter(prefix="/api/hello", tags=["hello"])
