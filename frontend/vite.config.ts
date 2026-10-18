@@ -21,10 +21,12 @@ export default defineConfig({
         manualChunks(id: string) {
           if (!id.includes("node_modules")) return undefined;
           if (id.includes("sql-formatter")) return "sql-formatter";
-          if (id.includes("@codemirror") || id.includes("@lezer") || id.includes("crelt")
-            || id.includes("style-mod") || id.includes("w3c-keyname")) return "codemirror";
+          if (id.includes("@codemirror") || id.includes("@lezer") || id.includes("@replit/codemirror")
+            || id.includes("crelt") || id.includes("style-mod") || id.includes("w3c-keyname")) return "codemirror";
           if (/node_modules\/(react|react-dom|scheduler)\//.test(id)) return "react";
-          return "vendor";
+          // No catch-all "vendor" chunk: a shared bucket can import from (and be imported by)
+          // the chunks above, creating circular chunk imports (TDZ errors at start-up).
+          return undefined;
         },
       },
     },
