@@ -6,8 +6,8 @@ import threading
 import time
 import traceback
 import uuid
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
-from typing import Callable
 
 
 @dataclass

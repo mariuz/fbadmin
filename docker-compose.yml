@@ -1,0 +1,27 @@
+# Try fbadmin with a throw-away Firebird 5 server:
+#   docker compose up --build
+#   open http://localhost:5050 and register server host "firebird", password "masterkey",
+#   database /var/lib/firebird/data/demo.fdb
+#
+# WARNING: fbadmin has no login screen yet (see ROADMAP "server mode").
+# Only publish port 5050 on trusted networks.
+services:
+  firebird:
+    image: firebirdsql/firebird:5
+    environment:
+      FIREBIRD_ROOT_PASSWORD: masterkey
+      FIREBIRD_DATABASE: demo.fdb
+      FIREBIRD_DATABASE_DEFAULT_CHARSET: UTF8
+    volumes:
+      - fbdata:/var/lib/firebird/data
+  fbadmin:
+    build: .
+    ports:
+      - "127.0.0.1:5050:5050"
+    volumes:
+      - fbadmin:/data
+    depends_on:
+      - firebird
+volumes:
+  fbdata:
+  fbadmin:

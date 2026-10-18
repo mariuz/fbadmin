@@ -10,3 +10,4 @@ backend/fbadmin/static/
 *.fdb
 *.fbk
 .env
+build/

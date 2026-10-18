@@ -108,7 +108,7 @@ class Catalog:
             return []
         names = [d[0].lower() for d in cur.description]
         data = cur.fetchall() or []
-        return [dict(zip(names, r)) for r in data]
+        return [dict(zip(names, r, strict=True)) for r in data]
 
     def one(self, sql: str, params: tuple | list = ()) -> dict[str, Any] | None:
         r = self.rows(sql, params)

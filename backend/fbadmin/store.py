@@ -142,7 +142,7 @@ class ServerStore:
         with self._lock:
             db = self.get_database(server_id, db_id)
             for k in ("name", "path"):
-                if k in changes and changes[k]:
+                if changes.get(k):
                     setattr(db, k, changes[k])
             self._save()
             return db

@@ -12,10 +12,10 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import __version__
-from .config import settings
-from .connections import PasswordRequired
 from .api import databases, jobs, query, servers
 from .api.deps import get_state
+from .config import settings
+from .connections import PasswordRequired
 from .metadata import OBJECT_TYPES
 
 STATIC_DIR = Path(__file__).parent / "static"

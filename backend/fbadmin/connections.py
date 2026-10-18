@@ -17,8 +17,8 @@ from __future__ import annotations
 import threading
 import time
 import uuid
+from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Iterator
 
 import firebirdsql
 from firebirdsql import services

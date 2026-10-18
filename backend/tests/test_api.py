@@ -1,7 +1,5 @@
 from pathlib import Path
 
-import pytest
-
 from .conftest import requires_server
 
 pytestmark = requires_server

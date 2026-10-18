@@ -1,1 +1,1 @@
-from .catalog import Catalog, OBJECT_TYPES  # noqa: F401
+from .catalog import OBJECT_TYPES, Catalog  # noqa: F401
