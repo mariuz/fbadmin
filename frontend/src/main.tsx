@@ -4,15 +4,15 @@ import "./locales";
 import "./features";
 import App from "./App";
 import { AuthGate } from "./features/security/AuthGate";
-import { loadPlugins } from "./plugins";
+import { PluginBoot } from "./PluginBoot";
 import "./styles.css";
 
-loadPlugins().finally(() => {
-  createRoot(document.getElementById("root")!).render(
-    <StrictMode>
-      <AuthGate>
+createRoot(document.getElementById("root")!).render(
+  <StrictMode>
+    <AuthGate>
+      <PluginBoot>
         <App />
-      </AuthGate>
-    </StrictMode>,
-  );
-});
+      </PluginBoot>
+    </AuthGate>
+  </StrictMode>,
+);

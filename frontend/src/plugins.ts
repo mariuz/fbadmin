@@ -27,7 +27,15 @@ declare global {
   interface Window { fbadmin?: typeof SDK }
 }
 
-export async function loadPlugins(): Promise<void> {
+let loading: Promise<void> | null = null;
+
+/** Load plugins once per page (safe to call repeatedly). */
+export function loadPlugins(): Promise<void> {
+  loading ??= doLoadPlugins();
+  return loading;
+}
+
+async function doLoadPlugins(): Promise<void> {
   window.fbadmin = SDK;
   let list: Array<{ name: string; frontend: string | null; error?: string }> = [];
   try {
