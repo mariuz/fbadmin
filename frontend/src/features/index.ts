@@ -4,4 +4,5 @@ import "./maintenance";
 import "./monitoring";
 import "./replication";
 import "./update-check";
+import "./objects";
 export {};

@@ -130,6 +130,10 @@ export const OBJECT_TYPES: Array<{ type: string; label: string; singular: string
   { type: "roles", label: "Roles", singular: "Role" },
   { type: "users", label: "Users", singular: "User" },
   { type: "system_tables", label: "System Tables", singular: "System Table" },
+  { type: "collations", label: "Collations", singular: "Collation" },
+  { type: "charsets", label: "Character Sets", singular: "Character Set" },
+  { type: "shadows", label: "Shadows", singular: "Shadow" },
+  { type: "blob_filters", label: "BLOB Filters", singular: "BLOB Filter" },
 ];
 
 export const typeInfo = (t?: string) => OBJECT_TYPES.find((o) => o.type === t);
