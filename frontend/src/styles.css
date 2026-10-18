@@ -196,3 +196,21 @@ pre.plan { margin: 0; padding: 12px; white-space: pre-wrap; }
 .coltable input.text, .coltable select.text { width: 100%; padding: 3px 6px; }
 .coltable td { padding: 3px 4px; }
 h2 .btn { font-size: 13px; font-weight: 400; }
+.cell-viewer { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.cell-viewer .cell-body { flex: 1; overflow: auto; }
+.cell-viewer pre { margin: 0; padding: 10px; white-space: pre-wrap; word-break: break-all; }
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.seg button { border: 0; background: var(--panel); padding: 2px 8px; cursor: pointer; font-size: 12px; }
+.seg button + button { border-left: 1px solid var(--border); }
+.seg button.on { background: var(--accent-soft); color: var(--accent); }
+.popover { position: absolute; top: calc(100% + 4px); left: 0; z-index: 30; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,.18); padding: 12px; width: 340px; }
+.popover .form { grid-template-columns: 130px 1fr; }
+.stats-table td { padding: 1px 10px 1px 0; }
+.plan-tree { margin: 0; padding: 12px; font-family: var(--mono); font-size: 12px; white-space: pre; }
+.plan-tree .op { color: var(--accent); font-weight: 600; }
+.plan-tree .tbl { color: #2563eb; }
+.plan-tree .idx { color: #0d9488; }
+.snippet { padding: 8px 12px; border-bottom: 1px solid var(--border); display: flex; gap: 8px; align-items: flex-start; }
+.snippet pre { margin: 4px 0 0; max-height: 80px; overflow: hidden; flex: 1; }
+.btn.stop { background: var(--danger); border-color: var(--danger); color: #fff; }
+.cm-lintRange-error { background-image: none !important; text-decoration: underline wavy var(--danger); text-underline-offset: 3px; }

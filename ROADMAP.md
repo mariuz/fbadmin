@@ -41,23 +41,28 @@ scope.
 
 ---
 
-## Milestone 0.2 — Query Tool, professional grade
+## Milestone 0.2 — Query Tool, professional grade 🚧 (mostly done)
 
-- ⬜ **Cancel a running query.** Cancel via a second attachment (`DELETE FROM MON$STATEMENTS`), and use `op_cancel` when the driver supports it.
-- ⬜ Statement timeout (`SET STATEMENT TIMEOUT`, Firebird 4+) and lock timeout, set from the toolbar
-- ⬜ Transaction options: isolation (snapshot, read committed with read consistency, snapshot table stability), read-only, wait or no wait
-- ⬜ **Parameter prompt** for `:name` and `?` placeholders, with typed inputs
-- ⬜ **Detailed (explained) plan** (`isc_info_sql_explain_plan`, Firebird 3+), shown as a tree and as a graphical plan
-- ⬜ Per-statement performance stats: reads, fetches, writes and marks from `MON$IO_STATS` / `MON$RECORD_STATS`, before and after
-- ⬜ Server-side cursors: fetch more rows on scroll instead of a hard row limit
-- ⬜ Export results as CSV, TSV, JSON, XLSX, SQL `INSERT` statements or Markdown
-- ⬜ BLOB viewer and editor: text, hex, image preview, JSON pretty-print; download and upload
-- ⬜ SQL formatter (keyword case, indentation) and comment/uncomment
-- ⬜ Column-aware autocompletion (aliases, procedures, functions, package members, `RDB$`/`MON$` columns)
-- ⬜ Snippets and templates library, saved queries and favourites
-- ⬜ Find and replace, multiple cursors, minimap
-- ⬜ Error position highlighted in the editor (from the "line X, column Y" in Firebird errors)
-- ⬜ Results: column resize, freeze, copy with headers, filter results client-side
+- ✅ **Cancel a running query:** a second attachment deletes the session's row in `MON$STATEMENTS`. The Execute button turns into Cancel with a live timer.
+- ✅ Statement timeout (`SET STATEMENT TIMEOUT`, Firebird 4+) and lock timeout, set from the toolbar
+- ✅ Transaction options: isolation (read committed, read consistency on Firebird 4+, no record version, snapshot, snapshot table stability), read-only, wait or no wait
+- ✅ **Parameter prompt** for `:name` and `?` placeholders. Values are remembered and NULL is supported. Placeholders inside PSQL modules are left alone.
+- ✅ **Detailed (explained) plan** (`isc_info_sql_explain_plan`), shown with tables, indices and operators highlighted
+- ⬜ Graphical (box-and-arrow) plan diagram
+- ✅ Per-statement performance stats: page reads, fetches, writes and marks, plus sequential/index reads, inserts, updates, deletes, backouts, purges and expunges (from `MON$IO_STATS` / `MON$RECORD_STATS`)
+- ✅ Server-side cursors: the last result set stays open and "Load more" fetches the next rows
+- ✅ Export results as CSV, TSV, JSON, SQL `INSERT` statements or Markdown
+- ⬜ Export to XLSX
+- ✅ Cell viewer for long text and BLOBs: text, JSON pretty-print, hex dump, image preview, download
+- ⬜ BLOB editing and upload in the data grid
+- ✅ SQL formatter (Shift+Alt+F, keywords upper-cased, parameters kept) and comment toggle (Ctrl+/)
+- ✅ Column-aware autocompletion: table and alias columns, `RDB$`/`MON$`/`SEC$` tables, procedures, functions and package members
+- ✅ Snippets library with built-in examples, save the selection as a snippet, export
+- ✅ Find and replace (Ctrl+F) and multiple cursors / rectangular selection (CodeMirror)
+- ⬜ Minimap
+- ✅ Error position underlined in the editor and marked in the gutter (from Firebird's "line X, column Y"), including when only a selection was run
+- ✅ Results: client-side row filter, sort, copy as TSV
+- ⬜ Results: column resize and freeze
 - ⬜ Macros and keyboard shortcut customisation
 - ⬜ "Query plan diff" between two statements
 - 💡 AI assistant: explain a plan, suggest indices, convert SQL from other dialects (opt-in, pluggable provider)

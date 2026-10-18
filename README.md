@@ -9,7 +9,7 @@ as a container next to your server.
 
 ![Query Tool](docs/screenshots/query-tool.png)
 
-> **Status:** early development (v0.1). See the [ROADMAP](ROADMAP.md) for where it is going.
+> **Status:** early development (v0.2). See the [ROADMAP](ROADMAP.md) for where it is going.
 > Tested against Firebird **3.0, 4.0 and 5.0**.
 
 ## Features
@@ -20,7 +20,7 @@ as a container next to your server.
 | **Properties** | Columns (domain, identity, computed, collation), constraints (PK/UK/FK/CHECK with rules), indices (selectivity, expression, partial), triggers, parameters, comments. |
 | **SQL (DDL)** | Re-creatable DDL for every object type. A round-trip test checks it on every CI run: extract, recreate in an empty database, compare. |
 | **Dependencies** | "Depends on" and "Used by" from `RDB$DEPENDENCIES`, with click-through navigation. |
-| **Query Tool** | CodeMirror editor with Firebird keywords and table autocompletion. Runs a selection or a whole script: `SET TERM`, and PSQL blocks without `SET TERM`, are both split correctly. Multiple result sets, execution plans, auto-commit or manual transactions (commit/rollback), row limits, query history, open/save `.sql` files, CSV/JSON export. |
+| **Query Tool** | CodeMirror editor with Firebird keywords and column-aware autocompletion. Runs a selection or a whole script: `SET TERM`, and PSQL blocks without `SET TERM`, are both split correctly. **Cancel** running statements. `:name` and `?` **parameter prompts**. **Detailed plans**. Per-statement **I/O and record stats**. Transaction settings: isolation, read-only, lock wait/timeout, and statement timeout on Firebird 4+. Auto-commit or manual commit/rollback. "Load more" from an open cursor. Errors underlined at their line and column. Formatter, comment toggle, snippets, history, and CSV/TSV/JSON/SQL/Markdown export. A cell viewer shows JSON, hex and images. |
 | **Data view** | Paged table data with sort and `WHERE` filters. Edit inside the grid: add, update and delete rows, all saved in one transaction. Rows are keyed by primary key, or by `RDB$DB_KEY` when the table has none. |
 | **Dashboard** | Database header info (ODS, page size, size, dialect, charset, forced writes, sweep interval, replica mode) and transaction counters (OIT/OAT/OST, with a gap warning). Object counts per type. |
 | **Monitor** | Live `MON$` view of attachments, running statements and transactions, plus I/O stats. Disconnect an attachment or cancel a running statement. |
@@ -32,6 +32,8 @@ as a container next to your server.
 <table>
 <tr><td><img src="docs/screenshots/properties.png" alt="Properties"></td><td><img src="docs/screenshots/ddl.png" alt="DDL"></td></tr>
 <tr><td><img src="docs/screenshots/data.png" alt="Data grid"></td><td><img src="docs/screenshots/monitor.png" alt="Monitor"></td></tr>
+<tr><td><img src="docs/screenshots/detailed-plan.png" alt="Detailed plan"></td><td><img src="docs/screenshots/query-results.png" alt="Results with cell viewer"></td></tr>
+<tr><td><img src="docs/screenshots/parameters.png" alt="Parameter prompt"></td><td><img src="docs/screenshots/error-position.png" alt="Error position"></td></tr>
 </table>
 
 ## Quick start
@@ -90,7 +92,7 @@ Integration tests create and drop temporary databases. You can point them at any
 with `FBADMIN_TEST_HOST`, `FBADMIN_TEST_PORT`, `FBADMIN_TEST_PASSWORD` and
 `FBADMIN_TEST_DIR` (a directory on the server).
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how the pieces fit together and
+See [docs/QUERY_TOOL.md](docs/QUERY_TOOL.md) for the Query Tool guide, [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how the pieces fit together and
 [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## Why not FlameRobin / IBExpert / DBeaver?

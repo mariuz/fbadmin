@@ -2,85 +2,268 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { EditorView } from "@codemirror/view";
 import { api } from "../api";
 import { errMsg, keys, useApp } from "../context";
-import type { ScriptResult } from "../types";
+import type { ScriptResult, SessionOptions, StatementResult } from "../types";
+import { Modal } from "./Modal";
 import { ResultGrid, download } from "./ResultGrid";
-import { SqlEditor, selectionOrAll } from "./SqlEditor";
-import { IconDownload, IconPlan, IconPlay, IconSpinner, IconUpload } from "./Icons";
+import {
+  SqlEditor, clearErrors, formatEditor, lineColToOffset, selectionOrAll, showError, type ExtraCompletions,
+} from "./SqlEditor";
+import { IconDownload, IconPlan, IconPlay, IconPlus, IconSpinner, IconTrash, IconUpload, IconX } from "./Icons";
 
+// ----------------------------------------------------------- persistence
 interface HistoryEntry { sql: string; at: number; ok: boolean; ms: number }
+interface Snippet { name: string; sql: string }
 const HISTORY_KEY = "fbadmin.history";
+const SNIPPETS_KEY = "fbadmin.snippets";
+const PARAMS_KEY = "fbadmin.params";
 
-function loadHistory(): HistoryEntry[] {
+function load<T>(key: string, fallback: T): T {
   try {
-    return JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]");
+    const v = localStorage.getItem(key);
+    return v ? (JSON.parse(v) as T) : fallback;
   } catch {
-    return [];
+    return fallback;
   }
 }
+function save(key: string, v: unknown) {
+  try { localStorage.setItem(key, JSON.stringify(v)); } catch { /* storage unavailable */ }
+}
 function pushHistory(e: HistoryEntry) {
-  try {
-    const h = [e, ...loadHistory().filter((x) => x.sql !== e.sql)].slice(0, 200);
-    localStorage.setItem(HISTORY_KEY, JSON.stringify(h));
-  } catch { /* storage unavailable */ }
+  save(HISTORY_KEY, [e, ...load<HistoryEntry[]>(HISTORY_KEY, []).filter((x) => x.sql !== e.sql)].slice(0, 200));
 }
 
-const DDL_RE = /^\s*(create|alter|drop|recreate|declare|comment|grant|revoke)\b/im;
+const DEFAULT_SNIPPETS: Snippet[] = [
+  { name: "Top statements by run time (MON$)", sql: "SELECT s.MON$ATTACHMENT_ID, s.MON$TIMESTAMP, s.MON$SQL_TEXT\nFROM MON$STATEMENTS s\nWHERE s.MON$STATE = 1\nORDER BY s.MON$TIMESTAMP;\n" },
+  { name: "Table sizes (record count estimate)", sql: "SELECT TRIM(r.RDB$RELATION_NAME) AS TABLE_NAME,\n  (SELECT COUNT(*) FROM RDB$RELATION_FIELDS f WHERE f.RDB$RELATION_NAME = r.RDB$RELATION_NAME) AS COLUMNS\nFROM RDB$RELATIONS r\nWHERE COALESCE(r.RDB$SYSTEM_FLAG, 0) = 0 AND r.RDB$VIEW_BLR IS NULL\nORDER BY 1;\n" },
+  { name: "Execute block", sql: "EXECUTE BLOCK RETURNS (N INTEGER)\nAS\nBEGIN\n  N = 1;\n  SUSPEND;\nEND;\n" },
+  { name: "Context variables", sql: "SELECT\n  RDB$GET_CONTEXT('SYSTEM', 'ENGINE_VERSION') AS ENGINE,\n  RDB$GET_CONTEXT('SYSTEM', 'CLIENT_ADDRESS') AS CLIENT,\n  CURRENT_USER, CURRENT_ROLE, CURRENT_CONNECTION, CURRENT_TRANSACTION\nFROM RDB$DATABASE;\n" },
+];
 
+const DDL_RE = /^\s*(create|alter|drop|recreate|declare|comment|grant|revoke)\b/im;
+const ISOLATIONS: Array<[string, string, number]> = [
+  ["read_committed", "Read committed", 3],
+  ["read_consistency", "Read committed – read consistency", 4],
+  ["read_committed_no_rec_version", "Read committed – no record version", 3],
+  ["snapshot", "Snapshot (concurrency)", 3],
+  ["snapshot_table_stability", "Snapshot table stability (consistency)", 3],
+];
+const STAT_LABELS: Array<[string, string]> = [
+  ["fetches", "Page fetches"], ["reads", "Page reads"], ["writes", "Page writes"], ["marks", "Page marks"],
+  ["seq_reads", "Seq. reads"], ["idx_reads", "Index reads"], ["inserts", "Inserts"], ["updates", "Updates"],
+  ["deletes", "Deletes"], ["backouts", "Backouts"], ["purges", "Purges"], ["expunges", "Expunges"],
+];
+
+// ------------------------------------------------------------- dialogs
+function ParamsDialog(props: { names: string[]; onDone: (v: Record<string, unknown> | null) => void }) {
+  const remembered = load<Record<string, string | null>>(PARAMS_KEY, {});
+  const [vals, setVals] = useState<Record<string, string | null>>(
+    Object.fromEntries(props.names.map((n) => [n, n in remembered ? remembered[n] : ""])),
+  );
+  const submit = () => {
+    save(PARAMS_KEY, { ...load(PARAMS_KEY, {}), ...vals });
+    props.onDone(vals);
+  };
+  return (
+    <Modal
+      title="Query parameters"
+      onClose={() => props.onDone(null)}
+      footer={<>
+        <button className="btn" onClick={() => props.onDone(null)}>Cancel</button>
+        <button className="btn primary" onClick={submit}>Execute</button>
+      </>}
+    >
+      <div className="form" onKeyDown={(e) => e.key === "Enter" && submit()}>
+        {props.names.map((n, i) => (
+          <div key={n} style={{ display: "contents" }}>
+            <label className="l mono">{n.startsWith("$") ? `? #${n.slice(1)}` : `:${n}`}</label>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <input className="text mono" style={{ flex: 1 }} autoFocus={i === 0} disabled={vals[n] === null}
+                value={vals[n] ?? ""} placeholder={vals[n] === null ? "NULL" : ""}
+                onChange={(e) => setVals({ ...vals, [n]: e.target.value })} />
+              <label className="check"><input type="checkbox" checked={vals[n] === null}
+                onChange={(e) => setVals({ ...vals, [n]: e.target.checked ? null : "" })} /> NULL</label>
+            </div>
+          </div>
+        ))}
+        <span />
+        <span className="muted">Values are sent as text; Firebird converts them to the column type.</span>
+      </div>
+    </Modal>
+  );
+}
+
+function TxSettings(props: { options: SessionOptions; onApply: (o: Partial<SessionOptions>) => Promise<void>; onClose: () => void }) {
+  const [o, setO] = useState(props.options);
+  const [err, setErr] = useState<string | null>(null);
+  const v4 = o.engine_major >= 4;
+  return (
+    <div className="popover" onMouseDown={(e) => e.stopPropagation()}>
+      <div className="form">
+        <label className="l">Isolation</label>
+        <select className="text" value={o.isolation} onChange={(e) => setO({ ...o, isolation: e.target.value })}>
+          {ISOLATIONS.map(([k, label, min]) => <option key={k} value={k} disabled={o.engine_major < min}>{label}</option>)}
+        </select>
+        <span />
+        <label className="check"><input type="checkbox" checked={o.read_only} onChange={(e) => setO({ ...o, read_only: e.target.checked })} /> Read only</label>
+        <label className="l">Lock resolution</label>
+        <select className="text" value={o.wait ? "wait" : "nowait"} onChange={(e) => setO({ ...o, wait: e.target.value === "wait" })}>
+          <option value="wait">Wait</option>
+          <option value="nowait">No wait</option>
+        </select>
+        <label className="l">Lock timeout (s)</label>
+        <input className="text" type="number" min={0} disabled={!o.wait} value={o.lock_timeout ?? ""} placeholder="infinite"
+          onChange={(e) => setO({ ...o, lock_timeout: e.target.value ? Number(e.target.value) : null })} />
+        <label className="l">Statement timeout</label>
+        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          <input className="text" type="number" min={0} disabled={!v4} value={o.statement_timeout || ""} placeholder={v4 ? "none" : "Firebird 4+"}
+            onChange={(e) => setO({ ...o, statement_timeout: Number(e.target.value || 0) })} style={{ flex: 1 }} />
+          <span className="muted">ms</span>
+        </div>
+      </div>
+      {err && <div className="err" style={{ marginTop: 8, whiteSpace: "pre-wrap" }}>{err}</div>}
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 12 }}>
+        <button className="btn" onClick={props.onClose}>Close</button>
+        <button className="btn primary" onClick={async () => {
+          try {
+            await props.onApply({ isolation: o.isolation, read_only: o.read_only, wait: o.wait, lock_timeout: o.wait ? o.lock_timeout : null, statement_timeout: v4 ? o.statement_timeout : undefined });
+            props.onClose();
+          } catch (e) { setErr(errMsg(e)); }
+        }}>Apply</button>
+      </div>
+    </div>
+  );
+}
+
+/** Detailed plan with highlighted operators, tables and indices. */
+function PlanTree(props: { text: string }) {
+  return (
+    <pre className="plan-tree">
+      {props.text.split("\n").map((line, i) => {
+        const parts = line.split(/(->\s*[A-Za-z][A-Za-z ]*?(?=\s"|$|\s\(|,)|Table "[^"]+"(?: as "[^"]+")?|Index "[^"]+")/g);
+        return (
+          <div key={i}>
+            {parts.map((p, j) =>
+              p.startsWith("->") ? <span key={j} className="op">{p}</span>
+                : p.startsWith("Table ") ? <span key={j} className="tbl">{p}</span>
+                : p.startsWith("Index ") ? <span key={j} className="idx">{p}</span>
+                : <span key={j}>{p}</span>,
+            )}
+          </div>
+        );
+      })}
+    </pre>
+  );
+}
+
+function StatsTable(props: { stats: Record<string, number> }) {
+  const items = STAT_LABELS.filter(([k]) => props.stats[k]);
+  if (!items.length) return <span className="muted">no I/O</span>;
+  return (
+    <table className="stats-table"><tbody><tr>
+      {items.map(([k, label]) => <td key={k}><span className="muted">{label}</span> {props.stats[k].toLocaleString()}</td>)}
+    </tr></tbody></table>
+  );
+}
+
+// ------------------------------------------------------------ query tool
 export function QueryTool(props: { serverId: string; dbId: string; initialSql?: string; autorun?: boolean; visible: boolean }) {
   const app = useApp();
   const [sql, setSql] = useState(props.initialSql ?? "");
   const [session, setSession] = useState<string | null>(null);
+  const [options, setOptions] = useState<SessionOptions | null>(null);
   const [result, setResult] = useState<ScriptResult | null>(null);
   const [running, setRunning] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const [autocommit, setAutocommit] = useState(true);
   const [txOpen, setTxOpen] = useState(false);
   const [maxRows, setMaxRows] = useState(1000);
   const [withPlan, setWithPlan] = useState(false);
+  const [withStats, setWithStats] = useState(false);
   const [pane, setPane] = useState<string>("data");
   const [activeResult, setActiveResult] = useState(0);
-  const [plan, setPlan] = useState<string | null>(null);
-  const [history, setHistory] = useState<HistoryEntry[]>(loadHistory);
+  const [plan, setPlan] = useState<{ plan: string | null; detailed: string | null } | null>(null);
+  const [history, setHistory] = useState<HistoryEntry[]>(() => load(HISTORY_KEY, []));
+  const [snippets, setSnippets] = useState<Snippet[]>(() => load(SNIPPETS_KEY, DEFAULT_SNIPPETS));
   const [schema, setSchema] = useState<Record<string, string[]>>({});
+  const [extra, setExtra] = useState<ExtraCompletions>({});
   const [editorH, setEditorH] = useState(260);
+  const [showTx, setShowTx] = useState(false);
+  const [paramReq, setParamReq] = useState<{ names: string[]; resolve: (v: Record<string, unknown> | null) => void } | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
   const view = useRef<EditorView | null>(null);
   const sessionRef = useRef<string | null>(null);
 
   const ensureSession = useCallback(async () => {
     if (sessionRef.current) return sessionRef.current;
-    const { session_id } = await api.openSession(props.serverId, props.dbId);
-    sessionRef.current = session_id;
-    setSession(session_id);
-    return session_id;
+    const r = await api.openSession(props.serverId, props.dbId);
+    sessionRef.current = r.session_id;
+    setSession(r.session_id);
+    setOptions(r.options);
+    return r.session_id;
   }, [props.serverId, props.dbId]);
 
   useEffect(() => {
-    // table names for autocompletion
-    Promise.all([api.objects(props.serverId, props.dbId, "tables"), api.objects(props.serverId, props.dbId, "views")])
-      .then(([t, v]) => setSchema(Object.fromEntries([...t, ...v].map((o) => [o.name, []]))))
+    api.completion(props.serverId, props.dbId)
+      .then((c) => {
+        setSchema(c.relations);
+        setExtra({ procedures: c.procedures, functions: c.functions, packages: c.packages });
+      })
       .catch(() => {});
+    ensureSession().catch(() => {});
     if (props.autorun && props.initialSql) run(props.initialSql);
     return () => {
       if (sessionRef.current) api.closeSession(sessionRef.current).catch(() => {});
     };
   }, []);
 
+  useEffect(() => {
+    if (!running) return;
+    const t0 = performance.now();
+    const t = setInterval(() => setElapsed(Math.round((performance.now() - t0) / 100) / 10), 100);
+    return () => clearInterval(t);
+  }, [running]);
+
+  const askParams = (names: string[]) =>
+    new Promise<Record<string, unknown> | null>((resolve) => setParamReq({ names, resolve }));
+
   const run = async (text?: string) => {
-    const q = text ?? (view.current ? selectionOrAll(view.current) : sql);
+    const v = view.current;
+    let q = text ?? (v ? selectionOrAll(v) : sql);
+    let base = 0;
+    if (v && text === undefined) {
+      const sel = v.state.selection.main;
+      base = sel.empty ? 0 : sel.from;
+    } else if (v && text !== undefined) {
+      const sel = v.state.selection.main;
+      base = !sel.empty && v.state.sliceDoc(sel.from, sel.to) === text ? sel.from : 0;
+    }
     if (!q.trim() || running) return;
+    if (v) clearErrors(v);
+    let params: Record<string, unknown> | undefined;
+    try {
+      const names = (await api.queryParams(q)).params;
+      if (names.length) {
+        const vals = await askParams(names);
+        setParamReq(null);
+        if (!vals) return;
+        params = vals;
+      }
+    } catch { /* analysis is best-effort */ }
     setRunning(true);
     setPlan(null);
     const started = performance.now();
     try {
       let sid = await ensureSession();
+      const body = { sql: q, autocommit, with_plan: withPlan, with_stats: withStats, max_rows: maxRows, params };
       let r: ScriptResult;
       try {
-        r = await api.runQuery(sid, { sql: q, autocommit, with_plan: withPlan, max_rows: maxRows });
+        r = await api.runQuery(sid, body);
       } catch (e: any) {
         if (e?.status === 404) {
-          // session expired: reopen once
-          sessionRef.current = null;
+          sessionRef.current = null; // session expired: reopen once
           sid = await ensureSession();
-          r = await api.runQuery(sid, { sql: q, autocommit, with_plan: withPlan, max_rows: maxRows });
+          r = await api.runQuery(sid, body);
         } else throw e;
       }
       setResult(r);
@@ -90,17 +273,59 @@ export function QueryTool(props: { serverId: string; dbId: string; initialSql?: 
       setPane(r.error ? "messages" : selects.length ? "data" : "messages");
       if (withPlan) {
         const p = r.results.map((x) => x.plan).filter(Boolean).join("\n\n");
-        setPlan(p || null);
+        setPlan({ plan: p || null, detailed: null });
       }
-      const entry = { sql: q, at: Date.now(), ok: !r.error, ms: Math.round(performance.now() - started) };
-      pushHistory(entry);
-      setHistory(loadHistory());
+      if (r.error && v) {
+        const err = r.error;
+        const failed = r.results[err.index];
+        const pos = err.position ?? (failed ? { line: failed.line, column: (failed as any).col ?? 1 } : null);
+        if (pos) {
+          const off = base + lineColToOffset(q, pos.line, pos.column);
+          if (off <= v.state.doc.length) showError(v, off, err.message);
+        }
+      }
+      pushHistory({ sql: q, at: Date.now(), ok: !r.error, ms: Math.round(performance.now() - started) });
+      setHistory(load(HISTORY_KEY, []));
       if (!r.error && DDL_RE.test(q) && autocommit) app.invalidate(keys.db(props.serverId, props.dbId));
     } catch (e) {
       setResult({ results: [], error: { message: errMsg(e), index: 0, line: 0, sql: q }, elapsed_ms: 0, transaction_open: txOpen });
       setPane("messages");
     } finally {
       setRunning(false);
+      setCancelling(false);
+    }
+  };
+
+  const cancel = async () => {
+    if (!sessionRef.current) return;
+    setCancelling(true);
+    try {
+      const r = await api.cancel(sessionRef.current);
+      if (!r.cancelled) app.toast("Nothing to cancel (the statement may be finishing)", "info");
+    } catch (e) {
+      app.toast(errMsg(e), "error");
+      setCancelling(false);
+    }
+  };
+
+  const loadMore = async () => {
+    if (!session || !result) return;
+    setLoadingMore(true);
+    try {
+      const f = await api.fetchMore(session, maxRows);
+      setResult((r) => {
+        if (!r) return r;
+        const results = r.results.map((x) => (x.kind === "select" && x === r.results.filter((y) => y.kind === "select").slice(-1)[0]
+          ? { ...x, rows: [...(x.rows ?? []), ...f.rows], row_count: (x.row_count ?? 0) + f.rows.length, truncated: f.has_more }
+          : x));
+        return { ...r, results, cursor_open: f.has_more, transaction_open: f.transaction_open };
+      });
+      setTxOpen(f.transaction_open);
+    } catch (e) {
+      app.toast(errMsg(e), "error");
+      setResult((r) => (r ? { ...r, cursor_open: false } : r));
+    } finally {
+      setLoadingMore(false);
     }
   };
 
@@ -109,10 +334,11 @@ export function QueryTool(props: { serverId: string; dbId: string; initialSql?: 
     try {
       const sid = await ensureSession();
       const r = await api.explain(sid, q);
-      setPlan(r.plan ?? "(no plan — statement does not access tables)");
+      setResult((x) => (x ? { ...x, cursor_open: false } : x)); // explain closes the open cursor
+      setPlan(r.plan || r.detailed ? r : { plan: "(no plan — the statement does not read tables)", detailed: null });
       setPane("plan");
     } catch (e) {
-      setPlan("Error: " + errMsg(e));
+      setPlan({ plan: "Error: " + errMsg(e), detailed: null });
       setPane("plan");
     }
   };
@@ -122,11 +348,40 @@ export function QueryTool(props: { serverId: string; dbId: string; initialSql?: 
     try {
       await (what === "commit" ? api.commit(session) : api.rollback(session));
       setTxOpen(false);
+      setResult((r) => (r ? { ...r, cursor_open: false } : r));
       app.toast(what === "commit" ? "Transaction committed" : "Transaction rolled back");
       if (what === "commit") app.invalidate(keys.db(props.serverId, props.dbId));
     } catch (e) {
       app.toast(errMsg(e), "error");
     }
+  };
+
+  const format = () => {
+    if (!view.current) return;
+    try {
+      formatEditor(view.current);
+    } catch (e) {
+      app.toast("Cannot format: " + errMsg(e), "error");
+    }
+  };
+
+  const insertText = (text: string) => {
+    const v = view.current;
+    if (!v) return setSql(sql + text);
+    const sel = v.state.selection.main;
+    v.dispatch({ changes: { from: sel.from, to: sel.to, insert: text }, selection: { anchor: sel.from + text.length } });
+    v.focus();
+  };
+
+  const saveSnippet = () => {
+    const text = view.current ? selectionOrAll(view.current) : sql;
+    if (!text.trim()) return;
+    const name = window.prompt("Snippet name", text.trim().split("\n")[0].slice(0, 60));
+    if (!name) return;
+    const next = [{ name, sql: text }, ...snippets.filter((s) => s.name !== name)];
+    setSnippets(next);
+    save(SNIPPETS_KEY, next);
+    setPane("snippets");
   };
 
   const openFile = () => {
@@ -140,7 +395,6 @@ export function QueryTool(props: { serverId: string; dbId: string; initialSql?: 
     inp.click();
   };
 
-  // splitter drag
   const startDrag = (e: React.MouseEvent) => {
     const y0 = e.clientY, h0 = editorH;
     const move = (ev: MouseEvent) => setEditorH(Math.max(80, h0 + ev.clientY - y0));
@@ -150,14 +404,22 @@ export function QueryTool(props: { serverId: string; dbId: string; initialSql?: 
   };
 
   const selects = result?.results.filter((r) => r.kind === "select") ?? [];
-  const current = selects[activeResult];
+  const current: StatementResult | undefined = selects[activeResult];
+  const isLastSelect = current && current === selects[selects.length - 1];
+  const txLabel = options ? ISOLATIONS.find(([k]) => k === options.isolation)?.[1].split(" – ")[0].replace(" (concurrency)", "") : "";
 
   return (
     <div className="qt" style={{ display: props.visible ? "flex" : "none" }}>
       <div className="toolbar">
-        <button className="btn primary" disabled={running} onClick={() => run()} title="Execute (F5 / Ctrl+Enter). Runs the selection if any.">
-          {running ? <IconSpinner className="spin" /> : <IconPlay />} Execute
-        </button>
+        {running ? (
+          <button className="btn stop" disabled={cancelling} onClick={cancel} title="Cancel the running statement">
+            <IconSpinner className="spin" /> {cancelling ? "Cancelling…" : `Cancel (${elapsed.toFixed(1)} s)`}
+          </button>
+        ) : (
+          <button className="btn primary" onClick={() => run()} title="Execute (F5 / Ctrl+Enter). Runs the selection if any.">
+            <IconPlay /> Execute
+          </button>
+        )}
         <button className="btn" onClick={explain} title="Show the execution plan without running"><IconPlan /> Explain</button>
         <span className="sep" />
         <button className={"btn" + (autocommit ? " on" : "")} onClick={() => setAutocommit(!autocommit)} title="Commit after every statement">
@@ -165,14 +427,25 @@ export function QueryTool(props: { serverId: string; dbId: string; initialSql?: 
         </button>
         <button className="btn" disabled={!txOpen} onClick={() => txAction("commit")}>Commit</button>
         <button className="btn" disabled={!txOpen} onClick={() => txAction("rollback")}>Rollback</button>
+        <div style={{ position: "relative" }}>
+          <button className={"btn" + (showTx ? " on" : "")} disabled={!options} onClick={() => setShowTx(!showTx)} title="Transaction isolation, read-only, lock and statement timeouts">
+            {txLabel}{options?.read_only ? " · RO" : ""}{options?.statement_timeout ? ` · ${options.statement_timeout} ms` : ""} ▾
+          </button>
+          {showTx && options && session && (
+            <TxSettings options={options} onClose={() => setShowTx(false)} onApply={async (o) => setOptions(await api.setOptions(session, o))} />
+          )}
+        </div>
         <span className="sep" />
-        <label>Max rows
+        <label>Rows
           <select className="text" value={maxRows} onChange={(e) => setMaxRows(Number(e.target.value))}>
             {[100, 1000, 10000, 100000].map((n) => <option key={n} value={n}>{n.toLocaleString()}</option>)}
           </select>
         </label>
         <label className="check" title="Fetch the PLAN of every executed statement"><input type="checkbox" checked={withPlan} onChange={(e) => setWithPlan(e.target.checked)} /> Plans</label>
+        <label className="check" title="Measure page and record I/O of every statement (from MON$ tables)"><input type="checkbox" checked={withStats} onChange={(e) => setWithStats(e.target.checked)} /> Stats</label>
         <span className="grow" />
+        <button className="btn small" title="Format SQL (Shift+Alt+F)" onClick={format}>Format</button>
+        <button className="btn icon" title="Save selection as snippet" onClick={saveSnippet}><IconPlus /></button>
         <button className="btn icon" title="Open .sql file" onClick={openFile}><IconUpload /></button>
         <button className="btn icon" title="Save as .sql file" onClick={() => download("query.sql", sql, "text/sql")}><IconDownload /></button>
       </div>
@@ -182,7 +455,9 @@ export function QueryTool(props: { serverId: string; dbId: string; initialSql?: 
           onChange={setSql}
           onExecute={(t) => run(t)}
           schema={schema}
-          placeholder="-- Write SQL here. F5 or Ctrl+Enter runs the selection or the whole script."
+          extra={extra}
+          onFormatError={(m) => app.toast("Cannot format: " + m, "error")}
+          placeholder="-- Write SQL here. F5 / Ctrl+Enter runs the selection or the script. :name and ? prompt for values. Ctrl+/ comments, Shift+Alt+F formats."
           editorRef={(v) => (view.current = v)}
         />
       </div>
@@ -195,6 +470,7 @@ export function QueryTool(props: { serverId: string; dbId: string; initialSql?: 
           </button>
           <button className={pane === "plan" ? "active" : ""} onClick={() => setPane("plan")}>Plan</button>
           <button className={pane === "history" ? "active" : ""} onClick={() => setPane("history")}>History</button>
+          <button className={pane === "snippets" ? "active" : ""} onClick={() => setPane("snippets")}>Snippets</button>
         </div>
         <div className="qt-out">
           {pane === "data" && (
@@ -210,7 +486,8 @@ export function QueryTool(props: { serverId: string; dbId: string; initialSql?: 
                   </div>
                 )}
                 <div style={{ flex: 1, minHeight: 0 }}>
-                  <ResultGrid key={`${result?.elapsed_ms}-${activeResult}`} columns={current.columns!} rows={current.rows!} />
+                  <ResultGrid key={`${result?.elapsed_ms}-${activeResult}`} columns={current.columns!} rows={current.rows!}
+                    hasMore={!!(isLastSelect && result?.cursor_open)} loadingMore={loadingMore} onLoadMore={loadMore} />
                 </div>
               </div>
             ) : (
@@ -224,17 +501,31 @@ export function QueryTool(props: { serverId: string; dbId: string; initialSql?: 
                 <div key={r.index} className="stmt">
                   <div className="muted">-- line {r.line} · {r.elapsed_ms} ms</div>
                   <div>{r.sql.length > 300 ? r.sql.slice(0, 300) + "…" : r.sql}</div>
-                  <div className={r.kind === "error" ? "err" : "ok"}>{r.kind === "error" ? "ERROR: " : ""}{r.message}{r.truncated ? ` — limited to ${maxRows.toLocaleString()} rows` : ""}</div>
+                  <div className={r.kind === "error" ? "err" : "ok"}>
+                    {r.kind === "error" ? "ERROR: " : ""}{r.message}
+                    {r.truncated ? ` — first ${r.row_count?.toLocaleString()} rows; more available` : ""}
+                  </div>
+                  {r.stats && <StatsTable stats={r.stats} />}
                 </div>
               ))}
               {result?.error && result.results.length === 0 && <div className="err">{result.error.message}</div>}
               {result && <div className="muted" style={{ paddingTop: 8 }}>Total: {result.elapsed_ms} ms</div>}
             </div>
           )}
-          {pane === "plan" && <pre className="plan mono">{plan ?? "Click Explain, or enable Plans and execute."}</pre>}
+          {pane === "plan" && (
+            plan ? (
+              <div>
+                {plan.plan && <><h3 style={{ margin: "12px 12px 0" }}>Plan</h3><pre className="plan mono">{plan.plan}</pre></>}
+                {plan.detailed && <><h3 style={{ margin: "12px 12px 0" }}>Detailed plan</h3><PlanTree text={plan.detailed} /></>}
+              </div>
+            ) : <div className="empty-state">Click Explain, or enable Plans and execute.</div>
+          )}
           {pane === "history" && (
             <div>
               {history.length === 0 && <div className="pad muted">No history yet.</div>}
+              {history.length > 0 && (
+                <div className="toolbar"><span className="grow" /><button className="btn small" onClick={() => { save(HISTORY_KEY, []); setHistory([]); }}>Clear history</button></div>
+              )}
               {history.map((h, i) => (
                 <div key={i} className="history-item" title="Click to load into the editor" onClick={() => setSql(h.sql)}>
                   <span className={h.ok ? "ok" : "err"}>{h.ok ? "✓" : "✗"}</span>{" "}
@@ -244,14 +535,39 @@ export function QueryTool(props: { serverId: string; dbId: string; initialSql?: 
               ))}
             </div>
           )}
+          {pane === "snippets" && (
+            <div>
+              <div className="toolbar">
+                <span className="muted">Click to insert at the cursor. Use + in the toolbar to save the selection.</span>
+                <span className="grow" />
+                <button className="btn small" onClick={() => download("fbadmin-snippets.json", JSON.stringify(snippets, null, 2), "application/json")}>Export</button>
+              </div>
+              {snippets.map((s, i) => (
+                <div key={i} className="snippet">
+                  <div style={{ flex: 1, cursor: "pointer", minWidth: 0 }} onClick={() => insertText(s.sql)}>
+                    <b>{s.name}</b>
+                    <pre className="mono">{s.sql}</pre>
+                  </div>
+                  <button className="btn icon small" title="Delete snippet" onClick={() => {
+                    const next = snippets.filter((_, j) => j !== i);
+                    setSnippets(next);
+                    save(SNIPPETS_KEY, next);
+                  }}><IconTrash size={13} /></button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
       <div className="status">
-        <span>{session ? "Connected" : "Not connected"}</span>
+        <span>{session ? `Connected · attachment ${options?.attachment_id ?? "?"}` : "Not connected"}</span>
         {txOpen && <span className="tx">Transaction open — commit or rollback</span>}
+        {result?.cursor_open && <span>Result set open</span>}
         {result && <span>{result.results.length} statement(s) · {result.elapsed_ms} ms</span>}
-        {current && <span>{current.row_count}{current.truncated ? "+" : ""} rows</span>}
+        {current && <span>{current.row_count?.toLocaleString()}{current.truncated ? "+" : ""} rows</span>}
+        {result?.error && <span className="err" style={{ cursor: "pointer" }} onClick={() => setPane("messages")}><IconX size={11} /> error at line {result.error.position?.line ?? result.error.line}</span>}
       </div>
+      {paramReq && <ParamsDialog names={paramReq.names} onDone={(v) => { setParamReq(null); paramReq.resolve(v); }} />}
     </div>
   );
 }

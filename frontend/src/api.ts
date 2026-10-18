@@ -1,4 +1,4 @@
-import type { Job, ObjectDetail, ScriptResult, Server } from "./types";
+import type { Completion, Job, ObjectDetail, ScriptResult, Server, SessionOptions } from "./types";
 
 export class ApiError extends Error {
   status: number;
@@ -102,12 +102,21 @@ export const api = {
     request("DELETE", db(sid, dbid) + `/monitor/statements/${id}`),
 
   openSession: (server_id: string, database_id: string) =>
-    request<{ session_id: string }>("POST", "/api/query/sessions", { server_id, database_id }),
-  runQuery: (sess: string, body: { sql: string; autocommit: boolean; with_plan?: boolean; max_rows?: number }) =>
-    request<ScriptResult>("POST", `/api/query/sessions/${sess}/execute`, body),
-  explain: (sess: string, sql: string) => request<{ plan: string | null }>("POST", `/api/query/sessions/${sess}/explain`, { sql }),
+    request<{ session_id: string; options: SessionOptions }>("POST", "/api/query/sessions", { server_id, database_id }),
+  runQuery: (sess: string, body: {
+    sql: string; autocommit: boolean; with_plan?: boolean; with_stats?: boolean; max_rows?: number;
+    params?: Record<string, unknown>;
+  }) => request<ScriptResult>("POST", `/api/query/sessions/${sess}/execute`, body),
+  fetchMore: (sess: string, rows: number) =>
+    request<{ rows: unknown[][]; has_more: boolean; transaction_open: boolean }>("POST", `/api/query/sessions/${sess}/fetch`, { rows }),
+  cancel: (sess: string) => request<{ cancelled: number }>("POST", `/api/query/sessions/${sess}/cancel`),
+  setOptions: (sess: string, o: Partial<SessionOptions>) => request<SessionOptions>("PUT", `/api/query/sessions/${sess}/options`, o),
+  queryParams: (sql: string) => request<{ params: string[] }>("POST", "/api/query/params", { sql }),
+  explain: (sess: string, sql: string) =>
+    request<{ plan: string | null; detailed: string | null }>("POST", `/api/query/sessions/${sess}/explain`, { sql }),
   commit: (sess: string) => request("POST", `/api/query/sessions/${sess}/commit`),
   rollback: (sess: string) => request("POST", `/api/query/sessions/${sess}/rollback`),
+  completion: (sid: string, dbid: string) => request<Completion>("GET", db(sid, dbid) + "/completion"),
   closeSession: (sess: string) => request<void>("DELETE", `/api/query/sessions/${sess}`),
 
   backup: (sid: string, body: Record<string, unknown>) => request<Job>("POST", `/api/servers/${sid}/backup`, body),

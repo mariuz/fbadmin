@@ -44,6 +44,7 @@ export interface StatementResult {
   index: number;
   line: number;
   sql: string;
+  col?: number;
   kind: "select" | "command" | "ignored" | "error";
   columns?: ColumnInfo[];
   rows?: unknown[][];
@@ -51,14 +52,39 @@ export interface StatementResult {
   truncated?: boolean;
   message?: string;
   plan?: string | null;
+  stats?: Record<string, number> | null;
   elapsed_ms: number;
 }
 
 export interface ScriptResult {
   results: StatementResult[];
-  error: { message: string; index: number; line: number; sql: string } | null;
+  error: {
+    message: string;
+    index: number;
+    line: number;
+    sql: string;
+    position?: { line: number; column: number } | null;
+  } | null;
   elapsed_ms: number;
   transaction_open: boolean;
+  cursor_open?: boolean;
+}
+
+export interface SessionOptions {
+  isolation: string;
+  read_only: boolean;
+  wait: boolean;
+  lock_timeout: number | null;
+  statement_timeout: number;
+  engine_major: number;
+  attachment_id: number | null;
+}
+
+export interface Completion {
+  relations: Record<string, string[]>;
+  procedures: string[];
+  functions: string[];
+  packages: Record<string, string[]>;
 }
 
 export interface Job {

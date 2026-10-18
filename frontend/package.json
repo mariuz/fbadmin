@@ -1,7 +1,7 @@
 {
   "name": "fbadmin-frontend",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -14,12 +14,14 @@
     "@codemirror/commands": "^6.6.0",
     "@codemirror/lang-sql": "^6.7.0",
     "@codemirror/language": "^6.10.0",
+    "@codemirror/lint": "^6.9.7",
     "@codemirror/search": "^6.5.0",
     "@codemirror/state": "^6.4.0",
     "@codemirror/view": "^6.33.0",
     "@lezer/highlight": "^1.2.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "sql-formatter": "^15.9.0"
   },
   "devDependencies": {
     "@types/react": "^18.3.5",

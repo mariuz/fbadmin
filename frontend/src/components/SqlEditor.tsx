@@ -4,10 +4,14 @@ import {
   EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter, drawSelection,
   rectangularSelection, placeholder as cmPlaceholder,
 } from "@codemirror/view";
-import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
+import { defaultKeymap, history, historyKeymap, indentWithTab, toggleComment } from "@codemirror/commands";
 import { sql, SQLDialect } from "@codemirror/lang-sql";
 import { syntaxHighlighting, defaultHighlightStyle, bracketMatching, indentOnInput, HighlightStyle } from "@codemirror/language";
-import { autocompletion, closeBrackets, closeBracketsKeymap, completionKeymap } from "@codemirror/autocomplete";
+import {
+  autocompletion, closeBrackets, closeBracketsKeymap, completeFromList, completionKeymap, type Completion as CmCompletion,
+} from "@codemirror/autocomplete";
+import { lintGutter, setDiagnostics } from "@codemirror/lint";
+import { format as formatSqlText } from "sql-formatter";
 import { searchKeymap, highlightSelectionMatches } from "@codemirror/search";
 import { tags as t } from "@lezer/highlight";
 
@@ -72,12 +76,81 @@ const baseTheme = EditorView.theme({
   ".cm-tooltip-autocomplete ul li[aria-selected]": { backgroundColor: "var(--select)", color: "var(--text)" },
 });
 
+export interface ExtraCompletions {
+  procedures?: string[];
+  functions?: string[];
+  packages?: Record<string, string[]>;
+}
+
+/** Format SQL with keywords upper-cased; keeps :named and ? parameters intact. */
+export function formatSql(text: string): string {
+  return formatSqlText(text, {
+    language: "sql",
+    keywordCase: "upper",
+    tabWidth: 2,
+    paramTypes: { named: [":"], positional: true },
+  });
+}
+
+/** Format the selection (or the whole document) in place. Throws on parse errors. */
+export function formatEditor(view: EditorView) {
+  const sel = view.state.selection.main;
+  const from = sel.empty ? 0 : sel.from;
+  const to = sel.empty ? view.state.doc.length : sel.to;
+  const out = formatSql(view.state.sliceDoc(from, to));
+  view.dispatch({ changes: { from, to, insert: out } });
+}
+
+/** Offset of a 1-based line/column inside ``text``. */
+export function lineColToOffset(text: string, line: number, col: number): number {
+  let off = 0;
+  for (let l = 1; l < line; l++) {
+    const nl = text.indexOf("\n", off);
+    if (nl === -1) return text.length;
+    off = nl + 1;
+  }
+  return Math.min(off + Math.max(col - 1, 0), text.length);
+}
+
+/** Underline an error at ``offset`` (to the end of the word) with a message. */
+export function showError(view: EditorView, offset: number, message: string) {
+  const doc = view.state.doc;
+  const from = Math.min(offset, doc.length);
+  const word = /^[\w$"]+/.exec(doc.sliceString(from, Math.min(from + 80, doc.length)));
+  const to = Math.min(from + (word ? word[0].length : 1), doc.length);
+  view.dispatch(setDiagnostics(view.state, [{ from, to: Math.max(to, from), severity: "error", message }]));
+  view.dispatch({ selection: { anchor: from }, scrollIntoView: true });
+}
+
+export function clearErrors(view: EditorView) {
+  view.dispatch(setDiagnostics(view.state, []));
+}
+
+function extraSource(extra?: ExtraCompletions) {
+  const opts: CmCompletion[] = [];
+  for (const p of extra?.procedures ?? []) opts.push({ label: p, type: "function", detail: "procedure" });
+  for (const f of extra?.functions ?? []) opts.push({ label: f, type: "function", detail: "function" });
+  for (const [pkg, members] of Object.entries(extra?.packages ?? {})) {
+    opts.push({ label: pkg, type: "namespace", detail: "package" });
+    for (const m of members) opts.push({ label: `${pkg}.${m}`, type: "function", detail: "package member" });
+  }
+  return completeFromList(opts);
+}
+
+function sqlExtensions(schema?: Record<string, string[]>, extra?: ExtraCompletions) {
+  const lang = sql({ dialect: firebirdDialect, upperCaseKeywords: true, schema });
+  return [lang, lang.language.data.of({ autocomplete: extraSource(extra) })];
+}
+
 export interface SqlEditorProps {
   value: string;
   onChange?: (v: string) => void;
   readOnly?: boolean;
   /** table name -> column names for autocompletion */
   schema?: Record<string, string[]>;
+  extra?: ExtraCompletions;
+  /** called when Shift+Alt+F formatting fails */
+  onFormatError?: (msg: string) => void;
   /** Ctrl/Cmd+Enter or F5 */
   onExecute?: (selectionOrAll: string) => void;
   placeholder?: string;
@@ -116,13 +189,26 @@ export function SqlEditor(props: SqlEditorProps) {
         highlightActiveLine(),
         highlightSelectionMatches(),
         autocompletion(),
+        lintGutter(),
         syntaxHighlighting(highlight),
         syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
         baseTheme,
-        langComp.current.of(sql({ dialect: firebirdDialect, upperCaseKeywords: true, schema: props.schema })),
+        langComp.current.of(sqlExtensions(props.schema, props.extra)),
         keymap.of([
           { key: "Mod-Enter", run: exec },
           { key: "F5", run: exec },
+          { key: "Mod-/", run: toggleComment },
+          {
+            key: "Shift-Alt-f",
+            run: (v) => {
+              try {
+                formatEditor(v);
+              } catch (e) {
+                cbs.current.onFormatError?.(e instanceof Error ? e.message : String(e));
+              }
+              return true;
+            },
+          },
           ...closeBracketsKeymap,
           ...defaultKeymap,
           ...searchKeymap,
@@ -134,7 +220,9 @@ export function SqlEditor(props: SqlEditorProps) {
         EditorView.editable.of(!props.readOnly),
         props.placeholder ? cmPlaceholder(props.placeholder) : [],
         EditorView.updateListener.of((u) => {
-          if (u.docChanged) cbs.current.onChange?.(u.state.doc.toString());
+          if (u.docChanged) {
+            cbs.current.onChange?.(u.state.doc.toString());
+          }
         }),
       ],
     });
@@ -155,12 +243,8 @@ export function SqlEditor(props: SqlEditorProps) {
   }, [props.value]);
 
   useEffect(() => {
-    view.current?.dispatch({
-      effects: langComp.current.reconfigure(
-        sql({ dialect: firebirdDialect, upperCaseKeywords: true, schema: props.schema }),
-      ),
-    });
-  }, [props.schema]);
+    view.current?.dispatch({ effects: langComp.current.reconfigure(sqlExtensions(props.schema, props.extra)) });
+  }, [props.schema, props.extra]);
 
   return <div className="cm-host" ref={host} />;
 }
