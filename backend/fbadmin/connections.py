@@ -23,7 +23,7 @@ from contextlib import contextmanager
 import firebirdsql
 from firebirdsql import services
 
-from .query import QuerySession, apply_tpb, end_transaction
+from .query import QuerySession, TxOptions, apply_tpb, end_transaction
 from .store import DatabaseEntry, ServerEntry, ServerStore
 
 
@@ -63,10 +63,27 @@ def connect(
         charset=srv.charset or "UTF8",
         wire_crypt=srv.wire_crypt,
         timeout=30,
+        **wire_options(srv),
     )
     if create:
         return firebirdsql.create_database(page_size=page_size, **kwargs)
-    return firebirdsql.connect(**kwargs)
+    conn = firebirdsql.connect(**kwargs)
+    if srv.read_only:  # production safety: every transaction of this server is read-only
+        apply_tpb(conn, TxOptions(read_only=True).tpb())
+    return conn
+
+
+AUTH_PLUGINS = ("Srp256", "Srp", "Legacy_Auth")
+
+
+def wire_options(srv: ServerEntry) -> dict:
+    """Wire compression and authentication plugin (driver keyword arguments)."""
+    if srv.auth_plugin and srv.auth_plugin not in AUTH_PLUGINS:
+        raise ValueError(f"Unknown authentication plugin {srv.auth_plugin!r}")
+    opts: dict = {"wire_compress": bool(srv.wire_compress)}
+    if srv.auth_plugin:
+        opts["auth_plugin_name"] = srv.auth_plugin
+    return opts
 
 
 class ConnectionManager:
@@ -138,6 +155,7 @@ class ConnectionManager:
             password=self._password(server_id),
             wire_crypt=srv.wire_crypt,
             timeout=60,
+            **wire_options(srv),
         )
         try:
             yield svc
@@ -159,6 +177,8 @@ class ConnectionManager:
         end_transaction(conn, commit=True)
         sess = QuerySession(conn=conn, server_id=server_id, db_id=db_id, attachment_id=att,
                             engine_major=int(str(version).split(".")[0]))
+        if self.store.get(server_id).read_only:
+            sess.force_read_only = sess.tx.read_only = True
         apply_tpb(conn, sess.tx.tpb())
         sid = uuid.uuid4().hex
         with self._lock:

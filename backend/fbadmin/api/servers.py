@@ -23,6 +23,10 @@ class ServerIn(BaseModel):
     role: str | None = None
     charset: str = "UTF8"
     wire_crypt: bool = True
+    wire_compress: bool = False
+    auth_plugin: str | None = None
+    read_only: bool = False
+    shared: bool = False
     group: str = "Servers"
 
 
@@ -36,6 +40,10 @@ class ServerUpdate(BaseModel):
     role: str | None = None
     charset: str | None = None
     wire_crypt: bool | None = None
+    wire_compress: bool | None = None
+    auth_plugin: str | None = None
+    read_only: bool | None = None
+    shared: bool | None = None
     group: str | None = None
 
 
