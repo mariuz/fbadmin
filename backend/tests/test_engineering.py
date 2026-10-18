@@ -63,7 +63,8 @@ def _app(monkeypatch, **env):
 def test_rate_limit_middleware(monkeypatch, tmp_path):
     monkeypatch.setenv("FBADMIN_DATA_DIR", str(tmp_path))
     with _app(monkeypatch, FBADMIN_RATE_LIMIT="5") as c:
-        codes = [c.get("/api/health").status_code for _ in range(8)]
+        codes = [c.get("/api/object-types").status_code for _ in range(8)]
+        assert c.get("/api/health").status_code == 200  # probes are never throttled
     assert codes[:5] == [200] * 5 and codes[-1] == 429
 
 

@@ -47,7 +47,7 @@ Query text and parameters are never logged.
 
 The rate limiter and the body size limit are generic and apply to every API request
 (login throttling in server mode is separate). A rejected request gets HTTP 429 with a
-`Retry-After` header, or HTTP 413, and a JSON body with `code` `rate_limited` or
+`Retry-After` header (`/api/health` is never throttled, so probes keep working), or HTTP 413, and a JSON body with `code` `rate_limited` or
 `request_too_large`. The UI polls a few endpoints every few seconds per open tab, so keep
 the rate limit well above 60 requests per minute per user.
 

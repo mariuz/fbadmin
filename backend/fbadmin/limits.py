@@ -86,7 +86,9 @@ class RateLimitMiddleware:
         return client[0] if client else "-"
 
     async def __call__(self, scope, receive, send):
-        if self.limiter is None or scope["type"] != "http" or not scope.get("path", "").startswith("/api/"):
+        path = scope.get("path", "")
+        # Health checks (container/Kubernetes probes) are never throttled.
+        if self.limiter is None or scope["type"] != "http" or not path.startswith("/api/") or path == "/api/health":
             return await self.app(scope, receive, send)
         wait = self.limiter.hit(self._client(scope))
         if wait > 0:

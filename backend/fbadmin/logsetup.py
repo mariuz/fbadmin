@@ -19,7 +19,7 @@ from typing import Any
 LEVELS = ("critical", "error", "warning", "info", "debug")
 
 # Attributes every LogRecord has; anything else passed via ``extra=`` is a structured field.
-_RESERVED = set(vars(logging.LogRecord("x", 0, "x", 0, "x", None, None))) | {"message", "asctime", "taskName"}
+_RESERVED = set(vars(logging.LogRecord("x", 0, "x", 0, "x", None, None))) | {"message", "asctime", "taskName", "color_message"}
 
 
 class JsonFormatter(logging.Formatter):
