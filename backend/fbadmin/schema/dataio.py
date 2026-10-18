@@ -15,6 +15,7 @@ import itertools
 import json
 import re
 import tempfile
+import time
 import uuid
 from collections.abc import Iterable, Iterator
 from pathlib import Path
@@ -44,6 +45,13 @@ def guess_format(filename: str) -> str:
 
 
 def new_upload_path(filename: str) -> tuple[str, Path]:
+    # forget uploads that were never imported
+    for old in upload_dir().glob("*__*"):
+        try:
+            if time.time() - old.stat().st_mtime > 86400:
+                old.unlink()
+        except OSError:
+            pass
     uid = uuid.uuid4().hex[:16]
     safe = re.sub(r"[^A-Za-z0-9._-]", "_", filename)[-80:] or "upload"
     return uid, upload_dir() / f"{uid}__{safe}"
@@ -227,7 +235,7 @@ _DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _TS = re.compile(r"^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2}(\.\d+)?)?$")
 _TIME = re.compile(r"^\d{2}:\d{2}(:\d{2}(\.\d+)?)?$")
 _BOOL = {"true": True, "false": False, "t": True, "f": False, "yes": True, "no": False, "y": True, "n": False}
-_VARCHAR_SIZES = [10, 20, 50, 100, 255, 500, 1000, 2000, 4000, 8191]
+_VARCHAR_SIZES = [20, 50, 100, 255, 500, 1000, 2000, 4000, 8191]
 
 
 def infer_type(values: Iterable[Any]) -> str:
@@ -291,7 +299,8 @@ def infer_type(values: Iterable[Any]) -> str:
         return "TIMESTAMP"
     if kinds == {"time"}:
         return "TIME"
-    size = next((s for s in _VARCHAR_SIZES if s >= maxlen), None)
+    # headroom: the sample may not contain the longest value of the file
+    size = next((s for s in _VARCHAR_SIZES if s >= maxlen * 1.25), None)
     return f"VARCHAR({size})" if size else "BLOB SUB_TYPE TEXT"
 
 

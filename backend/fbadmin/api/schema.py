@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import tempfile
 import threading
 import uuid
 from contextlib import contextmanager
@@ -257,8 +258,8 @@ def import_data(server_id: str, db_id: str, body: ImportIn):
                               on_error=body.on_error, result=result)
         finally:
             conn.close()
-            if body.delete_upload:
-                path.unlink(missing_ok=True)
+        if body.delete_upload:  # only after success, so a failed import can be retried
+            path.unlink(missing_ok=True)
 
     return _start_job("import", f"Import {info['filename']} into {body.table}", server_id, run)
 
@@ -304,15 +305,28 @@ def _export(server_id: str, db_id: str, body: ExportIn) -> Response:
         conn.close()
         raise ValueError(f"Unknown export format {body.format!r}")
 
-    def gen():
-        try:
-            yield from dataio.export_rows(cur, body.format, table_name=name, delimiter=body.delimiter,
-                                          header=body.header)
-        finally:
-            conn.close()
+    # Rows go to a spooled temporary file (memory, then disk) and the connection is closed before the
+    # response starts: a client that aborts the download cannot leave an attachment open.
+    f = tempfile.SpooledTemporaryFile(max_size=32 << 20)
+    try:
+        for chunk in dataio.export_rows(cur, body.format, table_name=name, delimiter=body.delimiter,
+                                        header=body.header):
+            f.write(chunk)
+    except Exception:
+        f.close()
+        raise
+    finally:
+        conn.close()
+    size = f.tell()
+    f.seek(0)
 
-    return StreamingResponse(gen(), media_type=media,
-                             headers={"Content-Disposition": f'attachment; filename="{fname}.{body.format}"'})
+    def chunks():
+        with f:
+            yield from iter(lambda: f.read(1 << 16), b"")
+
+    return StreamingResponse(chunks(), media_type=media,
+                             headers={"Content-Disposition": f'attachment; filename="{fname}.{body.format}"',
+                                      "Content-Length": str(size)})
 
 
 @router.get(DB + "/export")

@@ -81,13 +81,16 @@ def search_objects(cat: Catalog, q: str, scopes: set[str] | None = None, types: 
             continue
         cols = [f"TRIM(x.{name_col}) AS name", f"x.{desc_col} AS descr"]
         cols.append(f"TRIM(x.{parent_col}) AS parent" if parent_col else "CAST(NULL AS VARCHAR(63)) AS parent")
+        if otype == "columns":
+            cols.append("(SELECT IIF(r.RDB$VIEW_BLR IS NULL, 'tables', 'views') FROM RDB$RELATIONS r "
+                        "WHERE r.RDB$RELATION_NAME = x.RDB$RELATION_NAME) AS ptype")
         for i, s in enumerate(src_cols):
             cols.append(f"x.{s} AS src{i}")
         sql = f"SELECT {', '.join(cols)} FROM {table} x WHERE ({cond}) AND ({' OR '.join(checks)}) ORDER BY 1"
         for r in cat.rows(sql, params):
             item: dict[str, Any] = {"type": otype, "name": r["name"], "parent": r["parent"]}
-            if otype == "indices" and r["parent"]:
-                item["table"] = r["parent"]
+            if otype == "columns":
+                item["parent_type"] = (r.get("ptype") or "tables").strip()
             if "name" in scopes and q.lower() in (r["name"] or "").lower():
                 item.update(match="name", snippet=None)
             elif "comment" in scopes and r["descr"] and q.lower() in r["descr"].lower():

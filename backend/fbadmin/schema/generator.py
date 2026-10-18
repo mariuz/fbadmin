@@ -12,6 +12,7 @@ from typing import Any
 
 from ..metadata import Catalog
 from ..metadata.types import quote_ident
+from .dataio import converter
 
 _WORDS = ("alpha bravo charlie delta echo foxtrot golf hotel india juliet kilo lima mike november oscar papa "
           "quebec romeo sierra tango uniform victor whiskey xray yankee zulu firebird table index view").split()
@@ -61,7 +62,8 @@ class ColumnGen:
         self.c, self.rng, self.checks, self.unique = col, rng, checks, unique
         self.null_ratio = 0.0 if col["not_null"] or unique else null_ratio
         self.o = override or {}
-        self.t = (col["data_type"] or "").upper()
+        self.conv = converter(col["data_type"] or "VARCHAR(255)")
+        self.t =(col["data_type"] or "").upper()
         self.n = start - 1
         self.seen: set = set()
 
@@ -71,10 +73,10 @@ class ColumnGen:
         if mode == "null":
             return None
         if mode == "value":
-            return o.get("value")
+            return self.conv(o.get("value"))
         if mode == "list":
             vals = [v.strip() for v in str(o.get("values", "")).split(",") if v.strip()]
-            return rng.choice(vals) if vals else None
+            return self.conv(rng.choice(vals)) if vals else None
         if mode == "sequence":
             self.n += 1
             return self.n
