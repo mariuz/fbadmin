@@ -16,7 +16,7 @@ const files = [];
 })(root);
 
 const keys = new Set();
-const re = /\bt\(\s*(["'`])((?:\\.|(?!\1).)*)\1/g;
+const re = /\b(?:t|N_)\(\s*(["'`])((?:\\.|(?!\1).)*)\1/g;
 for (const f of files) {
   const src = readFileSync(f, "utf8");
   for (const m of src.matchAll(re)) if (!m[2].includes("${")) keys.add(m[2].replace(/\\(["'`\\])/g, "$1"));

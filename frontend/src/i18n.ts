@@ -28,3 +28,9 @@ export function t(text: string, vars?: Record<string, string | number>): string 
   if (vars) for (const [k, v] of Object.entries(vars)) out = out.split(`{${k}}`).join(String(v));
   return out;
 }
+
+/** Marks a string for extraction without translating it (for module-level constants);
+ *  translate it where it is shown with t(value). */
+export function N_(text: string): string {
+  return text;
+}
