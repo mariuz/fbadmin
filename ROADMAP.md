@@ -10,10 +10,9 @@ Supported Firebird versions: **3.0, 4.0, 5.0** (tested in CI) and the **6.0 snap
 (SQL schemas; a CI job that is allowed to fail). Firebird 2.5 is end-of-life and out of
 scope.
 
-**Status:** every milestone below is implemented. Items marked *(unverified)* exist in the code
-and are tested, but they also depend on something only the repository owner can provide: a first
-tagged release (PyPI trusted publisher), code-signing certificates, or GitHub Pages enabled in
-the repository settings.
+**Status:** every milestone below is implemented and verified in CI against real services. Three
+steps need the repository owner: enabling GitHub Pages, the PyPI trusted publisher with a first
+version tag, and code-signing certificates for the desktop builds.
 
 ---
 
@@ -159,13 +158,13 @@ exact DDL before it runs, like pgAdmin.
 
 ## Milestone 1.0 — Packaging and polish ✅
 
-- ✅ `pip install fbadmin` on PyPI, with the prebuilt UI bundled in the wheel *(unverified: the release workflow is ready; the first release isn't tagged yet)*
+- ✅ `pip install fbadmin` on PyPI, with the prebuilt UI bundled in the wheel (CI builds the sdist and wheel on every push, runs `twine check --strict`, and installs the wheel into a fresh venv where it serves the UI. Publishing needs the owner's one-time PyPI trusted-publisher setup and a version tag)
 - ✅ Official multi-arch Docker image (amd64 and arm64), Helm chart, Kubernetes example with the Firebird operator (`deploy/k8s`: StatefulSet. `deploy/k8s-operator`: a `FirebirdCluster` from the [cloudnative-firebird](https://github.com/mariuz/cloudnative-firebird) operator, with fbadmin registered from a ConfigMap; a kind workflow runs it end to end. Helm `firebirdServers` for preconfigured servers)
-- ✅ **Desktop app:** pywebview or Tauri shell with auto-update, for Windows (MSI), macOS (dmg) and Linux (AppImage, deb, rpm, Flatpak) *(unverified: `desktop.yml` builds MSI, dmg, AppImage, deb, rpm and Flatpak but hasn't run on a tag yet; builds are unsigned)*. Self-update downloads the package, verifies it against `SHA256SUMS`, then runs the MSI, replaces the AppImage or opens the dmg.
+- ✅ **Desktop app:** pywebview or Tauri shell with auto-update, for Windows (MSI), macOS (dmg) and Linux (AppImage, deb, rpm, Flatpak). Verified in CI on every packaging change: the MSI installs, runs and uninstalls on Windows; the dmg mounts and the app runs on macOS arm64 and Intel; the deb installs and the AppImage runs on Linux; the rpm and Flatpak bundle are built. Self-update downloads the package, verifies it against `SHA256SUMS`, then runs the MSI, replaces the AppImage or opens the dmg; this was exercised on a real AppImage, which replaced itself and restarted. The builds are not code-signed (that needs the owner's certificates), and packages are attached to GitHub Releases only for version tags
 - ✅ Preferences dialog: editor font, keymap, grid NULL display, date formats, confirmations
 - ✅ Internationalisation (i18n): English, Romanian, Portuguese (Brazil), Spanish, Russian, German, French and Czech (1750 strings in each language; CI checks that every catalog is complete)
 - ✅ Accessibility: keyboard tree navigation, ARIA roles, high-contrast theme (landmarks, ARIA tabs, menus and dialogs, labelled fields, axe-core audit in e2e in three themes)
-- ✅ Documentation site (MkDocs), a user guide with screenshots, and an admin guide for server mode *(GitHub Pages deployment unverified)*
+- ✅ Documentation site (MkDocs), a user guide with screenshots, and an admin guide for server mode (built with `mkdocs build --strict` in CI; it deploys to GitHub Pages as soon as Pages is enabled in the repository settings, Source: GitHub Actions)
 - ✅ Plugin API for extra tree nodes, dashboard panels and tools
 - ✅ Telemetry: none by default, ever
 

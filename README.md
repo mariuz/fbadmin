@@ -9,10 +9,15 @@ as a container next to your server.
 
 ![Query Tool](docs/screenshots/query-tool.png)
 
-> **Status:** every milestone of the [ROADMAP](ROADMAP.md) up to 1.0 is implemented.
-> Not released yet: the current version is 0.2.0, there is no tag, and nothing is on PyPI.
-> Tested against Firebird **3.0, 4.0, 5.0 and the 6.0 snapshots**. The UI is available in
-> English, Romanian, Portuguese (Brazil), Spanish, Russian, German, French and Czech.
+> **Status:** every milestone of the [ROADMAP](ROADMAP.md) up to 1.0 is implemented and
+> verified in CI:
+> - Firebird **3.0, 4.0, 5.0 and the 6.0 snapshots**
+> - real LDAP, OIDC and database-encryption services
+> - a Kubernetes operator deployment
+> - installers on Windows, macOS and Linux
+>
+> The UI speaks English, Romanian, Portuguese (Brazil), Spanish, Russian, German, French and
+> Czech. Not released yet: the current version is 0.2.0.
 
 ## Features
 
