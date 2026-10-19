@@ -67,7 +67,7 @@ connection, separate from the pool.
 on top of the Firebird client library for metadata connections:
 
 ```bash
-pip install "fbadmin[native]"      # plus libfbclient: apt install libfbclient2, or a Firebird install
+pip install "firebird-admin[native]"      # plus libfbclient: apt install libfbclient2, or a Firebird install
 FBADMIN_DRIVER=native FBADMIN_FBCLIENT=/opt/firebird/lib/libfbclient.so fbadmin
 ```
 

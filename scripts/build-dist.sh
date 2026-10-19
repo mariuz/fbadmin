@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Build the PyPI distributions (sdist + wheel) with the prebuilt web UI inside.
-#   scripts/build-dist.sh            -> dist/fbadmin-X.Y.Z.tar.gz, dist/fbadmin-X.Y.Z-py3-none-any.whl
+#   scripts/build-dist.sh            -> dist/firebird_admin-X.Y.Z.tar.gz, dist/firebird_admin-X.Y.Z-py3-none-any.whl
 #   SKIP_UI=1 scripts/build-dist.sh  -> reuse an existing backend/fbadmin/static
 #   SMOKE=1 scripts/build-dist.sh    -> also install the wheel in a fresh venv and fetch the UI
 set -euo pipefail
@@ -18,5 +18,5 @@ rm -rf dist backend/build backend/*.egg-info
 "$PY" scripts/check_dist.py dist
 
 if [ "${SMOKE:-0}" = "1" ]; then
-  "$root/scripts/smoke-wheel.sh" dist/fbadmin-*.whl
+  "$root/scripts/smoke-wheel.sh" dist/*.whl
 fi

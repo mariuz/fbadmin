@@ -32,7 +32,7 @@ modules:
       build-args:
         - --share=network
     build-commands:
-      - pip3 install --no-cache-dir --prefix=/app "$(ls fbadmin-*.whl)[desktop]"
+      - pip3 install --no-cache-dir --prefix=/app "$(ls *.whl)[desktop]"
       - install -Dm644 io.github.mariuz.fbadmin.desktop /app/share/applications/io.github.mariuz.fbadmin.desktop
       - install -Dm644 fbadmin.svg /app/share/icons/hicolor/scalable/apps/io.github.mariuz.fbadmin.svg
       - install -Dm644 fbadmin.png /app/share/icons/hicolor/512x512/apps/io.github.mariuz.fbadmin.png

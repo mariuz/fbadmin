@@ -5,9 +5,9 @@ object explorer, DDL extraction, a query tool with plans and transactions, an ed
 grid, live monitoring and backup/restore. No Firebird client library needed.
 
 ```bash
-pip install fbadmin
+pip install firebird-admin
 fbadmin                 # starts on http://localhost:5050 and opens your browser
-fbadmin-desktop         # the same in a native window (pip install "fbadmin[desktop]")
+fbadmin-desktop         # the same in a native window (pip install "firebird-admin[desktop]")
 ```
 
 Options: `--host`, `--port`, `--no-browser`, `--log-level`, `--log-format json`.

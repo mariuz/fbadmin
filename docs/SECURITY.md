@@ -18,7 +18,7 @@ network. Use server mode for that.
 ## Running in server mode
 
 ```bash
-pip install 'fbadmin[ldap]'            # the [ldap] extra is only needed for LDAP logins
+pip install 'firebird-admin[ldap]'            # the [ldap] extra is only needed for LDAP logins
 export FBADMIN_SERVER_MODE=1           # or: fbadmin --server-mode
 export FBADMIN_DATA_DIR=/var/lib/fbadmin
 fbadmin --host 0.0.0.0 --port 5050 --no-browser
@@ -85,7 +85,7 @@ plus the sections shown below. Environment variables override the file.
 Passwords are hashed with Argon2id (m=19 MiB, t=2, p=1). If `argon2-cffi` is missing, scrypt is
 used instead. Passwords need at least 8 characters.
 
-### LDAP (`pip install 'fbadmin[ldap]'`)
+### LDAP (`pip install 'firebird-admin[ldap]'`)
 
 ```bash
 FBADMIN_AUTH_SOURCES=internal,ldap
@@ -218,7 +218,7 @@ The server dialog has these per-server options:
 * **Wire compression.** zlib, Firebird 3+. fbadmin ships a small fix for the pure-Python driver,
   which otherwise fails on compressed connections. See `security/wirecompat.py`.
 * **Authentication plugin.** `Srp256` (the default), `Srp` or `Legacy_Auth`. `Legacy_Auth` needs
-  `pip install 'fbadmin[legacy-auth]'`.
+  `pip install 'firebird-admin[legacy-auth]'`.
 
 ![Server options](screenshots/security-server-dialog.png)
 

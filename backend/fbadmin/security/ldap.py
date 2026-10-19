@@ -1,4 +1,4 @@
-"""LDAP authentication (``pip install fbadmin[ldap]`` - uses ldap3).
+"""LDAP authentication (``pip install firebird-admin[ldap]`` - uses ldap3).
 
 Two modes:
 
@@ -24,7 +24,7 @@ def _ldap3():
     try:
         import ldap3
     except ImportError as exc:  # pragma: no cover
-        raise RuntimeError("LDAP authentication needs the ldap3 package: pip install 'fbadmin[ldap]'") from exc
+        raise RuntimeError("LDAP authentication needs the ldap3 package: pip install 'firebird-admin[ldap]'") from exc
     return ldap3
 
 

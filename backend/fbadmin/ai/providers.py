@@ -20,7 +20,7 @@ class AIProvider:
 
 
 class AnthropicProvider(AIProvider):
-    """Claude via the official Anthropic SDK (``pip install fbadmin[ai]``).
+    """Claude via the official Anthropic SDK (``pip install firebird-admin[ai]``).
 
     Credentials come from the SDK's normal resolution (ANTHROPIC_API_KEY, ANTHROPIC_AUTH_TOKEN,
     an ``ant auth login`` profile, ...). Model: FBADMIN_AI_MODEL (default claude-opus-5-5).
@@ -32,7 +32,7 @@ class AnthropicProvider(AIProvider):
         try:
             import anthropic
         except ImportError as exc:
-            raise AIUnavailable("The 'anthropic' package is not installed: pip install 'fbadmin[ai]'") from exc
+            raise AIUnavailable("The 'anthropic' package is not installed: pip install 'firebird-admin[ai]'") from exc
         self._anthropic = anthropic
         self.model = os.environ.get("FBADMIN_AI_MODEL", "claude-opus-5-5")
         self.effort = os.environ.get("FBADMIN_AI_EFFORT", "high")

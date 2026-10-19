@@ -220,7 +220,7 @@ jobs:
       # the desktop app's auto-updater refuses packages without a published checksum
       - name: SHA256SUMS
         working-directory: packages
-        run: sha256sum fbadmin-* > SHA256SUMS && cat SHA256SUMS
+        run: sha256sum fbadmin-* fbadmin_* > SHA256SUMS && cat SHA256SUMS
       - uses: softprops/action-gh-release@v2
         with:
           files: packages/*

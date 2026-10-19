@@ -14,7 +14,7 @@ Scope and limitations (see docs/DEVELOPMENT.md):
   transaction parameter blocks and wire-level statement info.
 * ``wire_crypt`` follows the client library's ``firebird.conf`` (``WireCrypt``), not the
   per-server setting.
-* Needs ``pip install firebird-driver`` (or ``pip install fbadmin[native]``) and a
+* Needs ``pip install firebird-driver`` (or ``pip install firebird-admin[native]``) and a
   ``libfbclient`` (Firebird 3+). Point ``FBADMIN_FBCLIENT`` at the library file if it is
   not on the default search path.
 """
@@ -40,7 +40,7 @@ def _load():
         from firebird import driver
     except ImportError as exc:  # pragma: no cover - depends on optional package
         raise RuntimeError("FBADMIN_DRIVER=native needs the 'firebird-driver' package "
-                           "(pip install 'fbadmin[native]')") from exc
+                           "(pip install 'firebird-admin[native]')") from exc
     lib = os.environ.get("FBADMIN_FBCLIENT")
     if lib and driver.driver_config.fb_client_library.value != lib:
         driver.driver_config.fb_client_library.value = lib

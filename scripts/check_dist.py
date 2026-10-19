@@ -47,8 +47,8 @@ def check_sdist(path: Path) -> list[str]:
 
 def main() -> int:
     dist = Path(sys.argv[1] if len(sys.argv) > 1 else "dist")
-    wheels = sorted(dist.glob("fbadmin-*.whl"))
-    sdists = sorted(dist.glob("fbadmin-*.tar.gz"))
+    wheels = sorted(dist.glob("*.whl"))
+    sdists = sorted(dist.glob("*.tar.gz"))
     if not wheels:
         print(f"no wheel found in {dist}", file=sys.stderr)
         return 1

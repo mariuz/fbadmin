@@ -74,7 +74,7 @@ The ⚙ button in the top bar opens Preferences:
 
 ## AI assistant (opt-in)
 
-The assistant is off by default. To enable it, set `FBADMIN_AI_PROVIDER=anthropic` and install the extra with `pip install 'fbadmin[ai]'`. The Anthropic SDK then picks up your credentials, for example `ANTHROPIC_API_KEY`.
+The assistant is off by default. To enable it, set `FBADMIN_AI_PROVIDER=anthropic` and install the extra with `pip install 'firebird-admin[ai]'`. The Anthropic SDK then picks up your credentials, for example `ANTHROPIC_API_KEY`.
 - `FBADMIN_AI_MODEL` changes the model (default `claude-opus-5-5`).
 - `FBADMIN_AI_EFFORT` changes the effort level (default `high`).
 

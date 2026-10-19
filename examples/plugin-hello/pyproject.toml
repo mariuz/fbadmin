@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "fbadmin-hello"
 version = "0.1.0"
 description = "Example fbadmin plugin: an API endpoint, a menu item and a workspace tab"
-dependencies = ["fbadmin"]
+dependencies = ["firebird-admin"]  # the fbadmin distribution on PyPI
 
 [project.entry-points."fbadmin.plugins"]
 hello = "fbadmin_hello:plugin"

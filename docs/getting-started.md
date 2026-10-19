@@ -17,7 +17,7 @@ The desktop app can update itself: About → **Download and install**.
 Requires Python 3.10 or newer. The package contains the prebuilt web UI.
 
 ```bash
-python -m pip install fbadmin
+python -m pip install firebird-admin
 fbadmin                      # starts on http://localhost:5050 and opens your browser
 fbadmin --no-browser --port 8080
 ```
@@ -34,8 +34,8 @@ Command-line options:
 Optional extras:
 
 ```bash
-pip install "fbadmin[desktop]"   # native window for fbadmin-desktop (pywebview)
-pip install "fbadmin[native]"    # optional libfbclient driver, see Administration → Configuration
+pip install "firebird-admin[desktop]"   # native window for fbadmin-desktop (pywebview)
+pip install "firebird-admin[native]"    # optional libfbclient driver, see Administration → Configuration
 ```
 
 ## Desktop app

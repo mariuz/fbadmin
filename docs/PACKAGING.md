@@ -15,7 +15,7 @@ The version lives in one place: `__version__` in `backend/fbadmin/__init__.py`
    chart changed) and the `<release>` entry in
    `packaging/flatpak/io.github.mariuz.fbadmin.metainfo.xml`.
 2. Run `scripts/gen-api-types.sh` if the API changed; make sure CI is green.
-3. Tag and push: `git tag v1.0.0 && git push origin v1.0.0`.
+3. Tag and push: `git tag -a v1.0.1 -m "fbadmin 1.0.1" && git push origin v1.0.1`.
 
 The tag starts three workflows:
 
@@ -29,10 +29,12 @@ The tag starts three workflows:
 
 ### One-time setup
 
-- **PyPI trusted publishing**: on pypi.org, project *fbadmin* → *Publishing* → add a
-  GitHub publisher: owner `mariuz`, repository `fbadmin`, workflow `release.yml`,
-  environment `pypi`. No API token is stored in GitHub. (For the very first upload use a
-  "pending publisher".)
+- **PyPI trusted publishing**: the distribution is **`firebird-admin`**, because the name
+  `fbadmin` on PyPI belongs to an unrelated older project. The import name and the `fbadmin` /
+  `fbadmin-desktop` commands are unchanged. On pypi.org, add a GitHub publisher for project
+  *firebird-admin*: owner `mariuz`, repository `fbadmin`, workflow `release.yml`, environment
+  `pypi`. Before the first upload, add it as a "pending publisher" under *Your account →
+  Publishing*. No API token is stored in GitHub.
 - **GitHub environment** `pypi` (Settings → Environments), optionally with required
   reviewers so a person approves each upload.
 - **GHCR**: the workflow pushes with `GITHUB_TOKEN`; make the package public once in the
@@ -44,14 +46,15 @@ The tag starts three workflows:
 ```bash
 scripts/build-dist.sh                 # npm ci + build UI, python -m build, scripts/check_dist.py
 SMOKE=1 scripts/build-dist.sh         # also install the wheel in a fresh venv and fetch the UI
-scripts/smoke-wheel.sh dist/fbadmin-*.whl 5106
+scripts/smoke-wheel.sh dist/*.whl 5106
 ```
 
 `scripts/check_dist.py` fails when the wheel lacks `fbadmin/static/index.html`, when an
 asset referenced by `index.html` is missing, or when a console script is missing. The
 `wheel` job in CI runs the same steps on every push.
 
-The wheel is pure Python (`py3-none-any`) and installs two commands: `fbadmin` (server,
+The wheel (`firebird_admin-X.Y.Z-py3-none-any.whl`, installed with `pip install firebird-admin`)
+is pure Python and installs two commands: `fbadmin` (server,
 opens the browser) and `fbadmin-desktop` (native window). Extras: `desktop` (pywebview),
 `native` (firebird-driver), `dev` (tests).
 

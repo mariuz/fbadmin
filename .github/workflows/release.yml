@@ -2,7 +2,7 @@
 # with trusted publishing and attach them to a GitHub Release.
 #
 # One-time setup (see docs/PACKAGING.md):
-#   * PyPI: add a trusted publisher for project "fbadmin": owner mariuz, repository fbadmin,
+#   * PyPI: add a trusted publisher for project "firebird-admin": owner mariuz, repository fbadmin,
 #     workflow release.yml, environment "pypi".
 #   * GitHub: create the "pypi" environment (optionally with required reviewers).
 name: Release
@@ -48,7 +48,7 @@ jobs:
       - name: Check the package metadata PyPI will render
         run: twine check --strict dist/*
       - name: Install the wheel in a fresh venv and fetch the UI
-        run: scripts/smoke-wheel.sh dist/fbadmin-*.whl 5106
+        run: scripts/smoke-wheel.sh dist/*.whl 5106
       - uses: actions/upload-artifact@v4
         with:
           name: python-dist
@@ -62,7 +62,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: pypi
-      url: https://pypi.org/project/fbadmin/
+      url: https://pypi.org/project/firebird-admin/
     permissions:
       id-token: write   # trusted publishing (OIDC), no API token stored
     steps:

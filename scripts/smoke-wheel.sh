@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Install a built wheel into a throw-away venv, start it and check that it serves the UI.
-#   scripts/smoke-wheel.sh dist/fbadmin-0.2.0-py3-none-any.whl [port]
+#   scripts/smoke-wheel.sh dist/firebird_admin-1.0.1-py3-none-any.whl [port]
 set -euo pipefail
 wheel="$(realpath "$1")"
 port="${2:-${SMOKE_PORT:-5106}}"

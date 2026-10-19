@@ -131,7 +131,7 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: pip install build
       - run: scripts/build-dist.sh
-      - run: scripts/smoke-wheel.sh dist/fbadmin-*.whl 5106
+      - run: scripts/smoke-wheel.sh dist/*.whl 5106
       - uses: actions/upload-artifact@v4
         with:
           name: python-dist

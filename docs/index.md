@@ -15,7 +15,7 @@ desktop window), or as a container next to your server.
 === "pip"
 
     ```bash
-    pip install fbadmin
+    pip install firebird-admin
     fbadmin            # opens http://localhost:5050
     ```
 
