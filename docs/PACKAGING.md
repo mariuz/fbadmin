@@ -78,13 +78,13 @@ pip install "./backend[desktop]" pyinstaller pillow
 (cd frontend && npm ci && npm run build)
 pyinstaller packaging/pyinstaller/fbadmin.spec --noconfirm     # -> dist/fbadmin/ or dist/fbadmin.app
 packaging/linux/build-packages.sh 0.2.0 appimage deb rpm        # Linux: needs fpm (and rpmbuild)
-wix build packaging/windows/fbadmin.wxs -arch x64 -d SourceDir=dist\fbadmin -d Version=0.2.0 -o fbadmin.msi
+wix build packaging/windows/fbadmin.wxs -arch x64 -wx -d SourceDir=%CD%\dist\fbadmin -d Version=0.2.0 -o fbadmin.msi
 ```
 
 | Platform | Format | How |
 |---|---|---|
 | Windows | `.zip` (portable), `.msi` | `Compress-Archive`; WiX v5 (`packaging/windows/fbadmin.wxs`) |
-| macOS | `.dmg` with `fbadmin.app` | PyInstaller `BUNDLE` + `hdiutil` (arm64 on macos-14, x86_64 on macos-13) |
+| macOS | `.dmg` with `fbadmin.app` | PyInstaller `BUNDLE` + `hdiutil` (arm64 on macos-14, x86_64 on macos-15-intel) |
 | Linux | AppImage, `.deb`, `.rpm` | `packaging/linux/build-packages.sh` (appimagetool, fpm) on Ubuntu 22.04 |
 | Linux | Flatpak | `packaging/flatpak/io.github.mariuz.fbadmin.yml` (GNOME runtime). The `flatpak` job in `desktop.yml` builds a `.flatpak` bundle, and a failure there doesn't fail the workflow. |
 

@@ -1,0 +1,4 @@
+# Runner labels newer than the pinned actionlint knows about.
+self-hosted-runner:
+  labels:
+    - macos-15-intel   # GitHub-hosted Intel macOS (replaces macos-13, retired December 2025)

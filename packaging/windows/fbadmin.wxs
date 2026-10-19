@@ -1,10 +1,11 @@
 <!--
   MSI installer for the fbadmin desktop app (WiX Toolset v5+: `dotnet tool install -g wix`).
 
-    wix build packaging/windows/fbadmin.wxs -arch x64 ^
-        -d SourceDir=dist\fbadmin -d Version=0.2.0 -o dist\fbadmin-0.2.0-x64.msi
+    wix build packaging/windows/fbadmin.wxs -arch x64 -wx ^
+        -d SourceDir=%CD%\dist\fbadmin -d Version=0.2.0 -o dist\fbadmin-0.2.0-x64.msi
 
-  SourceDir is the PyInstaller one-folder build. The installer is per-machine, installs
+  SourceDir is the PyInstaller one-folder build, as an ABSOLUTE path (WiX resolves relative
+  Files paths against this file's directory; an empty harvest is only a warning without -wx). The installer is per-machine, installs
   into Program Files\fbadmin and adds a Start menu shortcut. It is not code-signed.
 -->
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">

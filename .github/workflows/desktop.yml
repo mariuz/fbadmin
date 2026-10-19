@@ -36,7 +36,7 @@ jobs:
         include:
           - { name: Windows x64, os: windows-latest, kind: windows }
           - { name: macOS arm64, os: macos-14, kind: macos, arch: arm64 }
-          - { name: macOS x86_64, os: macos-13, kind: macos, arch: x86_64 }
+          - { name: macOS x86_64, os: macos-15-intel, kind: macos, arch: x86_64 }
           # 22.04 keeps the glibc baseline low so the AppImage runs on older distributions.
           - { name: Linux x86_64, os: ubuntu-22.04, kind: linux }
     steps:
@@ -84,7 +84,10 @@ jobs:
         shell: pwsh
         run: |
           dotnet tool install --global wix --version 5.0.2
-          wix build packaging/windows/fbadmin.wxs -arch x64 -d SourceDir=dist\fbadmin `
+          # absolute SourceDir: WiX resolves Files paths relative to the .wxs, not the working directory;
+          # -wx: an empty harvest is only a warning (WIX8601) and would produce an MSI without the app
+          $src = (Resolve-Path dist\fbadmin).Path
+          wix build packaging/windows/fbadmin.wxs -arch x64 -wx -d "SourceDir=$src" `
             -d Version=${{ steps.v.outputs.version }} -o "dist/packages/fbadmin-${{ steps.v.outputs.version }}-x64.msi"
 
       # --- macOS: dmg -------------------------------------------------------------
