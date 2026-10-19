@@ -121,6 +121,7 @@ jobs:
       # --- install the packages and start the installed app ------------------------
       - name: Install the MSI and run the installed app (Windows)
         if: matrix.kind == 'windows'
+        timeout-minutes: 10
         shell: pwsh
         run: |
           $msi = Get-ChildItem dist/packages/*.msi | Select-Object -First 1
@@ -129,12 +130,18 @@ jobs:
           $exe = "$env:ProgramFiles\fbadmin\fbadmin.exe"
           if (-not (Test-Path $exe)) { throw "not installed: $exe" }
           $env:FBADMIN_DATA_DIR = "$env:RUNNER_TEMP\fbmsi"
-          Start-Process $exe -ArgumentList "--browser --port 5107"
+          $env:BROWSER = "none"
+          $app = Start-Process $exe -ArgumentList "--browser --port 5107" -PassThru -RedirectStandardOutput app.log -RedirectStandardError app.err
           for ($i = 0; $i -lt 60; $i++) { try { Invoke-RestMethod http://127.0.0.1:5107/api/health | Out-Null; break } catch { Start-Sleep 1 } }
           (Invoke-WebRequest http://127.0.0.1:5107/ -UseBasicParsing).Content | Select-String 'id="root"' | Out-Null
-          if (-not $?) { throw "UI not served" }
-          $p = Start-Process msiexec -ArgumentList "/x `"$($msi.FullName)`" /qn" -Wait -PassThru
+          if (-not $?) { Get-Content app.log, app.err -ErrorAction SilentlyContinue; throw "UI not served" }
+          if (Select-String -Path app.err -Pattern "could not patch" -Quiet) { Get-Content app.err; throw "driver patch failed" }
+          # stop the app before uninstalling, or msiexec waits for the files in use
+          Stop-Process -Id $app.Id -Force -ErrorAction SilentlyContinue
+          Get-Process fbadmin -ErrorAction SilentlyContinue | Stop-Process -Force
+          $p = Start-Process msiexec -ArgumentList "/x `"$($msi.FullName)`" /qn /norestart" -Wait -PassThru
           Write-Host "uninstall exit $($p.ExitCode)"
+          if (Test-Path $exe) { throw "uninstall left $exe behind" }
       - name: Mount the dmg and run the app (macOS)
         if: matrix.kind == 'macos'
         run: |
