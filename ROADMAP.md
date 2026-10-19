@@ -10,9 +10,11 @@ Supported Firebird versions: **3.0, 4.0, 5.0** (tested in CI) and the **6.0 snap
 (SQL schemas; a CI job that is allowed to fail). Firebird 2.5 is end-of-life and out of
 scope.
 
-**Status:** every milestone below is implemented and verified in CI against real services. Three
-steps need the repository owner: enabling GitHub Pages, the PyPI trusted publisher with a first
-version tag, and code-signing certificates for the desktop builds.
+**Status:** every milestone below is implemented, verified in CI against real services, and
+released: 1.0.1 is on [PyPI](https://pypi.org/project/firebird-admin/) (`pip install firebird-admin`),
+on [GitHub Releases](https://github.com/mariuz/fbadmin/releases) with desktop installers for
+Windows, macOS and Linux, as a Docker image, and documented at https://mariuz.github.io/fbadmin/.
+The desktop builds are not code-signed yet; that needs the owner's signing certificates.
 
 ---
 
@@ -158,7 +160,7 @@ exact DDL before it runs, like pgAdmin.
 
 ## Milestone 1.0 — Packaging and polish ✅
 
-- ✅ `pip install firebird-admin` on PyPI, with the prebuilt UI bundled in the wheel (the name `fbadmin` on PyPI belongs to an unrelated project; the commands are still `fbadmin` and `fbadmin-desktop`). CI builds the sdist and wheel on every push, runs `twine check --strict`, and installs the wheel into a fresh venv where it serves the UI; a version tag publishes through PyPI trusted publishing
+- ✅ `pip install firebird-admin` on [PyPI](https://pypi.org/project/firebird-admin/) (1.0.1 published by the release workflow through trusted publishing), with the prebuilt UI bundled in the wheel. The name `fbadmin` on PyPI belongs to an unrelated project; the commands are still `fbadmin` and `fbadmin-desktop`. CI builds the sdist and wheel on every push, runs `twine check --strict`, and installs the wheel into a fresh venv where it serves the UI
 - ✅ Official multi-arch Docker image (amd64 and arm64), Helm chart, Kubernetes example with the Firebird operator (`deploy/k8s`: StatefulSet. `deploy/k8s-operator`: a `FirebirdCluster` from the [cloudnative-firebird](https://github.com/mariuz/cloudnative-firebird) operator, with fbadmin registered from a ConfigMap; a kind workflow runs it end to end. Helm `firebirdServers` for preconfigured servers)
 - ✅ **Desktop app:** pywebview or Tauri shell with auto-update, for Windows (MSI), macOS (dmg) and Linux (AppImage, deb, rpm, Flatpak). Verified in CI on every packaging change: the MSI installs, runs and uninstalls on Windows; the dmg mounts and the app runs on macOS arm64 and Intel; the deb installs and the AppImage runs on Linux; the rpm and Flatpak bundle are built. Self-update downloads the package, verifies it against `SHA256SUMS`, then runs the MSI, replaces the AppImage or opens the dmg; this was exercised on a real AppImage, which replaced itself and restarted. The builds are not code-signed (that needs the owner's certificates), and packages are attached to GitHub Releases only for version tags
 - ✅ Preferences dialog: editor font, keymap, grid NULL display, date formats, confirmations
