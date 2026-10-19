@@ -92,6 +92,7 @@ jobs:
           $src = (Resolve-Path dist\fbadmin).Path
           wix build packaging/windows/fbadmin.wxs -arch x64 -wx -d "SourceDir=$src" `
             -d Version=${{ steps.v.outputs.version }} -o "dist/packages/fbadmin-${{ steps.v.outputs.version }}-x64.msi"
+          Remove-Item dist/packages/*.wixpdb -ErrorAction SilentlyContinue   # debug symbols, not a release asset
 
       # --- macOS: dmg -------------------------------------------------------------
       - name: DMG (macOS)
