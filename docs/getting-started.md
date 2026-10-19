@@ -2,7 +2,15 @@
 
 fbadmin talks to Firebird over the network with the pure-Python
 [`firebirdsql`](https://github.com/nakagami/pyfirebirdsql) driver, so you do not need a
-Firebird client library. It works with Firebird 3.0, 4.0 and 5.0 servers.
+Firebird client library. It works with Firebird 3.0, 4.0 and 5.0 servers, and with the
+Firebird 6.0 snapshots (see [Firebird 6 and SQL schemas](FIREBIRD6.md)).
+
+## Desktop app
+
+Installers for Windows (`.msi`), macOS (`.dmg`, Apple silicon and Intel) and Linux (AppImage,
+`.deb`, `.rpm`, Flatpak) are attached to each
+[GitHub release](https://github.com/mariuz/fbadmin/releases), along with a `SHA256SUMS` file.
+The desktop app can update itself: About → **Download and install**.
 
 ## Install with pip
 
