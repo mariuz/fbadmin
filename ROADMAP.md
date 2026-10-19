@@ -10,11 +10,12 @@ Supported Firebird versions: **3.0, 4.0, 5.0** (tested in CI) and the **6.0 snap
 (SQL schemas; a CI job that is allowed to fail). Firebird 2.5 is end-of-life and out of
 scope.
 
-**Status:** every milestone below is implemented, verified in CI against real services, and
+**Status:** every milestone up to 1.0 and the engineering backlog is implemented, verified in CI against real services, and
 released: 1.0.1 is on [PyPI](https://pypi.org/project/firebird-admin/) (`pip install firebird-admin`),
 on [GitHub Releases](https://github.com/mariuz/fbadmin/releases) with desktop installers for
 Windows, macOS and Linux, as a Docker image, and documented at https://mariuz.github.io/fbadmin/.
 Code signing is deferred by decision of the project owner: the 1.x desktop builds ship unsigned. The signing steps (macOS Developer ID with notarization, Windows Authenticode) are already in the desktop workflow and turn on as soon as the certificates are added as repository secrets; see [docs/PACKAGING.md](docs/PACKAGING.md#desktop-app).
+Milestones 1.1, 1.2 and 2.0 below are planned.
 
 ---
 
@@ -183,6 +184,40 @@ exact DDL before it runs, like pgAdmin.
 - ✅ Rate limiting and request-size limits for server mode
 - ✅ Fuzz tests for the SQL splitter; property tests for DDL round-trips with generated schemas
 - ✅ Compatibility tests against the [firebird-qa](https://github.com/FirebirdSQL/firebird-qa) corpus of DDL *(weekly `compat.yml`; needs `FBADMIN_QA_DIR` locally)*
+
+## Milestone 1.1 — Firebird 6.0 final, alerts and backups ⬜
+
+- ⬜ **Firebird 6.0 final release:** test against the released 6.0, make the Firebird 6 CI job required (no `continue-on-error`), support any new data types and DDL that ship, and remove the snapshot workarounds the engine no longer needs (see [docs/FIREBIRD6.md](docs/FIREBIRD6.md))
+- ⬜ **Alerts:** email, Slack and webhook notifications for conditions fbadmin already detects: failed scheduled backups, long-running transactions holding back garbage collection (OIT/OAT gap), replication lag, validation errors
+- ⬜ **Backup verification:** automatic test restores of scheduled backups into a scratch database, with the result recorded and alerted on
+- ⬜ **Cloud backup targets:** S3, Azure Blob Storage and Google Cloud Storage, with retention rules
+
+## Milestone 1.2 — Desktop and data tools ⬜
+
+- 💡 **Embedded engine in the desktop app:** bundle Firebird embedded so a local `.fdb` opens without a running server (needs the engine libraries per platform in the installers)
+- ⬜ **Data compare:** compare the rows of a table in two databases (by primary key) and generate a sync script of `INSERT`, `UPDATE` and `DELETE` statements
+- ⬜ **Event monitor:** register `POST_EVENT` names and watch the events arrive live, with counts
+- ⬜ **Upgrade assistant:** check a database before moving from Firebird 3 to 5 or 6: reserved words used as identifiers, removed or changed features, the ODS change and the backup/restore plan
+- 💡 **PSQL debugging help:** Firebird has no step-through debugger, so combine per-line profiler timings, variable tracing and a test runner for procedures and functions
+
+## Milestone 2.0 — Teams and productivity ⬜
+
+- ⬜ **Two-factor login (TOTP)** for server mode
+- ⬜ **API tokens** for scripts and automation, scoped per user
+- ⬜ **Finer permissions:** per-database and per-object rights for fbadmin users, not just per server registration
+- ⬜ **Shared query library:** team-wide saved queries and snippets in server mode
+- ⬜ **Multi-server overview:** one page with the health of every registered server and database
+- ⬜ **Visual query builder** (pgAdmin parity): pick tables, joins and columns, generate the `SELECT`
+- ⬜ **Charts from query results:** bar, line and pie charts drawn from a result set
+- ⬜ **ERD export** to SVG and PNG
+- ⬜ **Schema history in git:** save the extracted DDL to a git repository and keep a history of schema changes
+- ⬜ **Command-line tool:** `fbadmin backup`, `fbadmin restore`, `fbadmin diff` and `fbadmin extract` for CI and cron jobs
+
+## Ongoing ⬜
+
+- ⬜ **Code signing** of the desktop builds (deferred; the workflow is ready and needs the owner's certificates as repository secrets)
+- ⬜ **Community translations** through Weblate, and more languages
+- ⬜ **Phone and tablet layout** for checking on servers away from a desk
 
 ## How to contribute to the roadmap
 
