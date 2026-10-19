@@ -33,8 +33,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if gh api "repos/${{ github.repository }}/pages" >/dev/null 2>&1; then enabled=true; else enabled=false
-            echo "::notice::GitHub Pages is not enabled for this repository: the site is built but not deployed"; fi
+          build_type=$(gh api "repos/${{ github.repository }}/pages" --jq .build_type 2>/dev/null || echo none)
+          if [ "$build_type" = workflow ]; then enabled=true; else enabled=false
+            echo "::notice::GitHub Pages source is '$build_type', not 'GitHub Actions' (Settings -> Pages -> Source): the site is built but not deployed"; fi
           echo "enabled=$enabled" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
