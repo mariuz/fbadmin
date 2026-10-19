@@ -93,9 +93,27 @@ wix build packaging/windows/fbadmin.wxs -arch x64 -wx -d SourceDir=%CD%\dist\fba
 
 Notes and limitations:
 
-- **Signing**: builds are not code-signed or notarized yet. Add an Apple Developer ID
-  (`codesign` + `notarytool`) and a Windows Authenticode certificate (`signtool`) as
-  secrets to remove the Gatekeeper/SmartScreen warnings.
+- **Signing**: `desktop.yml` signs the builds once these repository secrets exist (Settings →
+  Secrets and variables → Actions). Without them the packages are unsigned, the workflow
+  notes that, and macOS Gatekeeper and Windows SmartScreen warn on first start.
+
+  | Secret | Content |
+  |---|---|
+  | `MACOS_CERT_P12` | base64 of the *Developer ID Application* certificate and key (`.p12`) |
+  | `MACOS_CERT_PASSWORD` | password of that `.p12` |
+  | `MACOS_SIGN_IDENTITY` | `Developer ID Application: Your Name (TEAMID)` |
+  | `APPLE_ID`, `APPLE_TEAM_ID`, `APPLE_APP_PASSWORD` | notarization: Apple ID, team ID, app-specific password |
+  | `WINDOWS_CERT_PFX` | base64 of the Authenticode code-signing certificate (`.pfx`) |
+  | `WINDOWS_CERT_PASSWORD` | password of that `.pfx` |
+
+  - **macOS:** the app is signed with the hardened runtime and
+    `packaging/macos/entitlements.plist`, then the dmg is signed, notarized, stapled and
+    checked with `spctl`.
+  - **Windows:** `fbadmin.exe` and the MSI are signed with `signtool` and an RFC 3161
+    timestamp. The zip contains the signed exe.
+
+  Create base64 values with `base64 -i cert.p12 | pbcopy` (macOS) or
+  `[Convert]::ToBase64String([IO.File]::ReadAllBytes("cert.pfx"))` (PowerShell).
 - **Linux window**: the native window uses WebKitGTK through PyGObject, which is bundled at
   build time; the `.deb`/`.rpm` depend on the system WebKitGTK 4.1 libraries. The
   AppImage expects them on the host as well and otherwise falls back to the browser.

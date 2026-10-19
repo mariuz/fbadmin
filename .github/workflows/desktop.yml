@@ -39,6 +39,17 @@ jobs:
           - { name: macOS x86_64, os: macos-15-intel, kind: macos, arch: x86_64 }
           # 22.04 keeps the glibc baseline low so the AppImage runs on older distributions.
           - { name: Linux x86_64, os: ubuntu-22.04, kind: linux }
+    # Code signing turns on when these repository secrets exist (see docs/PACKAGING.md, "Signing");
+    # without them the builds are unsigned, as before.
+    env:
+      MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}            # base64 of a Developer ID Application .p12
+      MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+      MACOS_SIGN_IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}  # "Developer ID Application: Name (TEAMID)"
+      APPLE_ID: ${{ secrets.APPLE_ID }}                        # notarization (app-specific password)
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+      WINDOWS_CERT_PFX: ${{ secrets.WINDOWS_CERT_PFX }}        # base64 of an Authenticode .pfx
+      WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -75,6 +86,38 @@ jobs:
       - name: PyInstaller
         run: pyinstaller packaging/pyinstaller/fbadmin.spec --noconfirm
 
+      # --- code signing (only with the secrets above) ------------------------------
+      - name: Sign the app (macOS, Developer ID, hardened runtime)
+        if: matrix.kind == 'macos' && env.MACOS_CERT_P12 != ''
+        run: |
+          kc="$RUNNER_TEMP/signing.keychain-db"; kcpw="$(uuidgen)"
+          echo "$MACOS_CERT_P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security create-keychain -p "$kcpw" "$kc"
+          security set-keychain-settings -lut 3600 "$kc"
+          security unlock-keychain -p "$kcpw" "$kc"
+          security import "$RUNNER_TEMP/cert.p12" -k "$kc" -P "$MACOS_CERT_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$kcpw" "$kc" >/dev/null
+          existing=(); while IFS= read -r k; do [ -n "$k" ] && existing+=("$k"); done < <(security list-keychains -d user | tr -d '" ')
+          security list-keychains -d user -s "$kc" "${existing[@]}"
+          rm "$RUNNER_TEMP/cert.p12"
+          codesign --force --deep --timestamp --options runtime \
+            --entitlements packaging/macos/entitlements.plist -s "$MACOS_SIGN_IDENTITY" dist/fbadmin.app
+          codesign --verify --deep --strict --verbose=2 dist/fbadmin.app
+      - name: Sign the executable (Windows, Authenticode)
+        if: matrix.kind == 'windows' && env.WINDOWS_CERT_PFX != ''
+        shell: pwsh
+        run: |
+          [IO.File]::WriteAllBytes("$env:RUNNER_TEMP\cert.pfx", [Convert]::FromBase64String($env:WINDOWS_CERT_PFX))
+          $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" | Sort-Object FullName | Select-Object -Last 1
+          "SIGNTOOL=$($signtool.FullName)" >> $env:GITHUB_ENV
+          & $signtool.FullName sign /f "$env:RUNNER_TEMP\cert.pfx" /p $env:WINDOWS_CERT_PASSWORD /fd SHA256 `
+            /tr http://timestamp.digicert.com /td SHA256 dist\fbadmin\fbadmin.exe
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & $signtool.FullName verify /pa dist\fbadmin\fbadmin.exe
+      - name: Unsigned build
+        if: (matrix.kind == 'macos' && env.MACOS_CERT_P12 == '') || (matrix.kind == 'windows' && env.WINDOWS_CERT_PFX == '')
+        run: echo "::notice::No signing certificate configured; the ${{ matrix.name }} packages are unsigned (see docs/PACKAGING.md, Signing)"
+
       # --- Windows: zip + MSI ---------------------------------------------------
       - name: Zip (Windows)
         if: matrix.kind == 'windows'
@@ -93,6 +136,12 @@ jobs:
           wix build packaging/windows/fbadmin.wxs -arch x64 -wx -d "SourceDir=$src" `
             -d Version=${{ steps.v.outputs.version }} -o "dist/packages/fbadmin-${{ steps.v.outputs.version }}-x64.msi"
           Remove-Item dist/packages/*.wixpdb -ErrorAction SilentlyContinue   # debug symbols, not a release asset
+          if ($env:WINDOWS_CERT_PFX) {
+            & $env:SIGNTOOL sign /f "$env:RUNNER_TEMP\cert.pfx" /p $env:WINDOWS_CERT_PASSWORD /fd SHA256 `
+              /tr http://timestamp.digicert.com /td SHA256 (Get-ChildItem dist/packages/*.msi).FullName
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            Remove-Item "$env:RUNNER_TEMP\cert.pfx"
+          }
 
       # --- macOS: dmg -------------------------------------------------------------
       - name: DMG (macOS)
@@ -111,6 +160,15 @@ jobs:
             [ "$attempt" = 5 ] && exit 1
             echo "hdiutil failed (attempt $attempt), retrying"; sleep $((attempt * 5))
           done
+      - name: Sign and notarize the dmg (macOS)
+        if: matrix.kind == 'macos' && env.MACOS_CERT_P12 != '' && env.APPLE_ID != ''
+        run: |
+          set -- dist/packages/*.dmg; dmg=$1
+          codesign --force --timestamp -s "$MACOS_SIGN_IDENTITY" "$dmg"
+          xcrun notarytool submit "$dmg" --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" \
+            --password "$APPLE_APP_PASSWORD" --wait
+          xcrun stapler staple "$dmg"
+          spctl --assess --type open --context context:primary-signature --verbose=2 "$dmg"
 
       # --- Linux: AppImage, deb, rpm ---------------------------------------------
       - name: AppImage, deb, rpm (Linux)

@@ -14,7 +14,7 @@ scope.
 released: 1.0.1 is on [PyPI](https://pypi.org/project/firebird-admin/) (`pip install firebird-admin`),
 on [GitHub Releases](https://github.com/mariuz/fbadmin/releases) with desktop installers for
 Windows, macOS and Linux, as a Docker image, and documented at https://mariuz.github.io/fbadmin/.
-The desktop builds are not code-signed yet; that needs the owner's signing certificates.
+Code signing is wired into the desktop workflow (macOS Developer ID with notarization, Windows Authenticode) and turns on once the owner adds the certificates as repository secrets; see [docs/PACKAGING.md](docs/PACKAGING.md#desktop-app). Until then the builds are unsigned.
 
 ---
 
@@ -162,7 +162,7 @@ exact DDL before it runs, like pgAdmin.
 
 - ✅ `pip install firebird-admin` on [PyPI](https://pypi.org/project/firebird-admin/) (1.0.1 published by the release workflow through trusted publishing), with the prebuilt UI bundled in the wheel. The name `fbadmin` on PyPI belongs to an unrelated project; the commands are still `fbadmin` and `fbadmin-desktop`. CI builds the sdist and wheel on every push, runs `twine check --strict`, and installs the wheel into a fresh venv where it serves the UI
 - ✅ Official multi-arch Docker image (amd64 and arm64), Helm chart, Kubernetes example with the Firebird operator (`deploy/k8s`: StatefulSet. `deploy/k8s-operator`: a `FirebirdCluster` from the [cloudnative-firebird](https://github.com/mariuz/cloudnative-firebird) operator, with fbadmin registered from a ConfigMap; a kind workflow runs it end to end. Helm `firebirdServers` for preconfigured servers)
-- ✅ **Desktop app:** pywebview or Tauri shell with auto-update, for Windows (MSI), macOS (dmg) and Linux (AppImage, deb, rpm, Flatpak). Verified in CI on every packaging change: the MSI installs, runs and uninstalls on Windows; the dmg mounts and the app runs on macOS arm64 and Intel; the deb installs and the AppImage runs on Linux; the rpm and Flatpak bundle are built. Self-update downloads the package, verifies it against `SHA256SUMS`, then runs the MSI, replaces the AppImage or opens the dmg; this was exercised on a real AppImage, which replaced itself and restarted. The builds are not code-signed (that needs the owner's certificates), and packages are attached to GitHub Releases only for version tags
+- ✅ **Desktop app:** pywebview or Tauri shell with auto-update, for Windows (MSI), macOS (dmg) and Linux (AppImage, deb, rpm, Flatpak). Verified in CI on every packaging change: the MSI installs, runs and uninstalls on Windows; the dmg mounts and the app runs on macOS arm64 and Intel; the deb installs and the AppImage runs on Linux; the rpm and Flatpak bundle are built. Self-update downloads the package, verifies it against `SHA256SUMS`, then runs the MSI, replaces the AppImage or opens the dmg; this was exercised on a real AppImage, which replaced itself and restarted. Signing (macOS codesign + notarization, Windows signtool for the exe and MSI) runs when the signing secrets are configured; without them the builds are unsigned, and packages are attached to GitHub Releases only for version tags
 - ✅ Preferences dialog: editor font, keymap, grid NULL display, date formats, confirmations
 - ✅ Internationalisation (i18n): English, Romanian, Portuguese (Brazil), Spanish, Russian, German, French and Czech (1750 strings in each language; CI checks that every catalog is complete)
 - ✅ Accessibility: keyboard tree navigation, ARIA roles, high-contrast theme (landmarks, ARIA tabs, menus and dialogs, labelled fields, axe-core audit in e2e in three themes)
