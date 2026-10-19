@@ -68,7 +68,10 @@ jobs:
           sudo gem install --no-document fpm
           pip install "PyGObject<3.51" pycairo
       - name: Install fbadmin and PyInstaller
-        run: pip install "./backend[desktop]" pyinstaller pillow
+        # a prebuilt cryptography wheel (OpenSSL linked in statically): newer releases have no Intel
+        # macOS wheel, and a source build links Homebrew's libssl while PyInstaller bundles another
+        # one -> "Symbol not found: _SSL_get0_group_name" when the app starts
+        run: pip install --only-binary cryptography "./backend[desktop]" pyinstaller pillow
       - name: PyInstaller
         run: pyinstaller packaging/pyinstaller/fbadmin.spec --noconfirm
 
@@ -137,9 +140,10 @@ jobs:
         run: |
           set -- dist/packages/*.dmg; dmg=$1
           hdiutil attach "$dmg" -mountpoint /Volumes/fbadmin -nobrowse
-          FBADMIN_DATA_DIR="$RUNNER_TEMP/fbdmg" BROWSER=true /Volumes/fbadmin/fbadmin.app/Contents/MacOS/fbadmin --browser --port 5107 &
+          FBADMIN_DATA_DIR="$RUNNER_TEMP/fbdmg" BROWSER=true /Volumes/fbadmin/fbadmin.app/Contents/MacOS/fbadmin --browser --port 5107 > dmg-app.log 2>&1 &
           for _ in $(seq 1 90); do curl -fsS http://127.0.0.1:5107/api/health && break; sleep 1; done
-          curl -fsS http://127.0.0.1:5107/ | grep -q 'id="root"'
+          curl -fsS http://127.0.0.1:5107/ | grep -q 'id="root"' || { cat dmg-app.log; exit 1; }
+          if grep -q "could not patch" dmg-app.log; then cat dmg-app.log; exit 1; fi
           kill %1 || true
           hdiutil detach /Volumes/fbadmin || true
       - name: Install the deb, run the AppImage, inspect the rpm (Linux)
