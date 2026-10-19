@@ -17,7 +17,8 @@ as a container next to your server.
 > - installers on Windows, macOS and Linux
 >
 > The UI speaks English, Romanian, Portuguese (Brazil), Spanish, Russian, German, French and
-> Czech. Not released yet: the current version is 0.2.0.
+> Czech. Current release: **1.0.0**, on [PyPI](https://pypi.org/project/fbadmin/) (`pip install fbadmin`) and as desktop installers on the
+> [GitHub Releases](https://github.com/mariuz/fbadmin/releases) page.
 
 ## Features
 

@@ -2,7 +2,7 @@
   MSI installer for the fbadmin desktop app (WiX Toolset v5+: `dotnet tool install -g wix`).
 
     wix build packaging/windows/fbadmin.wxs -arch x64 -wx ^
-        -d SourceDir=%CD%\dist\fbadmin -d Version=0.2.0 -o dist\fbadmin-0.2.0-x64.msi
+        -d SourceDir=%CD%\dist\fbadmin -d Version=1.0.0 -o dist\fbadmin-1.0.0-x64.msi
 
   SourceDir is the PyInstaller one-folder build, as an ABSOLUTE path (WiX resolves relative
   Files paths against this file's directory; an empty harvest is only a warning without -wx). The installer is per-machine, installs
