@@ -1,0 +1,36 @@
+/* Upgrade assistant (features/upgrade). Classes are prefixed with upg-. */
+.upg { padding: 6px 16px 24px; max-width: 1100px; }
+.upg > section { border-bottom: 1px solid var(--border); padding: 4px 0 12px; }
+.upg h2 { font-size: 15px; margin: 10px 0 6px; }
+.upg h3 { font-size: 13px; margin: 10px 0 4px; }
+.upg label { display: inline-flex; align-items: center; gap: 6px; }
+.upg-path { width: 380px; max-width: 100%; }
+.upg-facts { border-collapse: collapse; margin: 4px 0 8px; }
+.upg-facts th, .upg-facts td { padding: 2px 12px 2px 0; text-align: left; }
+.upg-facts thead th { color: var(--muted); font-weight: 500; }
+.upg-facts tbody th { font-weight: 500; }
+.upg-count { border: 1px solid var(--border); border-radius: var(--radius); padding: 2px 8px; }
+.upg-count.blocker { border-color: var(--danger); }
+.upg-count.warning { border-color: var(--warn); }
+.upg-cat { margin-bottom: 6px; }
+.upg-finding { border: 1px solid var(--border); border-left-width: 4px; border-radius: var(--radius); padding: 4px 10px; margin: 6px 0; }
+.upg-finding.blocker { border-left-color: var(--danger); }
+.upg-finding.warning { border-left-color: var(--warn); }
+.upg-finding.info { border-left-color: var(--accent); }
+.upg-finding summary { cursor: pointer; padding: 2px 0; font-weight: 500; }
+.upg-finding p { margin: 6px 0; }
+/* the severity is told by the colored border; the text keeps the normal (contrast-safe) color */
+.upg-sev { display: inline-block; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em;
+  margin-right: 4px; padding: 0 6px; border: 1px solid var(--border); border-left-width: 4px; border-radius: 4px; }
+.upg-sev.blocker { border-color: var(--danger); }
+.upg-sev.warning { border-color: var(--warn); }
+.upg-sev.info { border-color: var(--accent); }
+.upg-objects { margin: 4px 0; padding-left: 18px; max-height: 360px; overflow: auto; }
+.upg-objects li { margin: 2px 0; }
+.upg-fix code, .upg-objects code { font-family: var(--mono); font-size: 12px; word-break: break-word; }
+.upg-plan { padding-left: 22px; }
+.upg-plan > li { margin-bottom: 8px; }
+.upg-plan p { margin: 4px 0; }
+.upg-tablewrap { overflow-x: auto; }
+.upg-cmd { background: var(--panel-2); border: 1px solid var(--border); border-radius: var(--radius); padding: 6px 8px;
+  font-family: var(--mono); font-size: 12px; white-space: pre-wrap; word-break: break-all; }
