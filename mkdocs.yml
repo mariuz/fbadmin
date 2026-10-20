@@ -83,6 +83,7 @@ nav:
       - Overview: admin/index.md
       - Configuration: admin/configuration.md
       - Deployment (Docker, Kubernetes): admin/deployment.md
+      - Command-line tool: CLI.md
       - Local databases (embedded engine): EMBEDDED.md
       - Security and server mode: SECURITY.md
       - Maintenance: MAINTENANCE.md
