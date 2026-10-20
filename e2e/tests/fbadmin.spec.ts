@@ -41,7 +41,7 @@ test("starts empty and makes no update-check request unless opted in", async () 
   page.on("request", (r) => r.url().includes("/api/version/latest") && calls.push(r.url()));
   await page.goto("/");
   await expect(page.locator(".brand")).toContainText("fbadmin");
-  await expect(page.locator(".tree")).toContainText("No servers registered yet.");
+  await expect(page.getByText("No servers registered yet.")).toBeVisible();
   await page.waitForTimeout(500);
   expect(calls).toEqual([]);
 });

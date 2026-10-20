@@ -260,22 +260,23 @@ export function Tree() {
     setMenu({ x: e.clientX, y: e.clientY, items: buildMenu(app, sel) });
   };
 
-  if (app.servers.length === 0) {
-    return (
-      <div className="tree">
-        <div className="empty-state" style={{ height: "auto", paddingTop: 40 }}>
-          <IconServer size={28} />
-          <div>{t("No servers registered yet.")}</div>
-        </div>
-      </div>
-    );
-  }
-  return (
-    <div className="tree" role="tree" aria-label={t("Object Explorer")} onKeyDown={onTreeKey}>
-      {app.servers.map((s) => (
-        <TreeNode key={s.id} spec={serverSpec(s)} depth={0} onContext={onContext} />
-      ))}
-      {menu && <ContextMenu {...menu} onClose={() => setMenu(null)} />}
+  const emptyHint = (
+    <div className="empty-state" style={{ height: "auto", paddingTop: 40 }}>
+      <IconServer size={28} />
+      <div>{t("No servers registered yet.")}</div>
     </div>
+  );
+  if (app.servers.length === 0) return <div className="tree">{emptyHint}</div>;
+  return (
+    <>
+      <div className="tree" role="tree" aria-label={t("Object Explorer")} onKeyDown={onTreeKey}>
+        {app.servers.map((s) => (
+          <TreeNode key={s.id} spec={serverSpec(s)} depth={0} onContext={onContext} />
+        ))}
+        {menu && <ContextMenu {...menu} onClose={() => setMenu(null)} />}
+      </div>
+      {/* only local (embedded) databases so far: still invite to register a server */}
+      {app.servers.every((s) => s.embedded) && <div className="tree-hint">{emptyHint}</div>}
+    </>
   );
 }

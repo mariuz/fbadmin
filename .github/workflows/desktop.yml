@@ -203,9 +203,7 @@ jobs:
           # the driver patches must apply in the frozen build too (they read firebirdsql's source)
           if grep -q "could not patch" frozen.log; then cat frozen.log; exit 1; fi
       - name: Smoke test local (embedded) databases in the frozen app
-        # verified on Linux; Windows and macOS are not verified yet (docs/EMBEDDED.md), so a
-        # failure there is reported without failing the release build
-        continue-on-error: ${{ matrix.kind != 'linux' }}
+        # required on every platform: passed on Windows, macOS arm64/x86_64 and Linux in CI
         timeout-minutes: 10
         shell: bash
         run: |

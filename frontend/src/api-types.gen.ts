@@ -1372,6 +1372,150 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/servers/{server_id}/databases/{db_id}/debug/parse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Parse Block
+         * @description Inputs, outputs and variables of an anonymous EXECUTE BLOCK.
+         */
+        post: operations["parse_block_api_servers__server_id__databases__db_id__debug_parse_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/servers/{server_id}/databases/{db_id}/debug/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Profile Run */
+        post: operations["profile_run_api_servers__server_id__databases__db_id__debug_profile_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/servers/{server_id}/databases/{db_id}/debug/routine": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Routine Info */
+        get: operations["routine_info_api_servers__server_id__databases__db_id__debug_routine_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/servers/{server_id}/databases/{db_id}/debug/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Plain Run
+         * @description Call the routine itself (not instrumented), rolled back.
+         */
+        post: operations["plain_run_api_servers__server_id__databases__db_id__debug_run_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/servers/{server_id}/databases/{db_id}/debug/tests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Tests */
+        get: operations["list_tests_api_servers__server_id__databases__db_id__debug_tests_get"];
+        put?: never;
+        /** Add Test */
+        post: operations["add_test_api_servers__server_id__databases__db_id__debug_tests_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/servers/{server_id}/databases/{db_id}/debug/tests/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Run Tests */
+        post: operations["run_tests_api_servers__server_id__databases__db_id__debug_tests_run_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/servers/{server_id}/databases/{db_id}/debug/tests/{test_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Test */
+        put: operations["update_test_api_servers__server_id__databases__db_id__debug_tests__test_id__put"];
+        post?: never;
+        /** Delete Test */
+        delete: operations["delete_test_api_servers__server_id__databases__db_id__debug_tests__test_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/servers/{server_id}/databases/{db_id}/debug/trace": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Trace Run */
+        post: operations["trace_run_api_servers__server_id__databases__db_id__debug_trace_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/servers/{server_id}/databases/{db_id}/designer/comments/{otype}/{name}": {
         parameters: {
             query?: never;
@@ -4004,6 +4148,13 @@ export interface components {
             /** Name */
             name: string;
         };
+        /** Expect */
+        Expect: {
+            /** Error */
+            error?: string | null;
+            /** Rows */
+            rows?: unknown[][] | null;
+        };
         /** ExplainIn */
         ExplainIn: {
             /** Sql */
@@ -4283,6 +4434,11 @@ export interface components {
             source: components["schemas"]["Endpoint"];
             target: components["schemas"]["Endpoint"];
         };
+        /** ParseIn */
+        ParseIn: {
+            /** Sql */
+            sql: string;
+        };
         /** PasswordChangeIn */
         PasswordChangeIn: {
             /** New Password */
@@ -4502,6 +4658,41 @@ export interface components {
             server_id?: string | null;
             /** Threshold */
             threshold?: number | null;
+        };
+        /** RunIn */
+        RunIn: {
+            /**
+             * Inputs
+             * @default {}
+             */
+            inputs?: {
+                [key: string]: string | null;
+            };
+            /**
+             * Max Steps
+             * @default 10000
+             */
+            max_steps?: number;
+            /** Name */
+            name?: string | null;
+            /**
+             * Otype
+             * @enum {string}
+             */
+            otype: "procedures" | "functions" | "block";
+            /** Sql */
+            sql?: string | null;
+            /** Watch */
+            watch?: string[] | null;
+        };
+        /** RunTestsIn */
+        RunTestsIn: {
+            /** Ids */
+            ids?: string[] | null;
+            /** Otype */
+            otype?: ("procedures" | "functions") | null;
+            /** Routine */
+            routine?: string | null;
         };
         /** ScheduleIn */
         ScheduleIn: {
@@ -4796,6 +4987,37 @@ export interface components {
             settings?: {
                 [key: string]: unknown;
             } | null;
+        };
+        /** TestIn */
+        TestIn: {
+            /** @default {} */
+            expect?: components["schemas"]["Expect"];
+            /**
+             * Inputs
+             * @default {}
+             */
+            inputs?: {
+                [key: string]: string | null;
+            };
+            /** Name */
+            name: string;
+            /**
+             * Otype
+             * @enum {string}
+             */
+            otype: "procedures" | "functions";
+            /** Routine */
+            routine: string;
+        };
+        /** TestUpdate */
+        TestUpdate: {
+            expect?: components["schemas"]["Expect"] | null;
+            /** Inputs */
+            inputs?: {
+                [key: string]: string | null;
+            } | null;
+            /** Name */
+            name?: string | null;
         };
         /** TraceIn */
         TraceIn: {
@@ -7902,6 +8124,360 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["DDLIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    parse_block_api_servers__server_id__databases__db_id__debug_parse_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                server_id: string;
+                db_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ParseIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    profile_run_api_servers__server_id__databases__db_id__debug_profile_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                server_id: string;
+                db_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RunIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    routine_info_api_servers__server_id__databases__db_id__debug_routine_get: {
+        parameters: {
+            query: {
+                otype: "procedures" | "functions" | "block";
+                name: string;
+            };
+            header?: never;
+            path: {
+                server_id: string;
+                db_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    plain_run_api_servers__server_id__databases__db_id__debug_run_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                server_id: string;
+                db_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RunIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_tests_api_servers__server_id__databases__db_id__debug_tests_get: {
+        parameters: {
+            query?: {
+                otype?: string | null;
+                routine?: string | null;
+            };
+            header?: never;
+            path: {
+                server_id: string;
+                db_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_test_api_servers__server_id__databases__db_id__debug_tests_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                server_id: string;
+                db_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TestIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_tests_api_servers__server_id__databases__db_id__debug_tests_run_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                server_id: string;
+                db_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RunTestsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_test_api_servers__server_id__databases__db_id__debug_tests__test_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                server_id: string;
+                db_id: string;
+                test_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TestUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_test_api_servers__server_id__databases__db_id__debug_tests__test_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                server_id: string;
+                db_id: string;
+                test_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    trace_run_api_servers__server_id__databases__db_id__debug_trace_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                server_id: string;
+                db_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RunIn"];
             };
         };
         responses: {

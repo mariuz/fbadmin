@@ -71,6 +71,7 @@ nav:
       - Query Tool: QUERY_TOOL.md
       - Data grid: user-guide/data-grid.md
       - Object dialogs: OBJECT_DIALOGS.md
+      - PSQL debugging and tests: PSQL_DEBUGGING.md
       - Schema tools: SCHEMA_TOOLS.md
       - Data compare: DATA_COMPARE.md
       - Firebird 6 and SQL schemas: FIREBIRD6.md

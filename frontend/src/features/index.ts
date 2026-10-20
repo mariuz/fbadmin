@@ -14,3 +14,4 @@ import "./datacompare";
 import "./embedded";
 import "./upgrade";
 import "./events";
+import "./debugger";

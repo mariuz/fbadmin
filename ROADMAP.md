@@ -15,7 +15,7 @@ released: 1.0.1 is on [PyPI](https://pypi.org/project/firebird-admin/) (`pip ins
 on [GitHub Releases](https://github.com/mariuz/fbadmin/releases) with desktop installers for
 Windows, macOS and Linux, as a Docker image, and documented at https://mariuz.github.io/fbadmin/.
 Code signing is deferred by decision of the project owner: the 1.x desktop builds ship unsigned. The signing steps (macOS Developer ID with notarization, Windows Authenticode) are already in the desktop workflow and turn on as soon as the certificates are added as repository secrets; see [docs/PACKAGING.md](docs/PACKAGING.md#desktop-app).
-Milestone 1.1 is implemented except Firebird 6.0 final support, which waits for the release; 1.2 and 2.0 are planned.
+Milestones 1.1 (except Firebird 6.0 final support, which waits for the release) and 1.2 are implemented; 2.0 is planned.
 
 ---
 
@@ -165,7 +165,7 @@ exact DDL before it runs, like pgAdmin.
 - ✅ Official multi-arch Docker image (amd64 and arm64), Helm chart, Kubernetes example with the Firebird operator (`deploy/k8s`: StatefulSet. `deploy/k8s-operator`: a `FirebirdCluster` from the [cloudnative-firebird](https://github.com/mariuz/cloudnative-firebird) operator, with fbadmin registered from a ConfigMap; a kind workflow runs it end to end. Helm `firebirdServers` for preconfigured servers)
 - ✅ **Desktop app:** pywebview or Tauri shell with auto-update, for Windows (MSI), macOS (dmg) and Linux (AppImage, deb, rpm, Flatpak). Verified in CI on every packaging change: the MSI installs, runs and uninstalls on Windows; the dmg mounts and the app runs on macOS arm64 and Intel; the deb installs and the AppImage runs on Linux; the rpm and Flatpak bundle are built. Self-update downloads the package, verifies it against `SHA256SUMS`, then runs the MSI, replaces the AppImage or opens the dmg; this was exercised on a real AppImage, which replaced itself and restarted. Builds ship unsigned by the owner's decision (signing is deferred); the signing steps (macOS codesign + notarization, Windows signtool for the exe and MSI) are ready and run once the signing secrets are configured, and packages are attached to GitHub Releases only for version tags
 - ✅ Preferences dialog: editor font, keymap, grid NULL display, date formats, confirmations
-- ✅ Internationalisation (i18n): English, Romanian, Portuguese (Brazil), Spanish, Russian, German, French and Czech (1868 strings in each language; CI checks that every catalog is complete)
+- ✅ Internationalisation (i18n): English, Romanian, Portuguese (Brazil), Spanish, Russian, German, French and Czech (2131 strings in each language; CI checks that every catalog is complete)
 - ✅ Accessibility: keyboard tree navigation, ARIA roles, high-contrast theme (landmarks, ARIA tabs, menus and dialogs, labelled fields, axe-core audit in e2e in three themes)
 - ✅ Documentation site (MkDocs), a user guide with screenshots, and an admin guide for server mode (built with `mkdocs build --strict` in CI; it deploys to GitHub Pages as soon as Pages is enabled in the repository settings, Source: GitHub Actions)
 - ✅ Plugin API for extra tree nodes, dashboard panels and tools
@@ -175,7 +175,7 @@ exact DDL before it runs, like pgAdmin.
 
 ## Engineering backlog ✅
 
-- ✅ Frontend end-to-end tests with Playwright, run in CI against a Firebird container (33 specs: core flows, every feature module, Firebird 6 schemas, accessibility, languages, alerts and backup storage)
+- ✅ Frontend end-to-end tests with Playwright, run in CI against a Firebird container (45 specs: core flows, every feature module, Firebird 6 schemas, accessibility, languages, alerts, backup storage, data compare, local databases, events, upgrade checks, PSQL debugging)
 - ✅ Generate a typed API client from FastAPI's OpenAPI schema (request bodies typed through `Body<path, method>`; most responses are still hand-typed)
 - ✅ Code-split the frontend bundle (CodeMirror and grid chunks)
 - ✅ Async driver (`firebirdsql.aio`) or a worker pool for long-running statements, so one slow query never blocks the metadata connection
@@ -192,13 +192,13 @@ exact DDL before it runs, like pgAdmin.
 - ✅ **Backup verification:** scheduled backups can be test-restored into a scratch database (opened, then dropped); old backups are only pruned and a backup only uploaded after it passed. Also on demand per archived backup. Scheduled validations count Firebird's reported errors (checked with a deliberately damaged data page)
 - ✅ **Cloud backup targets:** S3 and S3-compatible services, Azure Blob Storage and Google Cloud Storage, with per-schedule folder and retention; no cloud SDKs (requests signed by fbadmin), `env:` references for secrets. Verified against SeaweedFS (S3 API), Azurite and fake-gcs-server, including multipart uploads and a full backup → test restore → upload → retention run; real AWS, Azure and Google accounts are not part of CI
 
-## Milestone 1.2 — Desktop and data tools ⬜
+## Milestone 1.2 — Desktop and data tools ✅
 
-- 💡 **Embedded engine in the desktop app:** bundle Firebird embedded so a local `.fdb` opens without a running server (needs the engine libraries per platform in the installers)
-- ⬜ **Data compare:** compare the rows of a table in two databases (by primary key) and generate a sync script of `INSERT`, `UPDATE` and `DELETE` statements
-- ⬜ **Event monitor:** register `POST_EVENT` names and watch the events arrive live, with counts
-- ⬜ **Upgrade assistant:** check a database before moving from Firebird 3 to 5 or 6: reserved words used as identifiers, removed or changed features, the ODS change and the backup/restore plan
-- 💡 **PSQL debugging help:** Firebird has no step-through debugger, so combine per-line profiler timings, variable tracing and a test runner for procedures and functions
+- ✅ **Embedded engine in the desktop app:** "Local database" registrations open a `.fdb` file with the bundled Firebird 5 embedded engine (no server): tree, DDL, data grid, the full Query Tool, monitoring, backup/restore, nbackup, validation and gstat; trace, user management and encryption are hidden for local files. Never available in multi-user server mode. Verified on Linux (tests, the full e2e suite and a PyInstaller build) and by a required smoke test of the packaged app on Windows, macOS arm64/Intel and Linux in CI (create, query, backup and restore a local database) ([docs/EMBEDDED.md](docs/EMBEDDED.md))
+- ✅ **Data compare:** compare the rows of tables in two databases by primary or unique key (streamed merge-join, with a fallback sort when collations order keys differently), see inserts/updates/deletes with sample rows, download a sync script (FK-ordered, every Firebird type) or apply it to the target in one transaction ([docs/DATA_COMPARE.md](docs/DATA_COMPARE.md))
+- ✅ **Event monitor:** register `POST_EVENT` names and watch them arrive live with counts and a log, pick names found in PSQL sources, post a test event; clear errors when the server's `RemoteAuxPort` is not reachable ([docs/EVENTS.md](docs/EVENTS.md))
+- ✅ **Upgrade assistant:** checks before moving to Firebird 4, 5 or 6 (newly reserved words from each version's keyword list, legacy UDFs with built-in replacements, dialect 1, authentication, time zones, external tables, schemas and more), a tailored backup/restore plan, and an optional trial restore on the newer server that recompiles every view, procedure and trigger there ([docs/UPGRADE.md](docs/UPGRADE.md))
+- ✅ **PSQL debugging help:** trace runs of procedures, functions and EXECUTE BLOCKs (an instrumented copy records the line and variables after each statement, then everything is rolled back; step back and forth), per-line profiler timings on Firebird 5, and saved test cases per routine ([docs/PSQL_DEBUGGING.md](docs/PSQL_DEBUGGING.md))
 
 ## Milestone 2.0 — Teams and productivity ⬜
 

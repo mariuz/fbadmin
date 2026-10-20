@@ -8,10 +8,10 @@ opens without a running server."*
 - **Linux x86_64: done and verified.** That covers the development mode
   (`FBADMIN_EMBEDDED_DIR`) and a PyInstaller build made locally with the engine bundled. The
   backend tests, an end-to-end Playwright spec and a smoke test of the frozen app pass.
-- **Windows x64 and macOS (arm64, x86_64): wired into the packaging but not verified.** The
-  file sets are extracted and checked against the release archives, and CI runs the same
-  smoke test on the frozen app. That test reports failures on these platforms without
-  failing the release build. See [Unverified](#unverified-and-open-items).
+- **Windows x64 and macOS (arm64, x86_64): packaged and smoke-tested in CI.** The desktop
+  workflow runs the same smoke test on the frozen app on every platform: it creates a local
+  database, writes Unicode data, queries it, backs it up and restores it. It passed on all
+  four platforms and is required for a release. See [Open items](#unverified-and-open-items).
 
 Local database files open inside the fbadmin process. They support browsing, DDL, the data
 grid, the Query Tool, monitoring, and backup/restore, gstat, validation, sweep, properties
@@ -262,10 +262,9 @@ app.
 
 ## Unverified and open items
 
-- **Windows and macOS have not been run.** Their file sets come from the real release
-  archives, and the dependency analysis is above, but nothing here has executed them. The
-  desktop workflow's smoke test is the first real check, and failures there do not block a
-  release (`continue-on-error`). The specific risks:
+- **Windows and macOS are tested only by the CI smoke test** of the frozen app (create,
+  query, backup and restore of a local database), which passes. The installed MSI and dmg
+  and a notarized build have not been exercised with local databases. Areas to watch:
   - Windows: DLL resolution of the MSVC runtime next to PyInstaller's own copy.
   - macOS:
     - the `install_name_tool`/ad-hoc-signing fix-ups;
