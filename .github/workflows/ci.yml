@@ -178,7 +178,8 @@ jobs:
 
   e2e:
     name: End-to-end (Playwright, Firebird 5)
-    runs-on: ubuntu-latest
+    # Playwright does not support Ubuntu 26.04 (the current ubuntu-latest) yet
+    runs-on: ubuntu-24.04
     services:
       firebird:
         image: firebirdsql/firebird:5
