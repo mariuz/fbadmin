@@ -69,6 +69,7 @@ nav:
       - Overview: user-guide/index.md
       - Object explorer: user-guide/object-explorer.md
       - Query Tool: QUERY_TOOL.md
+      - Query library: QUERY_LIBRARY.md
       - Data grid: user-guide/data-grid.md
       - Object dialogs: OBJECT_DIALOGS.md
       - PSQL debugging and tests: PSQL_DEBUGGING.md
@@ -79,6 +80,7 @@ nav:
       - Upgrade assistant: UPGRADE.md
       - Monitoring and maintenance: user-guide/monitoring.md
       - Monitoring and performance: MONITORING.md
+      - Server overview: OVERVIEW.md
       - Event monitor: EVENTS.md
   - Administration:
       - Overview: admin/index.md

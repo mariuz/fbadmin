@@ -16,3 +16,5 @@ import "./upgrade";
 import "./events";
 import "./debugger";
 import "./schema-history";
+import "./library";
+import "./overview";
