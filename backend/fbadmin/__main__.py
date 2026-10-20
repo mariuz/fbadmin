@@ -1,20 +1,40 @@
-"""Command line entry point: ``fbadmin`` or ``python -m fbadmin``."""
+"""Command line entry point: ``fbadmin`` or ``python -m fbadmin``.
+
+Without a subcommand (or with ``serve``) the web server starts, with the options below. The subcommands
+``backup``, ``restore``, ``extract``, ``diff``, ``sql``, ``check`` and ``servers`` are the command-line tool
+in :mod:`fbadmin.cli` (docs/CLI.md).
+"""
 
 from __future__ import annotations
 
 import argparse
 import os
+import sys
 import threading
 import webbrowser
 
 import uvicorn
 
+from . import __version__
 from .config import settings
 from .logsetup import LEVELS, configure_logging
 
 
-def main() -> None:
-    p = argparse.ArgumentParser(prog="fbadmin", description="Web administration tool for Firebird SQL")
+def main(argv: list[str] | None = None) -> None:
+    argv = list(sys.argv[1:] if argv is None else argv)
+    from .cli import COMMANDS
+
+    if argv and argv[0] in COMMANDS:
+        from .cli import main as cli_main
+
+        sys.exit(cli_main(argv))
+    if argv and argv[0] == "serve":
+        argv = argv[1:]
+    tools = ",".join(COMMANDS)
+    p = argparse.ArgumentParser(
+        prog="fbadmin", description="Web administration tool for Firebird SQL",
+        usage=f"fbadmin [serve] [options]\n       fbadmin {{{tools}}} ... (command-line tool, see fbadmin COMMAND --help)")
+    p.add_argument("--version", action="version", version=f"fbadmin {__version__}")
     p.add_argument("--host", default=settings.host, help="bind address (default %(default)s)")
     p.add_argument("--port", type=int, default=settings.port, help="port (default %(default)s)")
     p.add_argument("--no-browser", action="store_true", help="do not open a browser window")
@@ -32,7 +52,7 @@ def main() -> None:
                    help="trust X-Forwarded-Proto/For from --forwarded-allow-ips (behind a reverse proxy)")
     p.add_argument("--forwarded-allow-ips", default=os.environ.get("FORWARDED_ALLOW_IPS", "127.0.0.1"),
                    help="proxy addresses trusted for X-Forwarded-* headers (default %(default)s)")
-    args = p.parse_args()
+    args = p.parse_args(argv)
     log_config = configure_logging(args.log_level, args.log_format)
     if args.server_mode:
         os.environ["FBADMIN_SERVER_MODE"] = "1"
