@@ -2,7 +2,7 @@ import { api } from "../api";
 import { errMsg, keys, type AppApi } from "../context";
 import { typeInfo, type Selection } from "../types";
 import type { MenuItem } from "./ContextMenu";
-import { contributedMenuItems } from "../registry";
+import { applyMenuFilters, contributedMenuItems } from "../registry";
 import { t } from "../i18n";
 import {
   ConfirmDialog, DatabaseDialog, RestoreDialog, ServerDialog, UserDialog,
@@ -26,7 +26,7 @@ async function runJob(app: AppApi, p: Promise<unknown>, what: string) {
 export function buildMenu(app: AppApi, sel: Selection): MenuItem[] {
   const base = buildBaseMenu(app, sel);
   const extra = contributedMenuItems(app, sel);
-  return extra.length ? [...base, { separator: true }, ...extra] : base;
+  return applyMenuFilters(app, sel, extra.length ? [...base, { separator: true }, ...extra] : base);
 }
 
 function buildBaseMenu(app: AppApi, sel: Selection): MenuItem[] {

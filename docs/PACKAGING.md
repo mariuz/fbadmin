@@ -77,8 +77,9 @@ default browser and keeps serving until Ctrl+C.
 The frozen app is built with PyInstaller:
 
 ```bash
-pip install "./backend[desktop]" pyinstaller pillow
+pip install "./backend[desktop,native]" pyinstaller pillow
 (cd frontend && npm ci && npm run build)
+python packaging/embedded/fetch-embedded.py                     # Firebird embedded engine -> build/firebird-embedded
 pyinstaller packaging/pyinstaller/fbadmin.spec --noconfirm     # -> dist/fbadmin/ or dist/fbadmin.app
 packaging/linux/build-packages.sh 0.2.0 appimage deb rpm        # Linux: needs fpm (and rpmbuild)
 wix build packaging/windows/fbadmin.wxs -arch x64 -wx -d SourceDir=%CD%\dist\fbadmin -d Version=0.2.0 -o fbadmin.msi
@@ -120,6 +121,14 @@ Notes and limitations:
 - **Flatpak**: the manifest installs the wheel with pip during the build (needs
   `--share=network` at build time). For Flathub, generate a vendored module with
   `flatpak-pip-generator` instead.
+- **Embedded engine (local databases)**: the Windows, macOS and Linux builds bundle the
+  minimal Firebird 5 embedded file set in `<app>/firebird`. It is fetched from the pinned,
+  SHA-256-checked release by `packaging/embedded/fetch-embedded.py`, and its licences and
+  notice go to `firebird/licenses/`. It adds about 7 MB (Linux), 18 MB (Windows) and 20 MB
+  (macOS) compressed. The `Smoke test local (embedded) databases` step exercises it in the
+  frozen app. That step is verified on Linux and does not fail the build on
+  Windows/macOS yet. The Flatpak does not include it. Details, licences and open items:
+  [EMBEDDED.md](EMBEDDED.md).
 - **MSI**: built with WiX v5's `Files` harvesting; the step is allowed to fail without
   failing the job, the zip is always produced.
 

@@ -44,6 +44,23 @@ export function contributedMenuItems(app: AppApi, sel: Selection): MenuItem[] {
   return out;
 }
 
+/** Filters run on the finished context menu (e.g. hide items that do not apply to a kind of server). */
+export type MenuFilter = (app: AppApi, sel: Selection, items: MenuItem[]) => MenuItem[];
+const menuFilters: MenuFilter[] = [];
+export function registerMenuFilter(fn: MenuFilter) {
+  menuFilters.push(fn);
+}
+export function applyMenuFilters(app: AppApi, sel: Selection, items: MenuItem[]): MenuItem[] {
+  return menuFilters.reduce((acc, fn) => {
+    try {
+      return fn(app, sel, acc);
+    } catch (e) {
+      console.error("menu filter failed", e);
+      return acc;
+    }
+  }, items);
+}
+
 // --- top bar buttons ------------------------------------------------------------
 export type TopbarItem = { id: string; render: (app: AppApi) => ReactNode };
 const topbarItems: TopbarItem[] = [];

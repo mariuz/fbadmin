@@ -55,12 +55,18 @@ class TxOptions:
 
 def apply_tpb(conn, tpb: bytes) -> None:
     """Use ``tpb`` for every transaction this connection starts from now on."""
+    if hasattr(conn, "set_tpb"):  # native driver (local/embedded databases)
+        conn.set_tpb(tpb)
+        return
     conn.cursor()  # makes sure conn._transaction exists
     conn._transaction.transaction_parameter_block = (tpb,) * 5
 
 
 def end_transaction(conn, commit: bool) -> None:
     """Commit/rollback even if the driver thinks nothing happened (refreshes snapshots)."""
+    if hasattr(conn, "end_transaction"):  # native driver (local/embedded databases)
+        conn.end_transaction(commit)
+        return
     t = getattr(conn, "_transaction", None)
     if t is None or t._trans_handle is None:
         return
@@ -214,6 +220,8 @@ def _prepare_info(conn, sql: str, item: int) -> str | None:
 
 
 def explain(conn, sql: str, detailed: bool = False) -> str | None:
+    if hasattr(conn, "plan"):  # native driver (local/embedded databases)
+        return conn.plan(sql, detailed)
     if detailed:
         return _prepare_info(conn, sql, isc_info_sql_explain_plan)
     return _prepare_info(conn, sql, isc_info_sql_get_plan)

@@ -10,3 +10,4 @@ import "./schema";
 import "./security";
 import "./alerts";
 import "./storage";
+import "./embedded";

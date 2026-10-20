@@ -43,6 +43,11 @@ jobs:
           pytest -q backend/tests/test_native_driver.py -rs
         env:
           FBADMIN_TEST_DIR: /var/lib/firebird/data
+      - name: Local databases (Firebird 5 embedded engine, no server)
+        if: matrix.firebird == '5'
+        run: |
+          PYTHON=python scripts/embedded-test-setup.sh "$RUNNER_TEMP/firebird-embedded"
+          FBADMIN_TEST_EMBEDDED_DIR="$RUNNER_TEMP/firebird-embedded" pytest -q backend/tests/test_embedded.py -rs
 
   integrations:
     name: Real services (crypt plugin, OpenLDAP, Dex OIDC)
@@ -199,10 +204,12 @@ jobs:
           cache-dependency-path: |
             frontend/package-lock.json
             e2e/package-lock.json
-      - run: pip install -e backend
+      - run: pip install -e "backend[native]"
       - name: Build the UI
         working-directory: frontend
         run: npm ci && npm run build
+      - name: Firebird embedded engine (local databases spec)
+        run: PYTHON=python scripts/embedded-test-setup.sh "$RUNNER_TEMP/firebird-embedded"
       - name: Install Playwright
         working-directory: e2e
         run: npm ci && npx playwright install --with-deps chromium
@@ -210,7 +217,7 @@ jobs:
         run: for _ in $(seq 1 30); do (echo > /dev/tcp/127.0.0.1/3050) 2>/dev/null && break; sleep 1; done
       - name: Run the e2e tests
         working-directory: e2e
-        run: npx playwright test
+        run: FBADMIN_EMBEDDED_DIR="$RUNNER_TEMP/firebird-embedded" npx playwright test
         env:
           FBADMIN_PYTHON: python
           FB_DB_DIR: /var/lib/firebird/data

@@ -8,10 +8,14 @@ uses (``cursor``, ``execute``, ``fetchone/fetchall/fetchmany``, ``description``,
 
 Scope and limitations (see docs/DEVELOPMENT.md):
 
-* Only **metadata connections** (object explorer, DDL, data grid, dashboards, monitor)
-  use it. Query Tool sessions, database create/drop and the Services API (backup,
-  restore, gstat, log) keep using ``firebirdsql``, because they depend on its
+* For registered servers only **metadata connections** (object explorer, DDL, data grid,
+  dashboards, monitor) use it. Query Tool sessions, database create/drop and the Services
+  API (backup, restore, gstat, log) keep using ``firebirdsql``, because they depend on its
   transaction parameter blocks and wire-level statement info.
+* **Local (embedded) databases** (see :mod:`fbadmin.embedded`) use it for *every*
+  connection, including Query Tool sessions: :class:`NativeConnection` implements the few
+  hooks :mod:`fbadmin.query` needs (``set_tpb``, ``end_transaction``, ``plan``), and the
+  Services API goes through :class:`fbadmin.embedded.EmbeddedServices`.
 * ``wire_crypt`` follows the client library's ``firebird.conf`` (``WireCrypt``), not the
   per-server setting.
 * Needs ``pip install firebird-driver`` (or ``pip install firebird-admin[native]``) and a
@@ -22,9 +26,14 @@ Scope and limitations (see docs/DEVELOPMENT.md):
 from __future__ import annotations
 
 import os
+import warnings
 from typing import Any
 
 import firebirdsql
+
+# A second attachment to a database the embedded engine already has open ignores the DPB's
+# "Providers = Engine13" (the provider is already chosen); harmless, so not worth a warning.
+warnings.filterwarnings("ignore", message="Secondary attachment - config data from DPB ignored")
 
 
 def driver_name() -> str:
@@ -39,9 +48,13 @@ def _load():
     try:
         from firebird import driver
     except ImportError as exc:  # pragma: no cover - depends on optional package
-        raise RuntimeError("FBADMIN_DRIVER=native needs the 'firebird-driver' package "
+        raise RuntimeError("The native driver needs the 'firebird-driver' package "
                            "(pip install 'firebird-admin[native]')") from exc
-    lib = os.environ.get("FBADMIN_FBCLIENT")
+    from .embedded import prepare_client
+
+    # With an embedded engine configured its client library serves remote servers too
+    # (one libfbclient per process); otherwise FBADMIN_FBCLIENT or the default search path.
+    lib = prepare_client() or os.environ.get("FBADMIN_FBCLIENT")
     if lib and driver.driver_config.fb_client_library.value != lib:
         driver.driver_config.fb_client_library.value = lib
     return driver
@@ -183,14 +196,71 @@ class NativeConnection:
         except self._errors as exc:
             raise _translate(exc) from exc
 
+    # --- hooks used by fbadmin.query (Query Tool sessions on local databases) ---------
+    def set_tpb(self, tpb: bytes) -> None:
+        """Use the raw transaction parameter block ``tpb`` for transactions started from now on."""
+        self._con.main_transaction.default_tpb = bytes(tpb)
+
+    def end_transaction(self, commit: bool) -> None:
+        if commit:
+            self.commit()
+        else:
+            self.rollback()
+
+    def plan(self, sql: str, detailed: bool = False) -> str | None:
+        """Execution plan of ``sql`` (prepared, not executed)."""
+        cur = self._con.cursor()
+        try:
+            stmt = cur.prepare(sql)
+            try:
+                text = stmt.detailed_plan if detailed else stmt.plan
+            finally:
+                stmt.free()
+        except self._errors as exc:
+            raise _translate(exc) from exc
+        finally:
+            cur.close()
+        return (text or "").strip() or None
+
+
+_db_configs: dict[tuple, str] = {}
+
+
+def _embedded_config(driver, database: str, page_size: int | None = None, db_charset: str | None = None) -> str:
+    """Name of a firebird-driver database configuration that opens ``database`` with the
+    embedded engine only (``Providers = Engine13``): a local registration must never fall
+    back to the Loopback provider and silently reach a server on localhost."""
+    key = (database, page_size, db_charset)
+    name = _db_configs.get(key)
+    if name is None:
+        name = f"fbadmin-embedded-{len(_db_configs) + 1}"
+        cfg = driver.driver_config.register_database(name)
+        cfg.database.value = database
+        cfg.config.value = "Providers = Engine13"
+        if page_size:
+            cfg.page_size.value = page_size
+        if db_charset:
+            cfg.db_charset.value = db_charset
+        _db_configs[key] = name
+    return name
+
 
 def connect_native(*, host: str, port: int, database: str, user: str, password: str,
-                   role: str | None = None, charset: str = "UTF8", **_ignored) -> NativeConnection:
+                   role: str | None = None, charset: str = "UTF8", embedded: bool = False,
+                   create: bool = False, page_size: int | None = None, **_ignored) -> NativeConnection:
+    """Attach (or with ``create`` create) a database. ``embedded``: a local file opened in-process."""
     driver = _load()
     errors = (driver.Error,)
-    dsn = f"{host}/{port}:{database}" if host else database
+    if embedded:
+        dsn = _embedded_config(driver, database, page_size, charset) if create else _embedded_config(driver, database)
+    else:
+        dsn = f"{host}/{port}:{database}" if host else database
     try:
-        con = driver.connect(dsn, user=user, password=password, role=role or None, charset=charset)
+        if create:
+            con = driver.create_database(dsn, user=user, password=password or None, role=role or None,
+                                         charset=charset)
+        else:
+            con = driver.connect(dsn, user=user, password=password or None, role=role or None, charset=charset)
         # Match firebirdsql's default (read committed) so new objects and fresh MON$ data show up.
         con.main_transaction.default_tpb = driver.tpb(driver.Isolation.READ_COMMITTED_RECORD_VERSION)
     except errors as exc:
