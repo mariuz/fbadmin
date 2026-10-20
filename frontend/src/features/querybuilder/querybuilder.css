@@ -1,0 +1,55 @@
+.qb { flex-direction: column; height: 100%; min-height: 0; }
+.qb .toolbar label { display: inline-flex; align-items: center; gap: 5px; }
+.qb .toolbar .qb-pick { max-width: 260px; }
+.qb-top { display: flex; flex: 1 1 55%; min-height: 160px; border-bottom: 1px solid var(--border); }
+.qb-canvas { flex: 1; min-width: 0; overflow: auto; position: relative; background:
+  radial-gradient(circle, var(--border) 1px, transparent 1px) 0 0 / 18px 18px, var(--bg); }
+.qb-lines { position: absolute; left: 0; top: 0; pointer-events: none; }
+.qb-line { fill: none; stroke: var(--muted); stroke-width: 1.6; }
+.qb-line.outer { stroke-dasharray: 6 4; }
+.qb-line.active { stroke: var(--accent-2); stroke-width: 2.4; }
+.qb-join-label { position: absolute; transform: translate(-50%, -50%); font-size: 10.5px; font-weight: 600; padding: 1px 6px;
+  border: 1px solid var(--border); border-radius: 10px; background: var(--panel); color: var(--text); cursor: pointer; z-index: 2; }
+.qb-join-label:hover, .qb-join-label.active { border-color: var(--accent-2); color: var(--accent); }
+.qb-box { position: absolute; background: var(--panel); border: 1px solid var(--border); border-radius: 7px; box-shadow: 0 2px 8px rgba(0,0,0,.08); z-index: 1; }
+.qb-box-head { display: flex; align-items: center; gap: 6px; padding: 4px 4px 4px 8px; height: 30px; border-bottom: 1px solid var(--border);
+  background: var(--panel-2); border-radius: 7px 7px 0 0; cursor: move; user-select: none; touch-action: none; }
+.qb-alias { font-weight: 700; color: var(--accent); }
+.qb-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.qb-cols { list-style: none; margin: 0; padding: 2px 0 4px; }
+.qb-col { display: flex; align-items: center; gap: 4px; height: 22px; padding: 0 8px; font-size: 12px; }
+.qb-col:hover { background: var(--hover); }
+.qb-col label { display: inline-flex; align-items: center; gap: 4px; min-width: 0; flex: 1; cursor: pointer; }
+.qb-col .qb-cname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qb-col.star { color: var(--muted); }
+.qb-col .qb-type { color: var(--muted); font-size: 11px; white-space: nowrap; max-width: 90px; overflow: hidden; text-overflow: ellipsis; }
+.qb-pk, .qb-fk { display: inline-flex; }
+.qb-fk { opacity: .6; }
+.qb-hint { position: absolute; left: 30px; top: 30px; color: var(--muted); max-width: 420px; }
+.qb-sql { width: 38%; min-width: 280px; max-width: 640px; display: flex; flex-direction: column; border-left: 1px solid var(--border); background: var(--panel); min-height: 0; }
+.qb-sql-bar { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-bottom: 1px solid var(--border); background: var(--panel-2); }
+.qb-sql-text { flex: 1; margin: 0; padding: 10px 12px; overflow: auto; white-space: pre; min-height: 60px; }
+.qb-save { padding: 4px 10px; font-size: 12px; }
+.qb-params { margin: 4px 10px; border: 1px solid var(--border); border-radius: var(--radius); display: flex; flex-wrap: wrap; gap: 6px 12px; }
+.qb-params label { display: inline-flex; gap: 6px; align-items: center; }
+.qb-issues { margin: 4px 0 8px; padding: 0 10px 0 28px; font-size: 12px; }
+.qb-bottom { flex: 1 1 45%; min-height: 140px; display: flex; flex-direction: column; }
+.qb-bottom .subtabs { margin: 0; padding: 0 6px; background: var(--panel-2); }
+.qb-pane { flex: 1; min-height: 0; overflow: auto; padding: 8px 10px; }
+.qb-grid { border-collapse: collapse; margin-bottom: 8px; }
+.qb-grid th { text-align: left; font-weight: 600; font-size: 12px; color: var(--muted); padding: 2px 6px; }
+.qb-grid td { padding: 2px 6px; vertical-align: middle; }
+.qb-grid input.text, .qb-grid select.text { padding: 2px 4px; }
+.qb-colcell { display: flex; gap: 6px; }
+.qb-valcell { display: flex; gap: 6px; align-items: center; }
+.qb-actions { white-space: nowrap; }
+.qb-empty { padding: 8px 0; }
+.qb-note { font-size: 12px; margin: 6px 0; max-width: 900px; }
+.qb-join { border: 1px solid var(--border); border-radius: var(--radius); margin: 0 0 8px; padding: 6px 10px 8px; }
+.qb-join.active { border-color: var(--accent-2); }
+.qb-join legend { font-weight: 600; font-size: 12px; padding: 0 4px; }
+.qb-join-head, .qb-join-cond { display: flex; align-items: center; gap: 6px; margin: 3px 0; flex-wrap: wrap; }
+.qb-custom { display: inline-flex; align-items: center; gap: 6px; flex: 1; min-width: 300px; }
+.qb-custom input { flex: 1; }
+.qb-load { display: flex; flex-direction: column; gap: 6px; }
+.qb-load textarea { width: 100%; }
