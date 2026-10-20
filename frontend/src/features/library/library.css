@@ -1,0 +1,34 @@
+/* Query library (milestone 2.0) */
+.lib { display: flex; height: 100%; min-height: 0; }
+.lib-side { width: 220px; flex: none; border-right: 1px solid var(--border); background: var(--panel-2); padding: 10px; overflow: auto; display: flex; flex-direction: column; gap: 8px; }
+.lib-side h4 { margin: 6px 0 0; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.lib-nav { list-style: none; margin: 0; padding: 0; }
+.lib-nav button { display: flex; align-items: center; gap: 6px; width: 100%; border: 0; background: none; text-align: left; padding: 4px 8px; border-radius: var(--radius); cursor: pointer; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lib-nav button:hover { background: var(--hover); }
+.lib-nav button.active { background: var(--select); font-weight: 600; }
+.lib-nav .muted { margin-left: auto; font-size: 11px; }
+.lib-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.lib-tag { border: 1px solid var(--border); background: var(--panel); color: var(--text); border-radius: 10px; padding: 1px 8px; font-size: 12px; cursor: pointer; }
+.lib-tag:hover { border-color: var(--accent-2); }
+.lib-tag.active { background: var(--select); border-color: var(--accent-2); }
+.lib-list { width: 340px; flex: none; border-right: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; }
+.lib-items { list-style: none; margin: 0; padding: 0; overflow: auto; flex: 1; }
+.lib-item { display: flex; flex-direction: column; gap: 2px; width: 100%; text-align: left; border: 0; border-bottom: 1px solid var(--border); background: var(--panel); color: var(--text); padding: 7px 10px; cursor: pointer; }
+.lib-item:hover { background: var(--hover); }
+.lib-item.active { background: var(--select); }
+.lib-item-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lib-item-sub { display: flex; flex-wrap: wrap; gap: 4px 8px; font-size: 12px; color: var(--muted); align-items: center; }
+.lib-chip { font-size: 12px; color: var(--muted); }
+.lib-item.active .lib-chip, .lib-item.active .lib-item-sub { color: var(--text); }
+.pill.lib-shared { color: var(--ok); border-color: var(--ok); }
+.lib-detail { flex: 1; min-width: 0; overflow: auto; padding: 12px 16px; }
+.lib-detail h3 { margin: 0 0 6px; font-size: 16px; }
+.lib-meta { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; margin: 4px 0; }
+.lib-desc { margin: 6px 0; white-space: pre-wrap; }
+.lib-param { font-family: var(--mono); background: var(--panel-2); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; margin-right: 4px; }
+.lib-sql-label { margin: 10px 0 4px; font-size: 12px; }
+.lib-sql { height: 260px; display: flex; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.lib-sql > div { flex: 1; min-width: 0; }
+.lib-preview { max-height: 200px; overflow: auto; margin: 0 0 8px; padding: 8px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--panel-2); white-space: pre-wrap; }
+.lib table.grid tr.sel td { background: var(--select); }
+.lib .hint { font-size: 12px; margin: 4px 0 8px; }

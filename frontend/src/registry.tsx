@@ -111,3 +111,23 @@ export function registerTreeNodes(p: TreeNodesProvider) {
 export function getTreeNodes(parent: "database") {
   return treeNodes.filter((t) => t.parent === parent);
 }
+
+// --- Query Tool toolbar buttons -------------------------------------------------
+export interface QueryToolContext {
+  serverId: string;
+  dbId: string;
+  /** The selected text, or the whole editor content when nothing is selected. */
+  selectionOrAll: () => string;
+  /** The whole editor content. */
+  getSql: () => string;
+  /** Replace the editor content. */
+  setSql: (sql: string) => void;
+}
+export type QueryToolAction = { id: string; render: (ctx: QueryToolContext) => ReactNode };
+const queryToolActions: QueryToolAction[] = [];
+export function registerQueryToolAction(a: QueryToolAction) {
+  queryToolActions.push(a);
+}
+export function getQueryToolActions() {
+  return queryToolActions;
+}

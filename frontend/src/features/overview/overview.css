@@ -1,0 +1,31 @@
+/* Multi-server overview (milestone 2.0) */
+/* --warn is meant for icons and borders; small warning text needs a darker shade on light backgrounds */
+.ov { --ov-warn: #8a5100; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .ov { --ov-warn: var(--warn); } }
+:root[data-theme="dark"] .ov, :root[data-theme="contrast"] .ov { --ov-warn: var(--warn); }
+.ov { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.ov-body { flex: 1; overflow: auto; padding: 12px 16px; }
+.ov-filters { display: inline-flex; gap: 4px; }
+.ov-filter b { margin-left: 2px; }
+.ov-badge { display: inline-flex; align-items: center; gap: 3px; padding: 0 7px; border-radius: 9px; border: 1px solid currentColor; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.ov-ok { color: var(--ok); }
+.ov-warning { color: var(--ov-warn); }
+.ov-critical { color: var(--danger); }
+.ov-unknown { color: var(--muted); }
+.ov-filter.on { background: var(--select); }
+.ov-server { border: 1px solid var(--border); border-left-width: 4px; border-radius: 8px; background: var(--panel); padding: 10px 12px; margin-bottom: 12px; }
+.ov-border-ok { border-left-color: var(--ok); }
+.ov-border-warning { border-left-color: var(--warn); }
+.ov-border-critical { border-left-color: var(--danger); }
+.ov-border-unknown { border-left-color: var(--muted); }
+.ov-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+.ov-head h3 { margin: 0; font-size: 15px; }
+.ov-msg { margin: 6px 0 0; white-space: pre-wrap; word-break: break-word; }
+.ov-grid { margin-top: 8px; max-height: none; }
+.ov .small { font-size: 12px; }
+.ov-dbname { white-space: normal; min-width: 180px; max-width: 420px; }
+.ov-issue { margin-top: 2px; }
+.ov table.grid td { vertical-align: top; }
+button.linkish { border: 0; background: none; padding: 0; font: inherit; color: var(--accent); cursor: pointer; text-align: left; }
+button.linkish:hover { text-decoration: underline; }
+.ov-head h3 button.linkish { font-weight: 650; }

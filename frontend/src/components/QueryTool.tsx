@@ -13,6 +13,7 @@ import {
   SqlEditor, clearErrors, formatEditor, lineColToOffset, selectionOrAll, showError, type ExtraCompletions,
 } from "./SqlEditor";
 import { IconDownload, IconPlan, IconPlay, IconPlus, IconSpinner, IconTrash, IconUpload, IconX } from "./Icons";
+import { getQueryToolActions, type QueryToolContext } from "../registry";
 
 // ----------------------------------------------------------- persistence
 interface HistoryEntry { sql: string; at: number; ok: boolean; ms: number }
@@ -466,6 +467,12 @@ export function QueryTool(props: { serverId: string; dbId: string; schema?: stri
   const isLastSelect = current && current === selects[selects.length - 1];
   const txShort = options ? ISOLATIONS.find(([k]) => k === options.isolation)?.[3] : undefined;
   const txLabel = txShort ? t(txShort) : "";
+  // for toolbar buttons contributed by features (registerQueryToolAction)
+  const toolCtx: QueryToolContext = {
+    serverId: props.serverId, dbId: props.dbId, setSql,
+    selectionOrAll: () => (view.current ? selectionOrAll(view.current) : sql),
+    getSql: () => view.current?.state.doc.toString() ?? sql,
+  };
 
   return (
     <div className="qt" style={{ display: props.visible ? "flex" : "none" }}>
@@ -533,6 +540,7 @@ export function QueryTool(props: { serverId: string; dbId: string; schema?: stri
         )}
         <button className="btn small" title={t("Format SQL (Shift+Alt+F)")} onClick={format}>{t("Format")}</button>
         <button className="btn icon" title={t("Save selection as snippet")} onClick={saveSnippet}><IconPlus /></button>
+        {getQueryToolActions().map((a) => <span key={a.id}>{a.render(toolCtx)}</span>)}
         <button className="btn icon" title={t("Open .sql file")} onClick={openFile}><IconUpload /></button>
         <button className="btn icon" title={t("Save as .sql file")} onClick={() => download("query.sql", sql, "text/sql")}><IconDownload /></button>
       </div>

@@ -26,6 +26,8 @@ from . import embedded
 from . import upgrade
 from . import events
 from . import debug
+from . import library
+from . import overview
 
 ROUTERS: list[APIRouter] = [
     servers.router,
@@ -54,4 +56,6 @@ ROUTERS: list[APIRouter] = [
     upgrade.router,
     events.router,
     debug.router,
+    library.router,
+    overview.router,
 ]
