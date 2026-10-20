@@ -571,6 +571,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/embedded/databases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add Local Database
+         * @description Create a new local database file or open an existing one, and register it.
+         */
+        post: operations["add_local_database_api_embedded_databases_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/embedded/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Status */
+        get: operations["status_api_embedded_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -3848,6 +3885,28 @@ export interface components {
             /** Upload Id */
             upload_id: string;
         };
+        /** LocalDatabaseIn */
+        LocalDatabaseIn: {
+            /**
+             * Charset
+             * @default UTF8
+             */
+            charset?: string;
+            /**
+             * Create
+             * @default false
+             */
+            create?: boolean;
+            /** Name */
+            name?: string | null;
+            /**
+             * Page Size
+             * @default 16384
+             */
+            page_size?: number;
+            /** Path */
+            path: string;
+        };
         /** LoginIn */
         LoginIn: {
             /** Password */
@@ -5922,6 +5981,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_local_database_api_embedded_databases_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LocalDatabaseIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    status_api_embedded_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
         };

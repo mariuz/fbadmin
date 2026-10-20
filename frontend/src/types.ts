@@ -20,6 +20,8 @@ export interface Server {
   auth_plugin?: string | null;
   read_only?: boolean;
   shared?: boolean;
+  /** Local database files opened with the embedded engine (features/embedded). */
+  embedded?: boolean;
   save_password: boolean;
   group: string;
   has_password: boolean;

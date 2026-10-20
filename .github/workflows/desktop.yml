@@ -2,6 +2,8 @@
 #   Windows: zipped one-folder build + MSI (WiX)
 #   macOS:   fbadmin.app in a .dmg (arm64 and x86_64)
 #   Linux:   AppImage, .deb and .rpm (fpm), Flatpak bundle
+# The Windows/macOS/Linux builds bundle the Firebird embedded engine for local databases
+# (packaging/embedded/fetch-embedded.py, docs/EMBEDDED.md); the Flatpak does not (yet).
 # Runs on release tags (artifacts are attached to the GitHub Release) and by hand.
 # The builds are not code-signed; see docs/PACKAGING.md.
 name: Desktop app
@@ -15,11 +17,15 @@ on:
       - packaging/**
       - backend/fbadmin/desktop.py
       - backend/fbadmin/updater.py
+      - backend/fbadmin/embedded.py
+      - backend/fbadmin/native.py
       - .github/workflows/desktop.yml
   pull_request:
     paths:
       - packaging/**
       - backend/fbadmin/desktop.py
+      - backend/fbadmin/embedded.py
+      - backend/fbadmin/native.py
       - .github/workflows/desktop.yml
   workflow_dispatch:
 
@@ -34,11 +40,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { name: Windows x64, os: windows-latest, kind: windows }
-          - { name: macOS arm64, os: macos-14, kind: macos, arch: arm64 }
-          - { name: macOS x86_64, os: macos-15-intel, kind: macos, arch: x86_64 }
+          - { name: Windows x64, os: windows-latest, kind: windows, fb: windows-x64 }
+          - { name: macOS arm64, os: macos-14, kind: macos, arch: arm64, fb: macos-arm64 }
+          - { name: macOS x86_64, os: macos-15-intel, kind: macos, arch: x86_64, fb: macos-x64 }
           # 22.04 keeps the glibc baseline low so the AppImage runs on older distributions.
-          - { name: Linux x86_64, os: ubuntu-22.04, kind: linux }
+          - { name: Linux x86_64, os: ubuntu-22.04, kind: linux, fb: linux-x64 }
     # Code signing turns on when these repository secrets exist (see docs/PACKAGING.md, "Signing");
     # without them the builds are unsigned, as before.
     env:
@@ -75,15 +81,23 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libgirepository1.0-dev libcairo2-dev pkg-config gir1.2-webkit2-4.1 \
-            libwebkit2gtk-4.1-0 rpm ruby-dev build-essential
+            libwebkit2gtk-4.1-0 rpm ruby-dev build-essential libtommath1
           sudo gem install --no-document fpm
           pip install "PyGObject<3.51" pycairo
       - name: Install fbadmin and PyInstaller
         # a prebuilt cryptography wheel (OpenSSL linked in statically): newer releases have no Intel
         # macOS wheel, and a source build links Homebrew's libssl while PyInstaller bundles another
         # one -> "Symbol not found: _SSL_get0_group_name" when the app starts
-        run: pip install --only-binary cryptography "./backend[desktop]" pyinstaller pillow
+        # [native]: firebird-driver, which local (embedded) databases use
+        run: pip install --only-binary cryptography "./backend[desktop,native]" pyinstaller pillow
+      - name: Firebird embedded engine (local databases)
+        # pinned release, SHA-256 checked; Linux takes libtommath.so.1 from the runner (libtommath1);
+        # macOS adds @loader_path rpaths and re-signs ad hoc (signed for real below when configured)
+        shell: bash
+        run: python packaging/embedded/fetch-embedded.py --platform ${{ matrix.fb }} --dest build/firebird-embedded
       - name: PyInstaller
+        env:
+          FBADMIN_REQUIRE_EMBEDDED: "1"
         run: pyinstaller packaging/pyinstaller/fbadmin.spec --noconfirm
 
       # --- code signing (only with the secrets above) ------------------------------
@@ -100,6 +114,9 @@ jobs:
           existing=(); while IFS= read -r k; do [ -n "$k" ] && existing+=("$k"); done < <(security list-keychains -d user | tr -d '" ')
           security list-keychains -d user -s "$kc" "${existing[@]}"
           rm "$RUNNER_TEMP/cert.p12"
+          # --deep does not reach Mach-O files among the data (the bundled Firebird engine)
+          find dist/fbadmin.app -path '*/firebird/*' -name '*.dylib' -type f -print0 \
+            | xargs -0 -n1 codesign --force --timestamp --options runtime -s "$MACOS_SIGN_IDENTITY"
           codesign --force --deep --timestamp --options runtime \
             --entitlements packaging/macos/entitlements.plist -s "$MACOS_SIGN_IDENTITY" dist/fbadmin.app
           codesign --verify --deep --strict --verbose=2 dist/fbadmin.app
@@ -185,6 +202,20 @@ jobs:
           curl -fsS http://127.0.0.1:5106/ | grep -q 'id="root"'
           # the driver patches must apply in the frozen build too (they read firebirdsql's source)
           if grep -q "could not patch" frozen.log; then cat frozen.log; exit 1; fi
+      - name: Smoke test local (embedded) databases in the frozen app
+        # verified on Linux; Windows and macOS are not verified yet (docs/EMBEDDED.md), so a
+        # failure there is reported without failing the release build
+        continue-on-error: ${{ matrix.kind != 'linux' }}
+        timeout-minutes: 10
+        shell: bash
+        run: |
+          if [ "${{ matrix.kind }}" = macos ]; then exe=dist/fbadmin.app/Contents/MacOS/fbadmin
+          elif [ -f dist/fbadmin/fbadmin.exe ]; then exe=dist/fbadmin/fbadmin.exe; else exe=dist/fbadmin/fbadmin; fi
+          FBADMIN_DATA_DIR="$RUNNER_TEMP/fbemb" BROWSER=true "$exe" --browser --port 5109 > embedded.log 2>&1 &
+          for _ in $(seq 1 90); do curl -fsS http://127.0.0.1:5109/api/health && break; sleep 1; done
+          python packaging/embedded/smoke-test.py http://127.0.0.1:5109 "$RUNNER_TEMP/fbemb-dbs" \
+            || { cat embedded.log; kill %1 || true; exit 1; }
+          kill %1 || true
       # --- install the packages and start the installed app ------------------------
       - name: Install the MSI and run the installed app (Windows)
         if: matrix.kind == 'windows'

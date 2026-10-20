@@ -7,6 +7,8 @@
 #
 # Output: dist/fbadmin/ (Windows/Linux, run fbadmin[.exe]) and dist/fbadmin.app (macOS).
 # The packaging steps (zip/MSI, dmg, AppImage/deb/rpm) are in .github/workflows/desktop.yml.
+import json
+import os
 import sys
 from pathlib import Path
 
@@ -31,11 +33,25 @@ hidden = (
     + collect_submodules("firebirdsql")
     + ["webview"]
 )
+datas = [(str(static), "fbadmin/static")]
+
+# Firebird embedded engine for local databases (docs/EMBEDDED.md): the file set extracted by
+# packaging/embedded/fetch-embedded.py is copied verbatim to <app>/firebird, where
+# fbadmin.embedded finds it. Without it the app works as before, minus local databases.
+# FBADMIN_REQUIRE_EMBEDDED=1 (CI) makes a missing file set an error.
+embedded = Path(os.environ.get("FBADMIN_EMBEDDED_BUNDLE") or root / "build" / "firebird-embedded")
+if (embedded / "fbadmin-embedded.json").is_file():
+    info = json.loads((embedded / "fbadmin-embedded.json").read_text("utf-8"))
+    print(f"fbadmin.spec: bundling the Firebird {info['build']} embedded engine ({info['platform']}) from {embedded}")
+    datas.append((str(embedded), "firebird"))
+    hidden += collect_submodules("firebird.driver") + collect_submodules("firebird.base")
+elif os.environ.get("FBADMIN_REQUIRE_EMBEDDED"):
+    raise SystemExit(f"{embedded} has no embedded engine: run packaging/embedded/fetch-embedded.py first")
 
 a = Analysis(  # noqa: F821
     [str(here / "launcher.py")],
     pathex=[str(backend)],
-    datas=[(str(static), "fbadmin/static")],
+    datas=datas,
     hiddenimports=hidden,
     excludes=["tkinter", "pytest", "hypothesis", "IPython"],
     noarchive=False,

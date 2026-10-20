@@ -1,0 +1,33 @@
+Firebird embedded engine bundled with fbadmin
+=============================================
+
+This directory contains unmodified binaries of the Firebird relational database
+(https://firebirdsql.org), release 5.0.4 (build 5.0.4.1812), taken from the official
+release archives published by the Firebird Project. fbadmin uses them as an embedded
+engine to open local database files without a Firebird server.
+
+Firebird is distributed under the InterBase Public License v1.0 (IPLicense.txt) and the
+Initial Developer's Public License v1.0 (IDPLicense.txt). As required by section 3.6 of
+these licences: the Source Code version of this Covered Code is available under the terms
+of these licences from the Firebird Project, at
+
+    https://github.com/FirebirdSQL/firebird/releases/tag/v5.0.4
+    (Firebird-5.0.4.1812-0-source.tar.xz, and the v5.0.4 tag of
+    https://github.com/FirebirdSQL/firebird)
+
+fbadmin does not modify the Firebird code. On macOS the build adds an @loader_path run
+path to some libraries and re-signs them so they load from the application bundle; the
+code itself is unchanged.
+
+Third-party libraries shipped with the Firebird binaries, depending on the platform:
+
+* ICU - International Components for Unicode (Windows: 63, macOS: 71),
+  Unicode License (ICU-63.txt / ICU-71.txt). Linux uses the system's ICU.
+* LibTomMath and LibTomCrypt - public domain / The LibTom License
+  (libtommath.txt, libtomcrypt.txt). On Linux libtommath.so.1 is taken from the build
+  machine's distribution package (libtommath1), unmodified.
+* zlib (Windows) - zlib License (zlib.txt).
+* Microsoft Visual C++ runtime (Windows: msvcp140*.dll, vcruntime140*.dll), redistributed
+  with Firebird under the Visual Studio redistribution terms.
+
+These components are NOT covered by fbadmin's MIT licence.

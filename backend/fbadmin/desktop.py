@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import logging
 import os
+import signal
 import socket
 import sys
 import threading
@@ -74,6 +75,53 @@ def _webview():
     return webview
 
 
+class DesktopApi:
+    """Exposed to the page as ``window.pywebview.api``: native file dialogs for local databases
+    (features/embedded in the frontend). Public methods only; pywebview calls them from JS."""
+
+    def __init__(self, webview) -> None:
+        self._webview = webview
+
+    def choose_database_file(self, save: bool = False, suggested: str = "") -> str | None:
+        wv = self._webview
+        dialogs = getattr(wv, "FileDialog", None)  # pywebview >= 5.3; older: OPEN_DIALOG/SAVE_DIALOG
+        kind = getattr(dialogs, "SAVE" if save else "OPEN", None) if dialogs else None
+        if kind is None:
+            kind = wv.SAVE_DIALOG if save else wv.OPEN_DIALOG
+        kwargs: dict = {"file_types": ("Firebird databases (*.fdb;*.gdb)", "All files (*.*)")}
+        if suggested:
+            folder, name = os.path.split(suggested)
+            if folder and os.path.isdir(folder):
+                kwargs["directory"] = folder
+            if save and name:
+                kwargs["save_filename"] = name
+        result = wv.windows[0].create_file_dialog(kind, **kwargs)
+        if not result:
+            return None
+        return result if isinstance(result, str) else result[0]
+
+
+def _handle_sigterm(webview) -> None:
+    """Quit cleanly on SIGTERM (logout, ``kill``): close the window / leave the wait loop.
+
+    Besides being polite, this matters with the embedded engine: the Firebird client library
+    installs its own SIGTERM handler (it shuts the engine down) and only chains to a handler
+    that is already there, so with the default action the process would keep running.
+    """
+    def on_term(_signum, _frame):
+        if webview is not None and getattr(webview, "windows", None):
+            for w in list(webview.windows):
+                try:
+                    w.destroy()
+                except Exception:  # noqa: BLE001
+                    pass
+            return
+        raise KeyboardInterrupt
+
+    if threading.current_thread() is threading.main_thread() and hasattr(signal, "SIGTERM"):
+        signal.signal(signal.SIGTERM, on_term)
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="fbadmin-desktop", description="fbadmin in a desktop window")
     p.add_argument("--port", type=int, default=0, help="port (default: a free port)")
@@ -95,10 +143,11 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     webview = None if args.browser else _webview()
+    _handle_sigterm(webview)
     if webview is not None:
         try:
             webview.create_window(f"fbadmin {__version__}", srv.url, width=1400, height=900,
-                                  min_size=(900, 600))
+                                  min_size=(900, 600), js_api=DesktopApi(webview))
             webview.start()  # blocks until the window is closed
         except Exception as exc:  # noqa: BLE001 - no GUI backend (e.g. headless Linux)
             log.warning("cannot open a native window (%s); using the web browser", exc)

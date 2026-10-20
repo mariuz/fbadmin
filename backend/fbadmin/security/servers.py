@@ -167,6 +167,10 @@ class EncryptedServerStore(ServerStore):
     def password_for(self, server_id: str) -> str | None:
         with self._lock:
             srv = self.get(server_id)
+            if srv.embedded:  # local database: the embedded engine does not authenticate
+                from ..embedded import EMBEDDED_PASSWORD
+
+                return EMBEDDED_PASSWORD
             return (self._reveal(srv.password, srv.id) or self._session_passwords.get(server_id)
                     or _configured_password(server_id))
 

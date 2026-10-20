@@ -61,6 +61,14 @@ def connect(
     create: bool = False,
     page_size: int = 16384,
 ) -> firebirdsql.Connection:
+    if srv.embedded:  # local file through the embedded engine (native driver)
+        from .embedded import connect_local
+
+        conn = connect_local(db_path, charset=srv.charset or "UTF8", role=srv.role, create=create,
+                             page_size=page_size, user=srv.user)
+        if srv.read_only and not create:
+            apply_tpb(conn, TxOptions(read_only=True).tpb())
+        return conn
     kwargs = dict(
         host=srv.host,
         port=srv.port,
@@ -116,7 +124,7 @@ class ConnectionManager:
 
     def _open_meta(self, key: tuple[str, str]) -> FbConnection:
         """Metadata connections may use the optional native driver (FBADMIN_DRIVER=native)."""
-        if not native_enabled():
+        if not native_enabled() or self.store.get(key[0]).embedded:
             return self._open(*key)
         srv = self.store.get(key[0])
         db: DatabaseEntry = self.store.get_database(*key)
@@ -204,6 +212,12 @@ class ConnectionManager:
     @contextmanager
     def service(self, server_id: str):
         srv = self.store.get(server_id)
+        if srv.embedded:  # the embedded service manager (backup/restore, gstat, validation...)
+            from .embedded import services as embedded_services
+
+            with embedded_services() as svc:
+                yield svc
+            return
         svc = services.connect(
             host=srv.host,
             port=srv.port,

@@ -11,3 +11,4 @@ import "./security";
 import "./alerts";
 import "./storage";
 import "./datacompare";
+import "./embedded";

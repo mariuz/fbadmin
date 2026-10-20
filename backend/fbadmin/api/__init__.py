@@ -22,6 +22,7 @@ from . import fbsecurity
 from . import storage
 from . import alerts
 from . import datacompare
+from . import embedded
 
 ROUTERS: list[APIRouter] = [
     servers.router,
@@ -46,4 +47,5 @@ ROUTERS: list[APIRouter] = [
     storage.router,
     alerts.router,
     datacompare.router,
+    embedded.router,
 ]

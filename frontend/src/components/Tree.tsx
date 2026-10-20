@@ -191,7 +191,7 @@ export function Tree() {
   const serverSpec = (srv: Server): NodeSpec => ({
     key: keys.server(srv.id),
     label: srv.name,
-    sub: `${srv.host}:${srv.port}`,
+    sub: srv.embedded ? t("embedded engine") : `${srv.host}:${srv.port}`,
     icon: IconServer,
     selection: { kind: "server", serverId: srv.id },
     load: async () => {

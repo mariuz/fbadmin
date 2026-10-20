@@ -81,6 +81,20 @@ FBADMIN_DRIVER=native FBADMIN_FBCLIENT=/path/to/libfbclient.so python -m pytest 
 (A libfbclient can be copied out of the Firebird container:
 `docker cp -L fb5:/opt/firebird/lib/libfbclient.so.2 .`; it also needs `libtommath`.)
 
+### Local (embedded) database tests
+
+`tests/test_embedded.py` needs no Firebird server. It runs the Firebird 5 embedded engine in
+the test process and skips its engine tests unless `FBADMIN_TEST_EMBEDDED_DIR` is set:
+
+```bash
+scripts/embedded-test-setup.sh                 # downloads + extracts to build/firebird-embedded
+FBADMIN_TEST_EMBEDDED_DIR=$PWD/build/firebird-embedded python -m pytest -q backend/tests/test_embedded.py
+```
+
+Start fbadmin with `FBADMIN_EMBEDDED_DIR=$PWD/build/firebird-embedded` to get the **Local
+database** button. `e2e/tests/embedded.spec.ts` runs when the server under test has it. See
+[EMBEDDED.md](EMBEDDED.md).
+
 ## End-to-end tests (Playwright)
 
 `e2e/` is a separate npm package with [Playwright](https://playwright.dev) tests that drive

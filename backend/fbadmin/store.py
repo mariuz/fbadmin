@@ -49,6 +49,8 @@ class ServerEntry(BaseModel):
     read_only: bool = False  # block everything but SELECT on this server
     shared: bool = False  # server mode: visible to every fbadmin user, managed by admins
     group: str = "Servers"
+    # local database files opened by the embedded engine in this process (see embedded.py)
+    embedded: bool = False
     databases: list[DatabaseEntry] = Field(default_factory=list)
 
     def public(self) -> dict:
@@ -129,6 +131,10 @@ class ServerStore:
     def password_for(self, server_id: str) -> str | None:
         with self._lock:
             srv = self.get(server_id)
+            if srv.embedded:  # the embedded engine does not authenticate
+                from .embedded import EMBEDDED_PASSWORD
+
+                return EMBEDDED_PASSWORD
             return srv.password or self._session_passwords.get(server_id) or _configured_password(server_id)
 
     def remember_password(self, server_id: str, password: str) -> None:
