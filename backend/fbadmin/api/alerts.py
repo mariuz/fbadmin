@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from ..alerts import checks
 from ..alerts.engine import get_engine
 from ..alerts.store import CONDITIONS, EVENTS, Channel, Rule, get_store
+from ..security import runas
 from ..security.core import require_admin
 from ..serialize import to_json
 
@@ -60,6 +61,8 @@ class RuleUpdate(BaseModel):
 
 def _rule_view(r: Rule) -> dict:
     d = r.model_dump()
+    ra = d.pop("run_as", None)
+    d["run_as_user"] = ra.get("user") if ra else None
     d["status"] = get_engine().status.get(r.id) if r.event in CONDITIONS else None
     return to_json(d)
 
@@ -119,19 +122,37 @@ def list_rules():
 @router.post("/rules", status_code=201)
 def create_rule(body: RuleIn):
     require_admin()
-    return _rule_view(get_store().add_rule(Rule(**body.model_dump())))
+    data = body.model_dump()
+    if data["event"] in CONDITIONS and data.get("server_id"):
+        data["run_as"] = runas.issue([data["server_id"], data.get("peer_server_id")], f"alert rule: {body.name}")
+    return _rule_view(get_store().add_rule(Rule(**data)))
 
 
 @router.put("/rules/{rule_id}")
 def update_rule(rule_id: str, body: RuleUpdate):
     require_admin()
-    return _rule_view(get_store().update_rule(rule_id, body.model_dump(exclude_unset=True)))
+    st = get_store()
+    cur = st.get_rule(rule_id)
+    changes = body.model_dump(exclude_unset=True)
+    merged = {**cur.model_dump(), **changes}
+    cred = None
+    if merged["event"] in CONDITIONS and merged.get("server_id"):
+        cred = runas.issue([merged["server_id"], merged.get("peer_server_id")], f"alert rule: {merged['name']}")
+        if cred is not None:
+            changes["run_as"] = cred
+    rule = st.update_rule(rule_id, changes)
+    if cred is not None:
+        runas.revoke(cur.run_as)
+    return _rule_view(rule)
 
 
 @router.delete("/rules/{rule_id}", status_code=204)
 def delete_rule(rule_id: str):
     require_admin()
-    get_store().remove_rule(rule_id)
+    st = get_store()
+    old = st.get_rule(rule_id).run_as
+    st.remove_rule(rule_id)
+    runas.revoke(old)
     get_engine().status.pop(rule_id, None)
 
 

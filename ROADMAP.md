@@ -15,7 +15,7 @@ released: 1.0.1 is on [PyPI](https://pypi.org/project/firebird-admin/) (`pip ins
 on [GitHub Releases](https://github.com/mariuz/fbadmin/releases) with desktop installers for
 Windows, macOS and Linux, as a Docker image, and documented at https://mariuz.github.io/fbadmin/.
 Code signing is deferred by decision of the project owner: the 1.x desktop builds ship unsigned. The signing steps (macOS Developer ID with notarization, Windows Authenticode) are already in the desktop workflow and turn on as soon as the certificates are added as repository secrets; see [docs/PACKAGING.md](docs/PACKAGING.md#desktop-app).
-Milestones 1.1 (except Firebird 6.0 final support, which waits for the release) and 1.2 are implemented; 2.0 is planned.
+Milestones 1.1 (except Firebird 6.0 final support, which waits for the release), 1.2 and 2.0 are implemented.
 
 ---
 
@@ -165,7 +165,7 @@ exact DDL before it runs, like pgAdmin.
 - ✅ Official multi-arch Docker image (amd64 and arm64), Helm chart, Kubernetes example with the Firebird operator (`deploy/k8s`: StatefulSet. `deploy/k8s-operator`: a `FirebirdCluster` from the [cloudnative-firebird](https://github.com/mariuz/cloudnative-firebird) operator, with fbadmin registered from a ConfigMap; a kind workflow runs it end to end. Helm `firebirdServers` for preconfigured servers)
 - ✅ **Desktop app:** pywebview or Tauri shell with auto-update, for Windows (MSI), macOS (dmg) and Linux (AppImage, deb, rpm, Flatpak). Verified in CI on every packaging change: the MSI installs, runs and uninstalls on Windows; the dmg mounts and the app runs on macOS arm64 and Intel; the deb installs and the AppImage runs on Linux; the rpm and Flatpak bundle are built. Self-update downloads the package, verifies it against `SHA256SUMS`, then runs the MSI, replaces the AppImage or opens the dmg; this was exercised on a real AppImage, which replaced itself and restarted. Builds ship unsigned by the owner's decision (signing is deferred); the signing steps (macOS codesign + notarization, Windows signtool for the exe and MSI) are ready and run once the signing secrets are configured, and packages are attached to GitHub Releases only for version tags
 - ✅ Preferences dialog: editor font, keymap, grid NULL display, date formats, confirmations
-- ✅ Internationalisation (i18n): English, Romanian, Portuguese (Brazil), Spanish, Russian, German, French and Czech (2131 strings in each language; CI checks that every catalog is complete)
+- ✅ Internationalisation (i18n): English, Romanian, Portuguese (Brazil), Spanish, Russian, German, French and Czech (2587 strings in each language; CI checks that every catalog is complete)
 - ✅ Accessibility: keyboard tree navigation, ARIA roles, high-contrast theme (landmarks, ARIA tabs, menus and dialogs, labelled fields, axe-core audit in e2e in three themes)
 - ✅ Documentation site (MkDocs), a user guide with screenshots, and an admin guide for server mode (built with `mkdocs build --strict` in CI; it deploys to GitHub Pages as soon as Pages is enabled in the repository settings, Source: GitHub Actions)
 - ✅ Plugin API for extra tree nodes, dashboard panels and tools
@@ -175,7 +175,7 @@ exact DDL before it runs, like pgAdmin.
 
 ## Engineering backlog ✅
 
-- ✅ Frontend end-to-end tests with Playwright, run in CI against a Firebird container (45 specs: core flows, every feature module, Firebird 6 schemas, accessibility, languages, alerts, backup storage, data compare, local databases, events, upgrade checks, PSQL debugging)
+- ✅ Frontend end-to-end tests with Playwright, run in CI against a Firebird container (70 specs: core flows, every feature module, Firebird 6 schemas, accessibility, languages, alerts, backup storage, data compare, local databases, events, upgrade checks, PSQL debugging, 2FA/tokens/permissions, query library, overview, query builder, charts, schema history)
 - ✅ Generate a typed API client from FastAPI's OpenAPI schema (request bodies typed through `Body<path, method>`; most responses are still hand-typed)
 - ✅ Code-split the frontend bundle (CodeMirror and grid chunks)
 - ✅ Async driver (`firebirdsql.aio`) or a worker pool for long-running statements, so one slow query never blocks the metadata connection
@@ -200,18 +200,22 @@ exact DDL before it runs, like pgAdmin.
 - ✅ **Upgrade assistant:** checks before moving to Firebird 4, 5 or 6 (newly reserved words from each version's keyword list, legacy UDFs with built-in replacements, dialect 1, authentication, time zones, external tables, schemas and more), a tailored backup/restore plan, and an optional trial restore on the newer server that recompiles every view, procedure and trigger there ([docs/UPGRADE.md](docs/UPGRADE.md))
 - ✅ **PSQL debugging help:** trace runs of procedures, functions and EXECUTE BLOCKs (an instrumented copy records the line and variables after each statement, then everything is rolled back; step back and forth), per-line profiler timings on Firebird 5, and saved test cases per routine ([docs/PSQL_DEBUGGING.md](docs/PSQL_DEBUGGING.md))
 
-## Milestone 2.0 — Teams and productivity ⬜
+## Milestone 2.0 — Teams and productivity ✅
 
-- ⬜ **Two-factor login (TOTP)** for server mode
-- ⬜ **API tokens** for scripts and automation, scoped per user
-- ⬜ **Finer permissions:** per-database and per-object rights for fbadmin users, not just per server registration
-- ⬜ **Shared query library:** team-wide saved queries and snippets in server mode
-- ⬜ **Multi-server overview:** one page with the health of every registered server and database
-- ⬜ **Visual query builder** (pgAdmin parity): pick tables, joins and columns, generate the `SELECT`
-- ⬜ **Charts from query results:** bar, line and pie charts drawn from a result set
-- ⬜ **ERD export** to SVG and PNG
-- ⬜ **Schema history in git:** save the extracted DDL to a git repository and keep a history of schema changes
-- ⬜ **Command-line tool:** `fbadmin backup`, `fbadmin restore`, `fbadmin diff` and `fbadmin extract` for CI and cron jobs
+- ✅ **Two-factor login (TOTP)** for server mode: authenticator apps with a QR code, single-use recovery codes, replay protection and rate limiting, per-user or global enforcement by admins ([docs/PERMISSIONS.md](docs/PERMISSIONS.md))
+- ✅ **API tokens** for scripts and automation: personal `Bearer` tokens, read-only or read-write, optionally limited to some servers, stored hashed, revocable, with last use and audit entries
+- ✅ **Finer permissions:** grants per user or group × server × database × object pattern × level (none / read / write / ddl / admin), enforced centrally for every endpoint and SQL statement; no grants keep the previous behaviour
+- ✅ **Shared query library:** saved queries with folders, tags, search and revision history, private or shared with all users in server mode; "Save to library" in the Query Tool ([docs/QUERY_LIBRARY.md](docs/QUERY_LIBRARY.md))
+- ✅ **Multi-server overview:** one page with the health of every server and database (reachability, versions, attachments, transaction gaps, size, last backup, replication, firing alerts, failed jobs), checked concurrently with timeouts and without password prompts ([docs/OVERVIEW.md](docs/OVERVIEW.md))
+- ✅ **Visual query builder:** tables and views on a canvas (or from the tree), joins suggested from foreign keys, columns, aggregates with automatic GROUP BY, criteria, ordering and row limits per server version, live SQL preview; fully usable from the keyboard ([docs/QUERY_BUILDER.md](docs/QUERY_BUILDER.md))
+- ✅ **Charts from query results:** bar, stacked, line, area, pie/donut and scatter charts next to the result grid, with aggregation, top-N, time axes, accessible colours and markers, SVG/PNG export ([docs/CHARTS.md](docs/CHARTS.md))
+- ✅ **ERD export** to standalone SVG and PNG (1×/2×), whole diagram or visible area, with an optional title block
+- ✅ **Schema history in git:** deterministic one-file-per-object DDL snapshots committed on demand, after DDL or on a schedule, with diffs, objects at any commit, push to a remote and migration scripts between commits ([docs/SCHEMA_HISTORY.md](docs/SCHEMA_HISTORY.md))
+- ✅ **Command-line tool:** `fbadmin backup`, `restore`, `extract`, `diff`, `sql` and `check` for CI and cron jobs, with exit codes and JSON output ([docs/CLI.md](docs/CLI.md))
+
+Also fixed in this milestone:
+- The `firebirdsql` driver decoded INT128, NUMERIC(>18), DECFLOAT and time zone values wrongly and truncated large parameters; fbadmin now patches these (see [docs/upstream-firebirdsql-fb4-types.md](docs/upstream-firebirdsql-fb4-types.md)).
+- In server mode, scheduled jobs, history sampling and alert condition checks run as the user who set them up (they previously failed for lack of a signed-in user), and server-wide monitoring and update settings are admin-only.
 
 ## Ongoing ⬜
 

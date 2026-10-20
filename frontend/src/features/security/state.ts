@@ -1,6 +1,7 @@
 /** Login / server-mode status shared by the auth gate, the user menu and dialogs. */
 import { useEffect, useState } from "react";
 import { request } from "../../api";
+import type { AppApi } from "../../context";
 
 export interface AuthUser {
   id: number;
@@ -58,3 +59,17 @@ export function useAuth(): AuthStatus | null {
 export const isAdmin = (s: AuthStatus | null = current) => !!s && (!s.server_mode || s.user?.role === "admin");
 /** Shared servers exist only in server mode and are managed by admins. */
 export const canShareServers = (s: AuthStatus | null = current) => !!s?.server_mode && s.user?.role === "admin";
+
+/** Extra entries of the user menu (two-factor sign-in, API tokens, permissions: features/access). */
+export interface UserMenuItem {
+  id: string;
+  label: () => string;
+  show: (s: AuthStatus) => boolean;
+  run: (app: AppApi) => void;
+  /** shown in the administrators' part of the menu */
+  admin?: boolean;
+}
+export const userMenuItems: UserMenuItem[] = [];
+export function registerUserMenuItem(item: UserMenuItem) {
+  userMenuItems.push(item);
+}

@@ -48,6 +48,8 @@ class Schedule(BaseModel):
     verify: bool = False              # test-restore each backup into a scratch database, then drop it
     verify_path: str | None = None    # scratch database path on the server (default: next to the database)
     upload: UploadOptions | None = None
+    # server mode: run as the user who scheduled it (security/runas.py); never returned by the API
+    run_as: dict | None = None
     created_at: float = Field(default_factory=time.time)
     last_run: float | None = None
     last_status: str | None = None
@@ -93,6 +95,8 @@ class Scheduler:
 
     def view(self, s: Schedule) -> dict:
         d = s.model_dump()
+        ra = d.pop("run_as", None)
+        d["run_as_user"] = ra.get("user") if ra else None
         nxt = self.next_run(s)
         d["next_run"] = nxt
         return d
@@ -124,9 +128,12 @@ class Scheduler:
     def remove(self, sid: str) -> None:
         with self._lock:
             self.get(sid)
-            del self.schedules[sid]
+            gone = self.schedules.pop(sid)
             self._next.pop(sid, None)
             self._save()
+        from ..security import runas
+
+        runas.revoke(gone.run_as)
 
     def history_for(self, sid: str | None = None, limit: int = 100) -> list[dict]:
         with self._lock:
@@ -151,9 +158,9 @@ class Scheduler:
                 self._next[s.id] = Cron(s.cron).next(datetime.fromtimestamp(now)).timestamp()
         for s in due:
             try:
-                started.append(self.run_now(s.id)["id"])
+                started.append(self._run_as_owner(s)["id"])
             except Exception as exc:  # noqa: BLE001
-                self._record(s, None, now, "failed", str(exc))
+                self._record(s, None, now, "failed", str(exc) or exc.__class__.__name__)
         return started
 
     def _record(self, s: Schedule, job_id: str | None, started: float, status: str, error: str | None = None,
@@ -173,6 +180,14 @@ class Scheduler:
                         f"The scheduled {s.kind} \"{s.name}\" failed: {error}",
                         server_id=s.server_id, database_id=s.database_id, key=f"schedule:{s.id}",
                         details={"schedule_id": s.id, "job_id": job_id, **extra})
+
+    def _run_as_owner(self, s: Schedule) -> dict:
+        """Start a due schedule. In server mode it runs as the user who scheduled it, so it sees that
+        user's servers and saved passwords (the scheduler thread has no signed-in user)."""
+        from ..security.runas import acting_as
+
+        with acting_as(s.run_as, "this schedule"):
+            return self.run_now(s.id)
 
     def run_now(self, sid: str) -> dict:
         from ..api.deps import get_state

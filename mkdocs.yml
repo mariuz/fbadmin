@@ -91,6 +91,7 @@ nav:
       - Command-line tool: CLI.md
       - Local databases (embedded engine): EMBEDDED.md
       - Security and server mode: SECURITY.md
+      - Two-factor sign-in, API tokens and permissions: PERMISSIONS.md
       - Maintenance: MAINTENANCE.md
       - Alerts: ALERTS.md
       - Replication: REPLICATION.md

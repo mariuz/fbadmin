@@ -57,6 +57,9 @@ class HistoryStore:
                     max_seconds REAL, seen INTEGER, PRIMARY KEY (server_id, db_id, sql_hash));
                 """
             )
+            # server mode: who enabled tracking, so the sampler thread can act as them (security/runas.py)
+            if "run_as" not in [r[1] for r in self._db.execute("PRAGMA table_info(tracked)")]:
+                self._db.execute("ALTER TABLE tracked ADD COLUMN run_as TEXT")
 
     def close(self) -> None:
         with self._lock:
@@ -87,12 +90,27 @@ class HistoryStore:
     def is_tracked(self, server_id: str, db_id: str) -> dict[str, Any] | None:
         return next((t for t in self.tracked() if t["server_id"] == server_id and t["db_id"] == db_id), None)
 
-    def set_tracked(self, server_id: str, db_id: str, enabled: bool) -> None:
+    def set_tracked(self, server_id: str, db_id: str, enabled: bool, run_as: dict | None = None) -> dict | None:
+        """Returns the previous run-as credential (to revoke) when it is replaced or tracking stops."""
         with self._lock:
+            row = self._db.execute("SELECT run_as FROM tracked WHERE server_id = ? AND db_id = ?",
+                                   (server_id, db_id)).fetchone()
+            old = json.loads(row[0]) if row and row[0] else None
             if enabled:
                 self._db.execute("INSERT OR IGNORE INTO tracked (server_id, db_id) VALUES (?, ?)", (server_id, db_id))
+                if run_as is None:
+                    return None
+                self._db.execute("UPDATE tracked SET run_as = ? WHERE server_id = ? AND db_id = ?",
+                                 (json.dumps(run_as), server_id, db_id))
             else:
                 self._db.execute("DELETE FROM tracked WHERE server_id = ? AND db_id = ?", (server_id, db_id))
+            return old
+
+    def run_as(self, server_id: str, db_id: str) -> dict | None:
+        with self._lock:
+            row = self._db.execute("SELECT run_as FROM tracked WHERE server_id = ? AND db_id = ?",
+                                   (server_id, db_id)).fetchone()
+        return json.loads(row[0]) if row and row[0] else None
 
     def mark(self, server_id: str, db_id: str, error: str | None) -> None:
         with self._lock:
@@ -236,19 +254,25 @@ def _slow_running(conn, min_seconds: float) -> list[dict[str, Any]]:
 
 def sample_all() -> None:
     from ..api.deps import get_state
+    from ..security.runas import Unavailable, acting_as
 
     store = get_store()
     st = get_state()
     for t in store.tracked():
         try:
-            st.store.get_database(t["server_id"], t["db_id"])
-        except Exception:  # noqa: BLE001 - database was removed from the registry
-            store.set_tracked(t["server_id"], t["db_id"], False)
-            continue
-        try:
-            sample_database(t["server_id"], t["db_id"])
-        except Exception:  # noqa: BLE001 - error is recorded in the tracked table
-            pass
+            # server mode: sample as the user who enabled tracking (the sampler has no signed-in user)
+            with acting_as(store.run_as(t["server_id"], t["db_id"]), "history tracking for this database"):
+                try:
+                    st.store.get_database(t["server_id"], t["db_id"])
+                except Exception:  # noqa: BLE001 - database was removed from the registry
+                    store.set_tracked(t["server_id"], t["db_id"], False)
+                    continue
+                try:
+                    sample_database(t["server_id"], t["db_id"])
+                except Exception:  # noqa: BLE001 - error is recorded in the tracked table
+                    pass
+        except Unavailable as exc:
+            store.mark(t["server_id"], t["db_id"], str(exc))
     store.prune(store.get_settings()["retention_hours"])
 
 

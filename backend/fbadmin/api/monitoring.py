@@ -96,7 +96,11 @@ def history_samples(server_id: str, db_id: str, hours: float = Query(6, gt=0, le
 def set_tracking(server_id: str, db_id: str, body: TrackingIn):
     get_state().store.get_database(server_id, db_id)  # 404 for unknown databases
     store = history.get_store()
-    store.set_tracked(server_id, db_id, body.enabled)
+    from ..security import runas
+
+    db = get_state().store.get_database(server_id, db_id)
+    cred = runas.issue(server_id, f"history: {db.name}") if body.enabled else None
+    runas.revoke(store.set_tracked(server_id, db_id, body.enabled, run_as=cred))
     if body.enabled:
         try:
             history.sample_database(server_id, db_id)
@@ -136,6 +140,9 @@ def get_settings():
 
 @settings_router.put("/settings")
 def put_settings(body: SettingsIn):
+    from ..security.core import require_admin
+
+    require_admin()  # sampler interval, retention and the /metrics exporter are server-wide settings
     if body.interval is not None and body.interval < 0:
         raise ValueError("interval must be >= 0 (0 disables the sampler)")
     if body.retention_hours is not None and body.retention_hours < 1:

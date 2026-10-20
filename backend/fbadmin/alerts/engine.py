@@ -148,9 +148,15 @@ class Engine:
     def check_all(self) -> None:
         from . import checks
 
+        from ..security.runas import Unavailable, acting_as
+
         for rule in list(self.store.rules.values()):
             if rule.enabled and rule.event in CONDITIONS:
-                checks.run(self, rule)
+                try:  # server mode: the checker thread has no signed-in user; act as the rule's author
+                    with acting_as(rule.run_as, "this alert rule"):
+                        checks.run(self, rule)
+                except Unavailable as exc:
+                    self.check_error(rule, str(exc))
 
     # ------------------------------------------------------------- delivery
     def _deliver(self, item: dict) -> None:

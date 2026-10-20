@@ -77,6 +77,8 @@ export interface AuditRow {
   error: string | null;
   row_count: number | null;
   elapsed_ms: number | null;
+  /** name of the API token used (2.0) */
+  token?: string | null;
 }
 
 type LoginResult = AuthStatus & { csrf_token: string };

@@ -10,6 +10,8 @@ import { Flame } from "../../components/Icons";
 import { secApi } from "./api";
 import { refreshAuth, setAuth, useAuth } from "./state";
 import { VaultDialog } from "./VaultDialog";
+import { MfaLoginStep } from "../access/Mfa";
+import type { LoginAnswer } from "../access/api";
 import { t } from "../../i18n";
 
 let showVault: ((resolve: (ok: boolean) => void) => void) | null = null;
@@ -64,6 +66,7 @@ function LoginPage() {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(() => new URLSearchParams(location.search).get("login_error"));
+  const [mfa, setMfa] = useState<LoginAnswer | null>(null); // second factor needed (features/access)
   const password_ok = auth.auth_sources.some((s) => s.type === "password");
   const oidc = auth.auth_sources.filter((s) => s.type === "oidc");
   const proxyOnly = auth.auth_sources.every((s) => s.type === "proxy");
@@ -73,9 +76,10 @@ function LoginPage() {
     setBusy(true);
     setError(null);
     try {
-      const r = await secApi.login(username, password);
+      const r: LoginAnswer = await secApi.login(username, password);
       if (location.search) history.replaceState(null, "", location.pathname);
-      setAuth(r);
+      if (r.mfa_required || r.mfa_setup_required) setMfa(r);
+      else setAuth(r);
     } catch (err) {
       setError(errMsg(err));
     } finally {
@@ -83,6 +87,13 @@ function LoginPage() {
     }
   };
 
+  if (mfa) {
+    return (
+      <div className="auth-page">
+        <MfaLoginStep answer={mfa} onDone={(r) => setAuth(r)} onCancel={() => { setMfa(null); setPassword(""); }} />
+      </div>
+    );
+  }
   return (
     <div className="auth-page">
       <form className="auth-card" onSubmit={submit}>

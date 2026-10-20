@@ -163,7 +163,7 @@ export function AuditLog(props: { visible: boolean }) {
               <Fragment key={r.id}>
                 <tr className={"audit-row" + (r.success ? "" : " failed")} onClick={() => setOpen(open === r.id ? null : r.id)}>
                   <td style={{ whiteSpace: "nowrap" }}>{fmtTime(r.ts)}</td>
-                  <td>{r.username}{r.client_ip && <div className="muted small">{r.client_ip}</div>}</td>
+                  <td>{r.username}{r.token && <div className="muted small">{t("token: {name}", { name: r.token })}</div>}{r.client_ip && <div className="muted small">{r.client_ip}</div>}</td>
                   <td title={r.server_host ?? ""}>{r.server_name ?? r.server_id}</td>
                   <td title={r.db_path ?? ""}>{r.db_name ?? r.db_id ?? ""}</td>
                   <td><span className={"pill cat-" + r.category}>{r.category}</span></td>

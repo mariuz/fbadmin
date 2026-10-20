@@ -20,3 +20,4 @@ import "./library";
 import "./overview";
 import "./charts";
 import "./querybuilder";
+import "./access";

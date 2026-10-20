@@ -39,6 +39,13 @@ class Security:
         self.api_limiter = RateLimiter(*settings.api_rate)
         self.audit = AuditLog(self.db, settings.audit)
         self.oidc = OidcClient()
+        from .access import AccessControl  # finer permissions, 2FA and API tokens (milestone 2.0)
+        from .mfa import MfaService
+        from .tokens import TokenService
+
+        self.access = AccessControl(self)
+        self.mfa = MfaService(self)
+        self.tokens = TokenService(self)
 
     @property
     def server_mode(self) -> bool:
@@ -121,6 +128,9 @@ class Security:
         if user["role"] == "admin" and self.db.admin_count(exclude=user_id) == 0:
             raise SecurityError(400, "At least one active administrator is required", "last_admin")
         self.logout_user(user_id)
+        self.tokens.forget_user(user_id)
+        self.access.forget_user(user_id)
+        self.mfa.forget_user(user_id)
         self.db.delete_user(user_id)
         folder = self.state.store.user_path(user_id).parent
         self.state.store.drop_user(user_id)
@@ -151,6 +161,10 @@ class Security:
         raise SecurityError(401, "Invalid user name or password", "invalid_credentials")
 
     def login_password(self, username: str, password: str, ip: str | None) -> Principal:
+        return self.finish_login(self.authenticate_password(username, password, ip), password)
+
+    def authenticate_password(self, username: str, password: str, ip: str | None) -> dict[str, Any]:
+        """Check the password (internal or LDAP); returns the user without opening a session."""
         username = (username or "").strip()
         self.check_login_rate(username, ip)
         sources = self.settings.auth_sources
@@ -174,6 +188,10 @@ class Security:
         if not user["active"]:
             raise SecurityError(403, "This account is disabled", "account_disabled")
         self.login_limiter.reset(self._rate_keys(username, ip)[1])
+        return user
+
+    def finish_login(self, user: dict[str, Any], password: str) -> Principal:
+        """Password (and second factor, if any) accepted: open the user's vault, record the login."""
         p = Principal(user_id=user["id"], username=user["username"], role=user["role"],
                       auth_source=user["auth_source"])
         self._open_vault_with_login_password(user, password)

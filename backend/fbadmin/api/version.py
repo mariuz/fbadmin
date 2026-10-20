@@ -16,6 +16,7 @@ import threading
 import time
 import urllib.request
 
+from ..security.core import require_admin
 from fastapi import APIRouter
 
 from .. import __version__
@@ -106,6 +107,7 @@ def update_plan():
 
 @router.post("/update/download")
 def update_download():
+    require_admin()  # desktop mode: allowed; server mode: administrators only
     from .. import updater
     from ..config import settings
 
@@ -130,6 +132,7 @@ def update_status():
 
 @router.post("/update/apply")
 def update_apply():
+    require_admin()  # desktop mode: allowed; server mode: administrators only
     from .. import updater
 
     kind = updater.install_kind()

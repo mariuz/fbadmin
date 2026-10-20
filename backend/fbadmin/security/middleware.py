@@ -8,11 +8,13 @@ a thread pool.
 from __future__ import annotations
 
 import json
+import logging
 import re
 from http.cookies import SimpleCookie
 from typing import Any
 from urllib.parse import urlsplit
 
+from .access import check_request, filter_response, needs_body
 from .readonly import blocked_request, write_statements
 from .sessions import Principal, current_client_ip, current_principal
 
@@ -20,7 +22,7 @@ SESSION_COOKIE = "fbadmin_session"
 CSRF_COOKIE = "fbadmin_csrf"
 CSRF_HEADER = "x-csrf-token"
 SAFE_METHODS = ("GET", "HEAD", "OPTIONS")
-PUBLIC_API = re.compile(r"^/api/(health$|auth/(status|login|setup|logout|oidc/.*)$)")
+PUBLIC_API = re.compile(r"^/api/(health$|auth/(status|login|login/mfa|login/mfa-setup|setup|logout|oidc/.*)$)")
 SECURITY_HEADERS = [
     (b"x-content-type-options", b"nosniff"),
     (b"x-frame-options", b"DENY"),
@@ -150,9 +152,23 @@ class SecurityMiddleware:
             if length and length.isdigit() and int(length) > sec.settings.max_request_size:
                 await self._reply(send, _json(413, "Request too large", "too_large"), extra_headers)
                 return
-            session = sec.sessions.get(req.cookies.get(SESSION_COOKIE))
+            auth = req.headers.get("authorization", "")
+            if auth[:7].lower() == "bearer ":
+                # API token (tokens.py): cookies are ignored on this path, so no CSRF token is needed
+                principal = sec.tokens.authenticate(auth[7:].strip(), req.ip)
+                if principal is None:
+                    await self._reply(send, _json(401, "Invalid, expired or revoked API token", "invalid_token",
+                                                  {"WWW-Authenticate": "Bearer"}), extra_headers)
+                    return
+                wait = sec.api_limiter.hit(f"u:{principal.user_id}")
+                if wait:
+                    await self._reply(send, _json(429, "Too many requests", "rate_limited",
+                                                  {"Retry-After": str(int(wait))}), extra_headers)
+                    return
+                tokens.append(current_principal.set(principal))
+            session = None if principal else sec.sessions.get(req.cookies.get(SESSION_COOKIE))
             new_session = False
-            if "proxy" in sec.settings.auth_sources and sec.settings.proxy.is_trusted(req.ip):
+            if principal is None and "proxy" in sec.settings.auth_sources and sec.settings.proxy.is_trusted(req.ip):
                 hdr_user = req.headers.get(sec.settings.proxy.header.lower(), "").strip()
                 if hdr_user and (session is None or session.principal.username.lower() != hdr_user.lower()):
                     from .proxy import principal_from_headers
@@ -169,7 +185,7 @@ class SecurityMiddleware:
                     new_session = True
                     extra_headers += session_cookies(sec, session, is_secure(sec, req.scheme))
             public = bool(PUBLIC_API.match(req.path))
-            if session is None and not public:
+            if session is None and principal is None and not public:
                 await self._reply(send, _json(401, "Login required", "auth_required"), extra_headers)
                 return
             if session is not None:
@@ -187,16 +203,35 @@ class SecurityMiddleware:
                         return
                 tokens.append(current_principal.set(principal))
 
+        # ---- finer permissions and API token scopes (access.py)
+        acc = sec.access.for_principal(principal) if principal is not None else None
+        restricted = acc is not None and not acc.free
+
         # ---- read-only servers and audit (server and query-session endpoints only)
         audit_ctx: dict[str, Any] | None = None
         body = b""
         body_read = False
-        if is_api and unsafe and (req.path.startswith("/api/servers/") or req.path.startswith("/api/query/")):
+        if is_api and unsafe and (req.path.startswith("/api/servers/") or req.path.startswith("/api/query/")
+                                  or (restricted and needs_body(req.path))):
             body, too_large = await _read_body(receive, sec.settings.max_request_size if sec.server_mode else None)
             body_read = True
             if too_large:
                 await self._reply(send, _json(413, "Request too large", "too_large"), extra_headers)
                 return
+        needs: list = []
+        if restricted and is_api:
+            try:
+                denied, needs = check_request(st, acc, principal, req.method, req.path,
+                                              scope.get("query_string", b"").decode("latin-1"), body)
+            except Exception:  # noqa: BLE001 - never let a failing check open access
+                logging.getLogger("fbadmin.security").exception("permission check failed for %s", req.path)
+                await self._reply(send, _json(403, "Permission check failed", "permission_denied"), extra_headers)
+                return
+            if denied:
+                await self._reply(send, _json(denied.status, denied.detail, denied.code), extra_headers)
+                return
+        response_filter = next((n for n in needs if n.filter), None)
+        if body_read:
             try:
                 refusal, audit_ctx = self._inspect(st, sec, req, body)
             except Exception:  # noqa: BLE001 - unknown ids etc.: let the endpoint answer
@@ -225,7 +260,30 @@ class SecurityMiddleware:
         status_box = {"status": 0}
         chunks: list[bytes] = []
 
+        held: dict[str, Any] = {}
+
         async def wrapped_send(message):
+            if response_filter is not None:  # rewrite the JSON answer (objects hidden from this user)
+                if message["type"] == "http.response.start":
+                    held["start"] = message
+                    held["chunks"] = []
+                    return
+                if message["type"] == "http.response.body":
+                    held["chunks"].append(message.get("body", b""))
+                    if message.get("more_body"):
+                        return
+                    start, data = held["start"], b"".join(held["chunks"])
+                    if start["status"] == 200:
+                        try:
+                            data = json.dumps(filter_response(acc, response_filter, json.loads(data))).encode()
+                        except ValueError:
+                            pass
+                    hdrs = [(k, v) for k, v in start.get("headers") or [] if k.lower() != b"content-length"]
+                    hdrs.append((b"content-length", str(len(data)).encode()))
+                    status_box["status"] = start["status"]
+                    await send({**start, "headers": hdrs + extra_headers})
+                    await send({"type": "http.response.body", "body": data})
+                    return
             if message["type"] == "http.response.start":
                 status_box["status"] = message["status"]
                 message = {**message, "headers": list(message.get("headers") or []) + extra_headers}

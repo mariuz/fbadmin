@@ -16,14 +16,15 @@ def attach(state: Any) -> None:
     from ..connections import ConnectionManager
     from . import wirecompat
     from .core import Security
-    from .servers import EncryptedServerStore, UserScopedJobs, UserScopedManager, UserScopedStore
+    from .access import AccessScopedManager, AccessScopedStore  # per-database/object rights, API tokens
+    from .servers import EncryptedServerStore, UserScopedJobs
     from .settings import load
 
     wirecompat.apply()
     s = load(app_settings.data_dir)
     if s.server_mode:
-        state.store = UserScopedStore(app_settings.data_dir)
-        state.manager = UserScopedManager(state.store)
+        state.store = AccessScopedStore(app_settings.data_dir)
+        state.manager = AccessScopedManager(state.store)
         state.jobs = UserScopedJobs()
     else:
         state.store = EncryptedServerStore(app_settings.servers_file, encrypted=s.master_file.exists())

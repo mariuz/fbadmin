@@ -71,6 +71,7 @@ class AuditLog:
             "error": (error or None) and str(error)[:4000],
             "row_count": row_count,
             "elapsed_ms": elapsed_ms,
+            "token": getattr(current_principal.get(), "token_name", None),
             **self._where(server_id, db_id),
         }
         try:

@@ -70,6 +70,8 @@ class SecurityDB:
                 c.row_factory = sqlite3.Row
                 c.execute("PRAGMA journal_mode=WAL")
                 c.executescript(SCHEMA)
+                if "token" not in {r[1] for r in c.execute("PRAGMA table_info(audit)")}:
+                    c.execute("ALTER TABLE audit ADD COLUMN token TEXT")  # API token name (2.0)
                 if new:
                     os.chmod(self.path, 0o600)
                 self._conn = c
@@ -150,7 +152,7 @@ class SecurityDB:
     # ------------------------------------------------------------- audit
     def add_audit(self, entry: dict[str, Any]) -> None:
         cols = ("ts", "username", "client_ip", "server_id", "server_name", "server_host", "db_id", "db_name",
-                "db_path", "category", "statement", "success", "error", "row_count", "elapsed_ms")
+                "db_path", "category", "statement", "success", "error", "row_count", "elapsed_ms", "token")
         self.execute(f"INSERT INTO audit ({', '.join(cols)}) VALUES ({', '.join('?' for _ in cols)})",
                      tuple(entry.get(c) for c in cols))
 

@@ -83,6 +83,8 @@ class Rule(BaseModel):
     channels: list[str] = Field(default_factory=list)
     cooldown_minutes: int = 60        # do not repeat the same alert more often than this
     notify_resolved: bool = True      # send a message when a condition clears
+    # server mode: condition checks run as the admin who saved the rule (security/runas.py)
+    run_as: dict | None = None
     created_at: float = Field(default_factory=time.time)
 
 

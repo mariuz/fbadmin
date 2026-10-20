@@ -108,8 +108,12 @@ def login(body: LoginIn, request: Request, response: Response):
     srcs = sec.settings.auth_sources
     if "internal" not in srcs and "ldap" not in srcs:
         raise SecurityError(400, "Password login is disabled", "password_login_disabled")
-    p = sec.login_password(body.username, body.password, request.client.host if request.client else None)
-    return _login_response(request, response, p)
+    ip = request.client.host if request.client else None
+    user = sec.authenticate_password(body.username, body.password, ip)
+    challenge = sec.mfa.challenge(user, body.password, ip)  # two-factor sign-in (security/mfa.py)
+    if challenge is not None:
+        return {**_status(request), **challenge}
+    return _login_response(request, response, sec.finish_login(user, body.password))
 
 
 @router.post("/setup")
