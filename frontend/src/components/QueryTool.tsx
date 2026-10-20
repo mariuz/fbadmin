@@ -9,6 +9,7 @@ import { getPrefs } from "../prefs";
 import { N_, t } from "../i18n";
 import { AI_TASKS, AssistantPane, askAi, useAiStatus } from "./Assistant";
 import { ResultGrid, download } from "./ResultGrid";
+import { getResultViews } from "../registry";
 import {
   SqlEditor, clearErrors, formatEditor, lineColToOffset, selectionOrAll, showError, type ExtraCompletions,
 } from "./SqlEditor";
@@ -216,6 +217,9 @@ export function QueryTool(props: { serverId: string; dbId: string; schema?: stri
   const [showTx, setShowTx] = useState(false);
   const [paramReq, setParamReq] = useState<{ names: string[]; resolve: (v: Record<string, unknown> | null) => void } | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
+  const resultViews = getResultViews();
+  const [resultView, setResultView] = useState("grid");
+  const [openedViews, setOpenedViews] = useState<string[]>([]);
   const [elapsed, setElapsed] = useState(0);
   const aiStatus = useAiStatus();
   const [ai, setAi] = useState<{ loading: boolean; task?: string; answer?: string; error?: string } | null>(null);
@@ -223,13 +227,18 @@ export function QueryTool(props: { serverId: string; dbId: string; schema?: stri
   const view = useRef<EditorView | null>(null);
   const sessionRef = useRef<string | null>(null);
 
+  // one session at a time: a query started while the first session is still opening waits for it
+  // (otherwise two sessions open and "load more" can ask the one without the result set)
+  const opening = useRef<Promise<string> | null>(null);
   const ensureSession = useCallback(async () => {
     if (sessionRef.current) return sessionRef.current;
-    const r = await api.openSession(props.serverId, props.dbId, props.schema);
-    sessionRef.current = r.session_id;
-    setSession(r.session_id);
-    setOptions(r.options);
-    return r.session_id;
+    opening.current ??= api.openSession(props.serverId, props.dbId, props.schema).then((r) => {
+      sessionRef.current = r.session_id;
+      setSession(r.session_id);
+      setOptions(r.options);
+      return r.session_id;
+    }).finally(() => { opening.current = null; });
+    return opening.current;
   }, [props.serverId, props.dbId]);
 
   useEffect(() => {
@@ -337,11 +346,12 @@ export function QueryTool(props: { serverId: string; dbId: string; schema?: stri
     }
   };
 
-  const loadMore = async () => {
-    if (!session || !result) return;
+  /** Fetch more rows of the open cursor (``rows`` defaults to the Rows setting). Used by the grid and result views. */
+  const loadMore = async (rows?: number): Promise<{ fetched: number; hasMore: boolean }> => {
+    if (!session || !result) return { fetched: 0, hasMore: false };
     setLoadingMore(true);
     try {
-      const f = await api.fetchMore(session, maxRows);
+      const f = await api.fetchMore(session, rows ?? maxRows);
       setResult((r) => {
         if (!r) return r;
         const results = r.results.map((x) => (x.kind === "select" && x === r.results.filter((y) => y.kind === "select").slice(-1)[0]
@@ -350,9 +360,11 @@ export function QueryTool(props: { serverId: string; dbId: string; schema?: stri
         return { ...r, results, cursor_open: f.has_more, transaction_open: f.transaction_open };
       });
       setTxOpen(f.transaction_open);
+      return { fetched: f.rows.length, hasMore: f.has_more };
     } catch (e) {
       app.toast(errMsg(e), "error");
       setResult((r) => (r ? { ...r, cursor_open: false } : r));
+      return { fetched: 0, hasMore: false };
     } finally {
       setLoadingMore(false);
     }
@@ -581,19 +593,38 @@ export function QueryTool(props: { serverId: string; dbId: string; schema?: stri
           {pane === "data" && (
             current ? (
               <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-                {selects.length > 1 && (
+                {(selects.length > 1 || resultViews.length > 0) && (
                   <div className="toolbar">
-                    {selects.map((s, i) => (
+                    {resultViews.length > 0 && (
+                      <div className="seg" role="group" aria-label={t("Result view")}>
+                        <button className={resultView === "grid" ? "on" : ""} aria-pressed={resultView === "grid"} onClick={() => setResultView("grid")}>{t("Grid")}</button>
+                        {resultViews.map((rv) => (
+                          <button key={rv.id} className={resultView === rv.id ? "on" : ""} aria-pressed={resultView === rv.id}
+                            onClick={() => { setResultView(rv.id); setOpenedViews((o) => (o.includes(rv.id) ? o : [...o, rv.id])); }}>
+                            {rv.icon} {t(rv.title)}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {selects.length > 1 && selects.map((s, i) => (
                       <button key={i} className={"btn small" + (i === activeResult ? " on" : "")} onClick={() => setActiveResult(i)}>
                         {t("Result {n}", { n: i + 1 })} <span className="muted">{t("(line {line})", { line: s.line })}</span>
                       </button>
                     ))}
                   </div>
                 )}
-                <div style={{ flex: 1, minHeight: 0 }}>
+                <div style={{ flex: 1, minHeight: 0, display: resultView === "grid" ? undefined : "none" }}>
                   <ResultGrid key={`${result?.elapsed_ms}-${activeResult}`} columns={current.columns!} rows={current.rows!}
-                    hasMore={!!(isLastSelect && result?.cursor_open)} loadingMore={loadingMore} onLoadMore={loadMore} />
+                    hasMore={!!(isLastSelect && result?.cursor_open)} loadingMore={loadingMore} onLoadMore={() => loadMore()} />
                 </div>
+                {resultViews.filter((rv) => openedViews.includes(rv.id)).map((rv) => (
+                  <div key={`${rv.id}-${result?.elapsed_ms}-${activeResult}`} style={{ flex: 1, minHeight: 0, display: resultView === rv.id ? undefined : "none" }}>
+                    {rv.render({
+                      columns: current.columns!, rows: current.rows!, hasMore: !!(isLastSelect && result?.cursor_open), loadingMore,
+                      loadMore: (n) => (isLastSelect ? loadMore(n) : Promise.resolve({ fetched: 0, hasMore: false })),
+                    })}
+                  </div>
+                ))}
               </div>
             ) : (
               <div className="empty-state">{result ? t("The script returned no result set.") : t("Run a query to see results.")}</div>

@@ -81,6 +81,9 @@ function TreeNode(props: {
         data-open={open ? "1" : "0"}
         onClick={() => app.select(spec.selection)}
         onDoubleClick={toggle}
+        // tables and views can be dragged onto other tools (e.g. the query builder canvas)
+        draggable={spec.selection.kind === "object" && RELATIONS.has(spec.selection.otype ?? "") ? true : undefined}
+        onDragStart={(e) => e.dataTransfer.setData("application/x-fbadmin-object", JSON.stringify(spec.selection))}
         onContextMenu={(e) => {
           e.preventDefault();
           app.select(spec.selection);

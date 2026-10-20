@@ -1,0 +1,51 @@
+/* Charts from query results. Eight categorical slots in a fixed order, validated for colour-vision
+   deficiency separation (protan/deutan/tritan) against each theme's panel colour; the high-contrast
+   theme uses brighter steps (all >= 3:1 on black). Identity never relies on colour alone: legends,
+   marker shapes on lines/scatter, tooltips and the data table carry the series names. */
+:root {
+  --qc-1: #2a78d6; --qc-2: #eb6834; --qc-3: #1baf7a; --qc-4: #eda100;
+  --qc-5: #e87ba4; --qc-6: #008300; --qc-7: #6250d6; --qc-8: #e34948;
+  --qc-grid: #e8eaed; --qc-axis: #b9bec5;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --qc-1: #3987e5; --qc-2: #d95926; --qc-3: #199e70; --qc-4: #c98500;
+    --qc-5: #d55181; --qc-6: #008300; --qc-7: #9085e9; --qc-8: #e66767;
+    --qc-grid: #2a2f36; --qc-axis: #4a515a;
+  }
+}
+:root[data-theme="dark"] {
+  --qc-1: #3987e5; --qc-2: #d95926; --qc-3: #199e70; --qc-4: #c98500;
+  --qc-5: #d55181; --qc-6: #008300; --qc-7: #9085e9; --qc-8: #e66767;
+  --qc-grid: #2a2f36; --qc-axis: #4a515a;
+}
+:root[data-theme="contrast"] {
+  --qc-1: #5aa2ff; --qc-2: #ff8a4c; --qc-3: #2fd39a; --qc-4: #ffc61a;
+  --qc-5: #ff8fc0; --qc-6: #4fd84f; --qc-7: #b3a8ff; --qc-8: #ff6b6b;
+  --qc-grid: #444; --qc-axis: #fff;
+}
+
+.qchart { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.qchart-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 6px 10px; border-bottom: 1px solid var(--border); background: var(--panel-2); }
+.qchart-controls label { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.qchart-controls select.text, .qchart-controls input.text { padding: 2px 4px; }
+.qchart-controls .ys { position: relative; }
+.qchart-ys-pop { position: absolute; top: 100%; left: 0; z-index: 20; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 6px 10px; box-shadow: 0 6px 20px rgba(0,0,0,.15); max-height: 260px; overflow: auto; min-width: 180px; }
+.qchart-ys-pop label { display: flex; padding: 2px 0; }
+.qchart-info { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding: 4px 10px; color: var(--muted); font-size: 12px; }
+.qchart-body { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 4px 10px 8px; overflow: auto; }
+.qchart-plot { position: relative; flex: 1; min-height: 220px; }
+.qchart-plot svg { display: block; outline: none; }
+.qchart-plot svg:focus-visible { box-shadow: 0 0 0 2px var(--accent-2); border-radius: 4px; }
+.qchart-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; padding: 4px 2px; list-style: none; margin: 0; }
+.qchart-legend li { display: inline-flex; align-items: center; gap: 6px; max-width: 320px; }
+.qchart-legend li span.l { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qchart-legend li b { font-weight: 600; font-variant-numeric: tabular-nums; }
+.qchart-tip { position: absolute; pointer-events: none; background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 6px 9px; font-size: 12px; box-shadow: 0 4px 14px rgba(0,0,0,.15); z-index: 5; max-width: 340px; }
+.qchart-tip .h { font-weight: 600; margin-bottom: 3px; overflow-wrap: anywhere; }
+.qchart-tip .r { display: flex; align-items: center; gap: 6px; }
+.qchart-tip .r span.l { color: var(--muted); }
+.qchart-tip .r b { margin-left: auto; padding-left: 10px; font-variant-numeric: tabular-nums; }
+.qchart-table { max-height: 40%; overflow: auto; border-top: 1px solid var(--border); margin-top: 6px; }
+.qchart-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.qchart-empty { padding: 30px; color: var(--muted); text-align: center; }

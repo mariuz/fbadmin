@@ -131,3 +131,28 @@ export function registerQueryToolAction(a: QueryToolAction) {
 export function getQueryToolActions() {
   return queryToolActions;
 }
+
+// --- Query Tool result views (shown next to the grid: Grid | Chart | …) ----------
+export interface ResultViewContext {
+  columns: import("./types").ColumnInfo[];
+  rows: unknown[][];
+  /** the open cursor has more rows */
+  hasMore: boolean;
+  loadingMore: boolean;
+  /** fetch up to ``rows`` more rows from the open cursor */
+  loadMore: (rows?: number) => Promise<{ fetched: number; hasMore: boolean }>;
+}
+export interface ResultView {
+  id: string;
+  /** English title marked with N_(); translated with t() where it is rendered. */
+  title: string;
+  icon?: ReactNode;
+  render: (ctx: ResultViewContext) => ReactNode;
+}
+const resultViews: ResultView[] = [];
+export function registerResultView(v: ResultView) {
+  resultViews.push(v);
+}
+export function getResultViews() {
+  return resultViews;
+}

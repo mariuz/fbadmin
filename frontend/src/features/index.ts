@@ -18,3 +18,5 @@ import "./debugger";
 import "./schema-history";
 import "./library";
 import "./overview";
+import "./charts";
+import "./querybuilder";

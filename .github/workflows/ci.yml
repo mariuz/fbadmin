@@ -151,12 +151,15 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "22.18"  # 22.18+ runs TypeScript test files without flags
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
         working-directory: frontend
       - run: npm run build
+        working-directory: frontend
+      # unit tests of pure modules (query builder SQL, chart data shaping); node --test runs .ts directly
+      - run: npm test
         working-directory: frontend
       # every t("…") string must be in all locale catalogs, translated
       - run: npm run i18n:check

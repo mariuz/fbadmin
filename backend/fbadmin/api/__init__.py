@@ -29,6 +29,7 @@ from . import debug
 from . import schema_history
 from . import library
 from . import overview
+from . import querybuilder
 
 ROUTERS: list[APIRouter] = [
     servers.router,
@@ -60,4 +61,5 @@ ROUTERS: list[APIRouter] = [
     schema_history.router,
     library.router,
     overview.router,
+    querybuilder.router,
 ]

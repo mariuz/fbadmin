@@ -70,6 +70,8 @@ nav:
       - Object explorer: user-guide/object-explorer.md
       - Query Tool: QUERY_TOOL.md
       - Query library: QUERY_LIBRARY.md
+      - Query builder: QUERY_BUILDER.md
+      - Charts from query results: CHARTS.md
       - Data grid: user-guide/data-grid.md
       - Object dialogs: OBJECT_DIALOGS.md
       - PSQL debugging and tests: PSQL_DEBUGGING.md
