@@ -8,3 +8,5 @@ import "./objects";
 export {};
 import "./schema";
 import "./security";
+import "./alerts";
+import "./storage";

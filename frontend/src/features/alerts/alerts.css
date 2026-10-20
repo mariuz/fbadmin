@@ -1,0 +1,7 @@
+/* Alerts feature (milestone 1.1) */
+.alerts .pill.warn, .alerts .pill.al-warning { color: var(--warn); border-color: var(--warn); }
+.alerts .pill.al-critical { color: var(--danger); border-color: var(--danger); }
+.alerts .pill.al-resolved { color: var(--ok); border-color: var(--ok); }
+.alerts .pill.al-info { color: var(--accent); border-color: var(--accent); }
+.alerts .small { font-size: 12px; }
+.al-channels { display: flex; flex-wrap: wrap; gap: 4px 14px; }

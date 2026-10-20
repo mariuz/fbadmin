@@ -53,8 +53,14 @@ export interface Schedule {
   id: string; name: string; kind: "backup" | "sweep" | "validate"; server_id: string; database_id: string; cron: string;
   enabled: boolean; keep: number; options: Record<string, any>; created_at: number; last_run: number | null;
   last_status: string | null; next_run: number | null;
+  verify: boolean; verify_path: string | null; upload: { target_id: string; prefix: string; keep: number } | null;
 }
-export interface HistoryItem { schedule_id: string; schedule_name: string; kind: string; job_id: string | null; started_at: number; finished_at: number; status: string; error: string | null; file?: string; size?: number; removed?: string[] }
+export interface HistoryItem {
+  schedule_id: string; schedule_name: string; kind: string; job_id: string | null; started_at: number; finished_at: number; status: string;
+  error: string | null; file?: string; size?: number; removed?: string[]; validation_errors?: number;
+  verify?: { ok: boolean; error?: string; seconds?: number; tables?: number };
+  upload?: { ok: boolean; error?: string; target?: string; key?: string; removed?: string[] };
+}
 
 export const mapi = {
   capabilities: (sid: string) => request<Capabilities>("GET", `${srv(sid)}/maintenance/capabilities`),
@@ -118,6 +124,7 @@ export const mapi = {
   runSchedule: (id: string) => request<Job>("POST", `/api/schedules/${id}/run`),
   scheduleHistory: (id?: string) => request<HistoryItem[]>("GET", id ? `/api/schedules/${id}/history` : "/api/schedules/history"),
   scheduleBackups: (id: string) => request<ArchiveItem[]>("GET", `/api/schedules/${id}/backups`),
+  verifyBackup: (id: string, path: string) => request<Job>("POST", `/api/schedules/${id}/backups/verify`, { path }),
   cronPreview: (expr: string) => request<{ next: string[] }>("GET", `/api/schedules/cron-preview?expr=${encodeURIComponent(expr)}`),
 };
 

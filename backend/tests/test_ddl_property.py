@@ -74,7 +74,9 @@ def default_for(t: str):
         # a literal default must fit the column (Firebird checks it at CREATE time)
         m = re.match(r"\w+\((\d+)\)", u)
         length = int(m.group(1)) if m else 1
-        options = [None, "DEFAULT 'x'", "DEFAULT ''", "DEFAULT USER"] + (["DEFAULT 'it''s'"] if length >= 4 else [])
+        options = [None, "DEFAULT 'x'", "DEFAULT ''"] + (["DEFAULT 'it''s'"] if length >= 4 else [])
+        if length >= 31:  # CURRENT_USER (e.g. SYSDBA) is checked against the column length at CREATE time
+            options.append("DEFAULT USER")
         return st.sampled_from(options)
     if u == "BOOLEAN":
         return st.sampled_from([None, "DEFAULT TRUE", "DEFAULT FALSE"])

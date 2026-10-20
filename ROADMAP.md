@@ -15,7 +15,7 @@ released: 1.0.1 is on [PyPI](https://pypi.org/project/firebird-admin/) (`pip ins
 on [GitHub Releases](https://github.com/mariuz/fbadmin/releases) with desktop installers for
 Windows, macOS and Linux, as a Docker image, and documented at https://mariuz.github.io/fbadmin/.
 Code signing is deferred by decision of the project owner: the 1.x desktop builds ship unsigned. The signing steps (macOS Developer ID with notarization, Windows Authenticode) are already in the desktop workflow and turn on as soon as the certificates are added as repository secrets; see [docs/PACKAGING.md](docs/PACKAGING.md#desktop-app).
-Milestones 1.1, 1.2 and 2.0 below are planned.
+Milestone 1.1 is implemented except Firebird 6.0 final support, which waits for the release; 1.2 and 2.0 are planned.
 
 ---
 
@@ -165,7 +165,7 @@ exact DDL before it runs, like pgAdmin.
 - ✅ Official multi-arch Docker image (amd64 and arm64), Helm chart, Kubernetes example with the Firebird operator (`deploy/k8s`: StatefulSet. `deploy/k8s-operator`: a `FirebirdCluster` from the [cloudnative-firebird](https://github.com/mariuz/cloudnative-firebird) operator, with fbadmin registered from a ConfigMap; a kind workflow runs it end to end. Helm `firebirdServers` for preconfigured servers)
 - ✅ **Desktop app:** pywebview or Tauri shell with auto-update, for Windows (MSI), macOS (dmg) and Linux (AppImage, deb, rpm, Flatpak). Verified in CI on every packaging change: the MSI installs, runs and uninstalls on Windows; the dmg mounts and the app runs on macOS arm64 and Intel; the deb installs and the AppImage runs on Linux; the rpm and Flatpak bundle are built. Self-update downloads the package, verifies it against `SHA256SUMS`, then runs the MSI, replaces the AppImage or opens the dmg; this was exercised on a real AppImage, which replaced itself and restarted. Builds ship unsigned by the owner's decision (signing is deferred); the signing steps (macOS codesign + notarization, Windows signtool for the exe and MSI) are ready and run once the signing secrets are configured, and packages are attached to GitHub Releases only for version tags
 - ✅ Preferences dialog: editor font, keymap, grid NULL display, date formats, confirmations
-- ✅ Internationalisation (i18n): English, Romanian, Portuguese (Brazil), Spanish, Russian, German, French and Czech (1750 strings in each language; CI checks that every catalog is complete)
+- ✅ Internationalisation (i18n): English, Romanian, Portuguese (Brazil), Spanish, Russian, German, French and Czech (1868 strings in each language; CI checks that every catalog is complete)
 - ✅ Accessibility: keyboard tree navigation, ARIA roles, high-contrast theme (landmarks, ARIA tabs, menus and dialogs, labelled fields, axe-core audit in e2e in three themes)
 - ✅ Documentation site (MkDocs), a user guide with screenshots, and an admin guide for server mode (built with `mkdocs build --strict` in CI; it deploys to GitHub Pages as soon as Pages is enabled in the repository settings, Source: GitHub Actions)
 - ✅ Plugin API for extra tree nodes, dashboard panels and tools
@@ -175,7 +175,7 @@ exact DDL before it runs, like pgAdmin.
 
 ## Engineering backlog ✅
 
-- ✅ Frontend end-to-end tests with Playwright, run in CI against a Firebird container (30 specs: core flows, every feature module, Firebird 6 schemas, accessibility, languages)
+- ✅ Frontend end-to-end tests with Playwright, run in CI against a Firebird container (33 specs: core flows, every feature module, Firebird 6 schemas, accessibility, languages, alerts and backup storage)
 - ✅ Generate a typed API client from FastAPI's OpenAPI schema (request bodies typed through `Body<path, method>`; most responses are still hand-typed)
 - ✅ Code-split the frontend bundle (CodeMirror and grid chunks)
 - ✅ Async driver (`firebirdsql.aio`) or a worker pool for long-running statements, so one slow query never blocks the metadata connection
@@ -185,12 +185,12 @@ exact DDL before it runs, like pgAdmin.
 - ✅ Fuzz tests for the SQL splitter; property tests for DDL round-trips with generated schemas
 - ✅ Compatibility tests against the [firebird-qa](https://github.com/FirebirdSQL/firebird-qa) corpus of DDL *(weekly `compat.yml`; needs `FBADMIN_QA_DIR` locally)*
 
-## Milestone 1.1 — Firebird 6.0 final, alerts and backups ⬜
+## Milestone 1.1 — Firebird 6.0 final, alerts and backups 🚧
 
-- ⬜ **Firebird 6.0 final release:** test against the released 6.0, make the Firebird 6 CI job required (no `continue-on-error`), support any new data types and DDL that ship, and remove the snapshot workarounds the engine no longer needs (see [docs/FIREBIRD6.md](docs/FIREBIRD6.md))
-- ⬜ **Alerts:** email, Slack and webhook notifications for conditions fbadmin already detects: failed scheduled backups, long-running transactions holding back garbage collection (OIT/OAT gap), replication lag, validation errors
-- ⬜ **Backup verification:** automatic test restores of scheduled backups into a scratch database, with the result recorded and alerted on
-- ⬜ **Cloud backup targets:** S3, Azure Blob Storage and Google Cloud Storage, with retention rules
+- ⬜ **Firebird 6.0 final release:** test against the released 6.0, make the Firebird 6 CI job required (no `continue-on-error`), support any new data types and DDL that ship, and remove the snapshot workarounds the engine no longer needs (see [docs/FIREBIRD6.md](docs/FIREBIRD6.md)) *(waiting for the release: as of October 2026 only the `6-snapshot` image exists)*
+- ✅ **Alerts:** email (SMTP), Slack-compatible and signed JSON webhook channels; event rules (failed scheduled job, failed test restore, validation errors, failed upload) and condition rules checked every minute (OAT gap with the holder named, long-running transactions, replication lag, unreachable database), with cool-downs, "resolved" messages and a delivery history ([docs/ALERTS.md](docs/ALERTS.md)). Verified against a real SMTP server (Mailpit), a local webhook receiver and Firebird 3, 4, 5 and 6
+- ✅ **Backup verification:** scheduled backups can be test-restored into a scratch database (opened, then dropped); old backups are only pruned and a backup only uploaded after it passed. Also on demand per archived backup. Scheduled validations count Firebird's reported errors (checked with a deliberately damaged data page)
+- ✅ **Cloud backup targets:** S3 and S3-compatible services, Azure Blob Storage and Google Cloud Storage, with per-schedule folder and retention; no cloud SDKs (requests signed by fbadmin), `env:` references for secrets. Verified against SeaweedFS (S3 API), Azurite and fake-gcs-server, including multipart uploads and a full backup → test restore → upload → retention run; real AWS, Azure and Google accounts are not part of CI
 
 ## Milestone 1.2 — Desktop and data tools ⬜
 

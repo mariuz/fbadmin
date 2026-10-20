@@ -81,6 +81,7 @@ nav:
       - Deployment (Docker, Kubernetes): admin/deployment.md
       - Security and server mode: SECURITY.md
       - Maintenance: MAINTENANCE.md
+      - Alerts: ALERTS.md
       - Replication: REPLICATION.md
       - Privacy: PRIVACY.md
   - Development:

@@ -19,11 +19,19 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from .. import alerts
 from ..config import settings
-from . import archive, ops
+from . import archive, ops, verify
 from .cron import Cron
 
 HISTORY_KEEP = 500
+
+
+class UploadOptions(BaseModel):
+    """Copy each backup to a cloud storage target (see ``fbadmin.storage``)."""
+    target_id: str
+    prefix: str = ""  # folder (key prefix) in the bucket/container
+    keep: int = 0     # backups to keep in the cloud under the prefix (0 = keep all)
 
 
 class Schedule(BaseModel):
@@ -36,6 +44,9 @@ class Schedule(BaseModel):
     enabled: bool = True
     keep: int = 7  # backups to keep (0 = keep all)
     options: ops.BackupOptions = Field(default_factory=ops.BackupOptions)
+    verify: bool = False              # test-restore each backup into a scratch database, then drop it
+    verify_path: str | None = None    # scratch database path on the server (default: next to the database)
+    upload: UploadOptions | None = None
     created_at: float = Field(default_factory=time.time)
     last_run: float | None = None
     last_status: str | None = None
@@ -156,6 +167,11 @@ class Scheduler:
                 cur.last_status = status
                 self._save()
             self._save_history()
+        if status == "failed":
+            alerts.emit("schedule.failed", "critical", f"Scheduled {s.kind} failed: {s.name}",
+                        f"The scheduled {s.kind} \"{s.name}\" failed: {error}",
+                        server_id=s.server_id, database_id=s.database_id, key=f"schedule:{s.id}",
+                        details={"schedule_id": s.id, "job_id": job_id, **extra})
 
     def run_now(self, sid: str) -> dict:
         from ..api.deps import get_state
@@ -168,32 +184,104 @@ class Scheduler:
 
         def fn(log) -> None:
             extra: dict = {}
+            failure: str | None = None
             try:
                 with st.manager.service(s.server_id) as svc:
                     major = ops.engine_major(svc)
                     if s.kind == "backup":
-                        dest = archive.new_path(s.id, db.name)
-                        log(f"Backing up {db.path} to {dest}")
-                        size = ops.backup_to_local_file(svc, db.path, dest, s.options, major, log)
-                        removed = archive.apply_retention(s.id, s.keep)
-                        for r in removed:
-                            log(f"Retention: deleted {r}")
-                        extra = {"file": f"{dest.parent.name}/{dest.name}", "size": size, "removed": removed}
+                        extra, failure = self._backup(s, db, svc, major, log)
                     elif s.kind == "sweep":
                         log(f"Sweeping {db.path}")
                         ops.repair(svc, db.path, "sweep", log=log)
                     else:
                         log(f"Validating {db.path} (online)")
-                        ops.validate_online(svc, db.path, log=log)
-                log("Done")
+                        errors = verify.validation_errors(ops.validate_online(svc, db.path, log=log))
+                        extra = {"validation_errors": errors}
+                        if errors:
+                            failure = f"Online validation found {errors} error(s)"
+                            alerts.emit("validation.errors", "critical", f"Validation errors in {db.name}",
+                                        f"Online validation of {db.path} found {errors} error(s). See the job log "
+                                        "and run a full validation (gfix -v -full).",
+                                        server_id=s.server_id, database_id=s.database_id, key=f"validate:{s.id}",
+                                        details={"errors": errors})
+                log("Done" if not failure else failure)
             except Exception as exc:
-                self._record(s, job_ref.get("id"), started, "failed", str(exc) or exc.__class__.__name__)
+                self._record(s, job_ref.get("id"), started, "failed", str(exc) or exc.__class__.__name__, **extra)
                 raise
+            if failure:
+                self._record(s, job_ref.get("id"), started, "failed", failure, **extra)
+                raise RuntimeError(failure)
             self._record(s, job_ref.get("id"), started, "finished", None, **extra)
 
         job = st.jobs.start(f"scheduled-{s.kind}", f"Scheduled {s.kind}: {s.name} ({db.name})", s.server_id, fn)
         job_ref["id"] = job.id
         return job.summary()
+
+    def _backup(self, s: Schedule, db, svc, major: int, log) -> tuple[dict, str | None]:
+        """Back up, then optionally test-restore and upload. Old backups are only pruned (locally and in
+        the cloud) when the new one passed its test restore, so a bad backup never replaces good ones."""
+        from ..api.deps import get_state
+
+        st = get_state()
+        dest = archive.new_path(s.id, db.name)
+        log(f"Backing up {db.path} to {dest}")
+        size = ops.backup_to_local_file(svc, db.path, dest, s.options, major, log)
+        extra: dict = {"file": f"{dest.parent.name}/{dest.name}", "size": size}
+        if s.verify:
+            srv = st.store.get(s.server_id)
+            try:
+                target = verify.scratch_path(db.path, s.id, s.verify_path)
+                extra["verify"] = verify.verify_backup(svc, srv, st.store.password_for(s.server_id) or "", dest,
+                                                       target, major, log, [d.path for d in srv.databases])
+            except Exception as exc:  # noqa: BLE001
+                err = str(exc).strip() or exc.__class__.__name__
+                extra["verify"] = {"ok": False, "error": err}
+                alerts.emit("backup.verify_failed", "critical", f"Backup of {db.name} failed its test restore",
+                            f"The backup {dest.name} of {db.path} could not be restored: {err}. Older backups were "
+                            "kept and the backup was not uploaded.",
+                            server_id=s.server_id, database_id=s.database_id, key=f"verify:{s.id}",
+                            details={"file": extra["file"]})
+                return extra, f"Backup verification failed: {err}"
+        removed = archive.apply_retention(s.id, s.keep)
+        for r in removed:
+            log(f"Retention: deleted {r}")
+        extra["removed"] = removed
+        if s.upload and s.upload.target_id:
+            from ..storage import upload_with_retention
+
+            try:
+                extra["upload"] = {"ok": True, **upload_with_retention(s.upload.target_id, dest, s.upload.prefix,
+                                                                      s.upload.keep, log)}
+            except Exception as exc:  # noqa: BLE001
+                err = str(exc).strip() or exc.__class__.__name__
+                extra["upload"] = {"ok": False, "error": err}
+                alerts.emit("upload.failed", "critical", f"Upload of the {db.name} backup failed",
+                            f"The backup {dest.name} could not be uploaded to cloud storage: {err}. "
+                            "It is kept in the local archive.",
+                            server_id=s.server_id, database_id=s.database_id, key=f"upload:{s.id}",
+                            details={"file": extra["file"]})
+                return extra, f"Upload failed: {err}"
+        return extra, None
+
+    def verify_now(self, sid: str, rel: str) -> dict:
+        """Test-restore one archived backup of a schedule (button in the UI)."""
+        from ..api.deps import get_state
+
+        s = self.get(sid)
+        st = get_state()
+        db = st.store.get_database(s.server_id, s.database_id)
+        src = archive.resolve(rel)
+        if src.parent.name != archive._safe(s.id):
+            raise ValueError("The backup does not belong to this schedule")
+
+        def fn(log) -> None:
+            srv = st.store.get(s.server_id)
+            target = verify.scratch_path(db.path, s.id, s.verify_path)
+            with st.manager.service(s.server_id) as svc:
+                verify.verify_backup(svc, srv, st.store.password_for(s.server_id) or "", src, target,
+                                     ops.engine_major(svc), log, [d.path for d in srv.databases])
+
+        return st.jobs.start("verify-backup", f"Test restore: {src.name}", s.server_id, fn).summary()
 
     # ------------------------------------------------------------------ thread
     def start(self, interval: float = 15) -> None:

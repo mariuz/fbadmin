@@ -19,6 +19,8 @@ from . import schema
 from . import admin
 from . import auth
 from . import fbsecurity
+from . import storage
+from . import alerts
 
 ROUTERS: list[APIRouter] = [
     servers.router,
@@ -40,4 +42,6 @@ ROUTERS: list[APIRouter] = [
     auth.router,
     admin.router,
     fbsecurity.router,
+    storage.router,
+    alerts.router,
 ]

@@ -78,6 +78,45 @@ jobs:
           FBADMIN_TEST_LDAP_URL: ldap://127.0.0.1:3389
           FBADMIN_TEST_OIDC_ISSUER: http://127.0.0.1:5556/dex
 
+  storage:
+    name: Cloud storage and alerts (SeaweedFS S3, Azurite, fake-gcs-server, Mailpit SMTP)
+    runs-on: ubuntu-latest
+    services:
+      firebird:
+        image: firebirdsql/firebird:5
+        env:
+          FIREBIRD_ROOT_PASSWORD: masterkey
+        ports:
+          - 3050:3050
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e "backend[dev]"
+      # the emulators need command-line arguments and a config file, so they are started by the
+      # script (not as service containers); its "export NAME=value" lines go to $GITHUB_ENV
+      - name: Start the storage emulators
+        shell: bash
+        run: scripts/storage-test-servers.sh | sed -n 's/^export //p' >> "$GITHUB_ENV"
+        env:
+          S3_IMAGE: chrislusf/seaweedfs:latest
+          AZURITE_IMAGE: mcr.microsoft.com/azure-storage/azurite:latest
+          GCS_IMAGE: fsouza/fake-gcs-server:latest
+      - name: Start the SMTP server (Mailpit)
+        shell: bash
+        run: scripts/smtp-test-server.sh | sed -n 's/^export //p' | tr ' ' '\n' >> "$GITHUB_ENV"
+      - name: Storage and alert tests
+        run: |
+          test -n "$FBADMIN_TEST_S3_ENDPOINT" && test -n "$FBADMIN_TEST_AZURE_ENDPOINT" && test -n "$FBADMIN_TEST_GCS_ENDPOINT"
+          test -n "$FBADMIN_TEST_SMTP_HOST"
+          pytest -q backend/tests/test_storage.py backend/tests/test_storage_real.py backend/tests/test_alerts.py -rs
+        env:
+          FBADMIN_TEST_DIR: /var/lib/firebird/data
+      - name: Emulator logs
+        if: failure()
+        run: for c in fbs3 fbazurite fbgcs fbadmin-mailpit; do echo "== $c"; docker logs --tail 100 "$c" 2>&1; done
+
   frontend:
     name: Frontend build
     runs-on: ubuntu-latest

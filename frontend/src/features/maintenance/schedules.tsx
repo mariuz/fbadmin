@@ -5,18 +5,36 @@ import type { Job } from "../../types";
 import { IconDownload, IconPlay, IconPlus, IconRefresh, IconTrash } from "../../components/Icons";
 import { browserDownload, fmtBytes, fmtTime, mapi, type ArchiveItem, type HistoryItem, type Schedule } from "./api";
 import { BackupOptionsForm, JobLog, Section, backupPayload, defaultBackupOpts, useBusy, useCaps, type BackupOpts } from "./common";
+import { sapi, type StorageTarget } from "../storage/api";
 
 const PRESETS: Array<[string, string]> = [
   ["0 2 * * *", N_("daily at 02:00")], ["30 1 * * 1-5", N_("weekdays at 01:30")], ["0 3 * * 0", N_("Sundays at 03:00")],
   ["0 */6 * * *", N_("every 6 hours")], ["@hourly", N_("hourly")], ["0 4 1 * *", N_("monthly, 1st at 04:00")],
 ];
 
-interface Form { id?: string; name: string; kind: Schedule["kind"]; server_id: string; database_id: string; cron: string; enabled: boolean; keep: string; options: BackupOpts }
+interface Form {
+  id?: string; name: string; kind: Schedule["kind"]; server_id: string; database_id: string; cron: string; enabled: boolean; keep: string; options: BackupOpts;
+  verify: boolean; verify_path: string; upload_target: string; upload_prefix: string; upload_keep: string;
+}
 
 function toForm(s: Schedule): Form {
   const o = { ...defaultBackupOpts() } as any;
   for (const [k, v] of Object.entries(s.options ?? {})) o[k] = v === null ? (typeof o[k] === "boolean" ? false : "") : typeof o[k] === "string" ? String(v) : v;
-  return { id: s.id, name: s.name, kind: s.kind, server_id: s.server_id, database_id: s.database_id, cron: s.cron, enabled: s.enabled, keep: String(s.keep), options: o };
+  return {
+    id: s.id, name: s.name, kind: s.kind, server_id: s.server_id, database_id: s.database_id, cron: s.cron, enabled: s.enabled, keep: String(s.keep), options: o,
+    verify: !!s.verify, verify_path: s.verify_path ?? "", upload_target: s.upload?.target_id ?? "", upload_prefix: s.upload?.prefix ?? "", upload_keep: String(s.upload?.keep ?? 0),
+  };
+}
+
+/** One-line result of a run: file, test restore, upload, validation. */
+function runResult(h: HistoryItem): string {
+  const parts: string[] = [];
+  if (h.file) parts.push(`${h.file} · ${fmtBytes(h.size)}`);
+  if (h.removed?.length) parts.push(t("{count} old removed", { count: h.removed.length }));
+  if (h.verify?.ok) parts.push(t("test restore ok ({tables} tables, {seconds} s)", { tables: h.verify.tables ?? 0, seconds: h.verify.seconds ?? 0 }));
+  if (h.upload?.ok) parts.push(t("uploaded to {target}: {key}", { target: h.upload.target ?? "", key: h.upload.key ?? "" }));
+  if (h.validation_errors === 0) parts.push(t("validation: no errors"));
+  return parts.join(" · ") || t("ok");
 }
 
 export function SchedulesPanel(props: { visible: boolean; serverId?: string; dbId?: string }) {
@@ -28,12 +46,14 @@ export function SchedulesPanel(props: { visible: boolean; serverId?: string; dbI
   const [backups, setBackups] = useState<ArchiveItem[]>([]);
   const [preview, setPreview] = useState<string[] | string>([]);
   const [job, setJob] = useState<Job | null>(null);
+  const [targets, setTargets] = useState<StorageTarget[]>([]);
   const caps = useCaps(form?.server_id || props.serverId || app.servers[0]?.id || "");
   const { busy, error, run } = useBusy();
 
   const load = async () => {
     try {
       setItems(await mapi.schedules());
+      setTargets(await sapi.targets().catch(() => []));
       setHistory(await mapi.scheduleHistory(selected ?? undefined));
       if (selected) setBackups(await mapi.scheduleBackups(selected));
     } catch (e) { app.toast(errMsg(e), "error"); }
@@ -55,12 +75,15 @@ export function SchedulesPanel(props: { visible: boolean; serverId?: string; dbI
     const srv = app.servers.find((s) => s.id === sid);
     const dbid = props.dbId ?? srv?.databases[0]?.id ?? "";
     const dbName = srv?.databases.find((d) => d.id === dbid)?.name ?? t("database");
-    setForm({ name: t("Nightly backup {name}", { name: dbName }), kind: "backup", server_id: sid, database_id: dbid, cron: "0 2 * * *", enabled: true, keep: "7", options: defaultBackupOpts() });
+    setForm({ name: t("Nightly backup {name}", { name: dbName }), kind: "backup", server_id: sid, database_id: dbid, cron: "0 2 * * *", enabled: true, keep: "7", options: defaultBackupOpts(),
+      verify: false, verify_path: "", upload_target: "", upload_prefix: "", upload_keep: "0" });
   };
   useEffect(() => { if (props.dbId && props.visible && !form) newForm(); }, []);
   const save = () => run(async () => {
     if (!form) return;
-    const body = { name: form.name, kind: form.kind, server_id: form.server_id, database_id: form.database_id, cron: form.cron, enabled: form.enabled, keep: Number(form.keep) || 0, options: backupPayload(form.options) };
+    const body = { name: form.name, kind: form.kind, server_id: form.server_id, database_id: form.database_id, cron: form.cron, enabled: form.enabled, keep: Number(form.keep) || 0, options: backupPayload(form.options),
+      verify: form.kind === "backup" && form.verify, verify_path: form.verify_path.trim() || null,
+      upload: form.kind === "backup" && form.upload_target ? { target_id: form.upload_target, prefix: form.upload_prefix.trim(), keep: Number(form.upload_keep) || 0 } : null };
     const s = form.id ? await mapi.updateSchedule(form.id, body) : await mapi.createSchedule(body);
     setForm(null);
     setSelected(s.id);
@@ -72,7 +95,7 @@ export function SchedulesPanel(props: { visible: boolean; serverId?: string; dbI
   return (
     <div className="mt-body">
       <Section wide title={t("Scheduled jobs")} hint={t("Backups (streamed into the fbadmin archive with retention), sweeps and online validations on a cron schedule, run by fbadmin itself. Times are in the fbadmin host's local time; runs missed while fbadmin was stopped are skipped. The server password must be saved.")}
-        right={<><button className="btn small" onClick={load}><IconRefresh size={12} /></button><button className="btn small primary" onClick={newForm}><IconPlus size={12} /> {t("New schedule")}</button></>}>
+        right={<><button className="btn small" onClick={load} aria-label={t("Refresh")}><IconRefresh size={12} /></button><button className="btn small" onClick={() => app.openTab({ kind: "storage", title: t("Backup storage") })}>☁ {t("Backup storage")}</button><button className="btn small primary" onClick={newForm}><IconPlus size={12} /> {t("New schedule")}</button></>}>
         {items.length === 0 ? <div className="muted">{t("No schedules yet.")}</div> : (
           <div className="grid-wrap"><table className="grid">
             <thead><tr><th>{t("Name")}</th><th>{t("Kind")}</th><th>{t("Database")}</th><th>{t("Schedule")}</th><th>{t("Keep")}</th><th>{t("Next run")}</th><th>{t("Last run")}</th><th /></tr></thead>
@@ -115,7 +138,7 @@ export function SchedulesPanel(props: { visible: boolean; serverId?: string; dbI
               <select className="text" value={form.server_id} onChange={(e) => setForm({ ...form, server_id: e.target.value, database_id: srvOf(e.target.value)?.databases[0]?.id ?? "" })}>
                 {app.servers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
-              <select className="text" style={{ flex: 1 }} value={form.database_id} onChange={(e) => setForm({ ...form, database_id: e.target.value })}>
+              <select className="text" style={{ flex: 1 }} aria-label={t("Database")} value={form.database_id} onChange={(e) => setForm({ ...form, database_id: e.target.value })}>
                 {fsrv?.databases.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
               </select>
             </div>
@@ -123,7 +146,7 @@ export function SchedulesPanel(props: { visible: boolean; serverId?: string; dbI
             <div>
               <div className="mt-row">
                 <input className="text mono" style={{ width: 180 }} value={form.cron} onChange={(e) => setForm({ ...form, cron: e.target.value })} />
-                <select className="text" value="" onChange={(e) => e.target.value && setForm({ ...form, cron: e.target.value })}>
+                <select className="text" aria-label={t("presets…")} value="" onChange={(e) => e.target.value && setForm({ ...form, cron: e.target.value })}>
                   <option value="">{t("presets…")}</option>
                   {PRESETS.map(([c, l]) => <option key={c} value={c}>{t(l)} ({c})</option>)}
                 </select>
@@ -135,6 +158,25 @@ export function SchedulesPanel(props: { visible: boolean; serverId?: string; dbI
             {form.kind === "backup" && <>
               <label className="l">{t("Keep last N backups")}</label>
               <input className="text" type="number" min={0} value={form.keep} onChange={(e) => setForm({ ...form, keep: e.target.value })} title={t("0 keeps all")} />
+              <span />
+              <label className="check" title={t("Restores the backup into a scratch database on the server, opens it and drops it again. Old backups are only removed (and the backup only uploaded) when the test restore succeeds.")}>
+                <input type="checkbox" checked={form.verify} onChange={(e) => setForm({ ...form, verify: e.target.checked })} /> {t("Test-restore each backup")}
+              </label>
+              {form.verify && <>
+                <label className="l" htmlFor="sch-vpath">{t("Test-restore path on the server")}</label>
+                <input id="sch-vpath" className="text mono" value={form.verify_path} placeholder={t("default: next to the database, fbadmin_verify_<id>.fdb")} onChange={(e) => setForm({ ...form, verify_path: e.target.value })} />
+              </>}
+              <label className="l" htmlFor="sch-upload">{t("Upload to cloud storage")}</label>
+              <select id="sch-upload" className="text" value={form.upload_target} onChange={(e) => setForm({ ...form, upload_target: e.target.value })}>
+                <option value="">{targets.length ? t("no upload") : t("no upload (add a target under Backup storage)")}</option>
+                {targets.map((tg) => <option key={tg.id} value={tg.id}>{tg.name} ({tg.kind})</option>)}
+              </select>
+              {form.upload_target && <>
+                <label className="l" htmlFor="sch-prefix">{t("Folder (key prefix)")}</label>
+                <input id="sch-prefix" className="text mono" value={form.upload_prefix} placeholder="fbadmin/nightly" onChange={(e) => setForm({ ...form, upload_prefix: e.target.value })} />
+                <label className="l" htmlFor="sch-ukeep">{t("Keep last N in the cloud")}</label>
+                <input id="sch-ukeep" className="text" type="number" min={0} value={form.upload_keep} title={t("0 keeps all")} onChange={(e) => setForm({ ...form, upload_keep: e.target.value })} />
+              </>}
             </>}
             <span />
             <label className="check"><input type="checkbox" checked={form.enabled} onChange={(e) => setForm({ ...form, enabled: e.target.checked })} /> {t("Enabled")}</label>
@@ -155,7 +197,9 @@ export function SchedulesPanel(props: { visible: boolean; serverId?: string; dbI
                 const sid = items.find((s) => s.id === selected)!.server_id;
                 return (
                   <tr key={b.path}><td>{b.name}</td><td className="num">{fmtBytes(b.size)}</td><td>{fmtTime(b.modified)}</td>
-                    <td><button className="btn small" onClick={() => browserDownload(mapi.archiveUrl(sid, b.path), b.name)}><IconDownload size={12} /> {t("Download")}</button></td></tr>
+                    <td><button className="btn small" onClick={() => browserDownload(mapi.archiveUrl(sid, b.path), b.name)}><IconDownload size={12} /> {t("Download")}</button>{" "}
+                      <button className="btn small" disabled={busy} title={t("Restore into a scratch database on the server, open it, then drop it")}
+                        onClick={() => run(async () => setJob(await mapi.verifyBackup(selected!, b.path)))}>{t("Test restore")}</button></td></tr>
                 );
               })}</tbody>
             </table></div>
@@ -171,7 +215,7 @@ export function SchedulesPanel(props: { visible: boolean; serverId?: string; dbI
                 <td>{fmtTime(h.started_at)}</td><td>{h.schedule_name}</td><td>{h.kind}</td>
                 <td><span className={"pill " + h.status}>{h.status}</span></td>
                 <td className="num">{(h.finished_at - h.started_at).toFixed(1)} s</td>
-                <td style={{ whiteSpace: "normal" }}>{h.error ? <span className="err">{h.error}</span> : h.file ? `${h.file} · ${fmtBytes(h.size)}${h.removed?.length ? " · " + t("{count} old removed", { count: h.removed.length }) : ""}` : t("ok")}</td>
+                <td style={{ whiteSpace: "normal" }}>{h.error ? <><span className="err">{h.error}</span>{h.file ? <div className="muted">{runResult(h)}</div> : null}</> : runResult(h)}</td>
               </tr>
             ))}</tbody>
           </table></div>

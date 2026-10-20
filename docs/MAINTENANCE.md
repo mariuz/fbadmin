@@ -132,6 +132,112 @@ with **retention**: keep the last N files), **sweeps** and **online validations*
 
 ![schedules](screenshots/maintenance-schedules.png)
 
+### Test restores
+
+A backup that cannot be restored is not a backup. With **Test-restore each backup** on, every
+scheduled backup is restored into a scratch database on the same server, opened (fbadmin
+counts its tables, indices and procedures) and dropped again. The run history shows the result.
+
+* The scratch database goes next to the source database as `fbadmin_verify_<schedule id>.fdb`.
+  For a database registered by alias, or to use another disk, set **Test-restore path on the
+  server**. fbadmin refuses a path that is a registered database, overwrites a leftover only
+  when its name starts with `fbadmin_verify_`, and drops only databases it created.
+* **Old backups are only removed after the new one passed its test restore**, locally and in
+  the cloud, and a backup that fails is not uploaded. A bad backup therefore never pushes out
+  the last good ones. The run fails and raises the `backup.verify_failed` and `schedule.failed`
+  alerts (see [Alerts](ALERTS.md)).
+* **Test restore** next to each archived backup runs the same check on demand.
+* Restoring needs disk space on the server for a second copy of the database, and time; for
+  large databases run the verified schedule less often than the plain backup.
+
+Scheduled **online validations** count the errors Firebird reports (`Relation 128 (T) : 2 ERRORS
+found`). A validation with errors fails the run and raises the `validation.errors` alert.
+
+Each schedule can also **upload** its backups to a cloud storage target (below), with its own
+folder and its own retention (*Keep last N in the cloud*).
+
+## Cloud storage targets
+
+Backups can also be copied to object storage: **Amazon S3** (and S3-compatible services),
+**Azure Blob Storage** and **Google Cloud Storage**. A backup is first written to the local
+backup directory as before, then uploaded as `<target prefix>/<folder>/<file name>.fbk`.
+Retention works like the local one: after the upload, the oldest `.fbk` objects directly in
+that folder are deleted so that the newest *N* remain (other objects, and sub-folders, are
+never touched; `0` keeps everything).
+
+* Targets are stored in `<data dir>/storage_targets.json` (file mode `0600`). Only
+  administrators can create, see or test them in server mode, since they hold credentials.
+* **Secrets are never returned by the API.** Secret fields show as `********` with a
+  `has_<field>` flag; when editing, leave a secret as `********` (or empty) to keep it.
+* **`env:` references.** Any setting can be written as `env:NAME`; the value is then read
+  from the fbadmin process environment each time the target is used, so secrets do not have to
+  be stored in the file (for example `secret_access_key: env:AWS_SECRET_ACCESS_KEY`).
+  References are not secret and are shown as they are.
+* **Test** writes a tiny object named `<prefix>/.fbadmin-test-<random>`, lists it, reads its
+  size and deletes it, and reports the provider's error code if any step fails.
+* Uploads stream from disk in 16 MiB pieces (S3 multipart upload, Azure blocks, GCS resumable
+  upload), so backups of any size are never held in memory; failed S3 multipart uploads are
+  aborted. Requests have timeouts, network errors and 5xx/429 responses are retried, and
+  `HTTPS_PROXY`/`NO_PROXY` are respected. No cloud SDK is needed: requests are signed by
+  fbadmin itself (AWS Signature V4, Azure Shared Key, Google service-account JWT).
+
+### Amazon S3 and S3-compatible storage
+
+| Setting | Required | Notes |
+|---|---|---|
+| `bucket` | yes | |
+| `region` | | default `us-east-1` |
+| `access_key_id` | yes | |
+| `secret_access_key` | yes | secret |
+| `session_token` | | secret; for temporary (STS) credentials |
+| `endpoint` | | S3-compatible services; default `https://s3.<region>.amazonaws.com` |
+| `path_style` | | `true`/`false`; default `true` when an endpoint is set or the bucket name contains dots, else virtual-hosted (`<bucket>.s3…`) |
+| `prefix` | | folder inside the bucket, e.g. `fbadmin/` |
+
+S3-compatible endpoints, for example: MinIO `http://minio:9000`, Cloudflare R2
+`https://<account id>.r2.cloudflarestorage.com` (region `auto`), Wasabi
+`https://s3.<region>.wasabisys.com`, Backblaze B2 `https://s3.<region>.backblazeb2.com`,
+SeaweedFS `http://<filer>:8333`.
+
+The IAM policy needs `s3:PutObject`, `s3:GetObject`, `s3:DeleteObject` and
+`s3:AbortMultipartUpload` on `arn:aws:s3:::<bucket>/<prefix>*` and `s3:ListBucket` (plus
+`s3:ListBucketMultipartUploads` if you want to clean up) on `arn:aws:s3:::<bucket>`.
+
+### Azure Blob Storage
+
+| Setting | Required | Notes |
+|---|---|---|
+| `account` | yes | storage account name |
+| `container` | yes | |
+| `account_key` | one of these | secret; Shared Key authentication |
+| `sas_token` | one of these | secret; a SAS with read, add, create, write, delete and list (`sp=racwdl`) on the container |
+| `endpoint` | | default `https://<account>.blob.core.windows.net`; Azurite: `http://127.0.0.1:10000/devstoreaccount1` |
+| `prefix` | | folder inside the container |
+
+Files larger than one piece are uploaded with Put Block / Put Block List; uncommitted blocks of
+an interrupted upload are discarded by Azure after a week. With an account key, the key gives
+full access to the account; a container SAS (or a SAS with an expiry you rotate) is narrower.
+
+### Google Cloud Storage
+
+| Setting | Required | Notes |
+|---|---|---|
+| `bucket` | yes | |
+| `service_account_json` | yes, unless `endpoint` is set | secret; the full JSON key file of a service account |
+| `endpoint` | | default `https://storage.googleapis.com`; e.g. a fake-gcs-server. Without a key, no credentials are sent |
+| `prefix` | | folder inside the bucket |
+
+The service account needs **Storage Object Admin** (`roles/storage.objectAdmin`) on the bucket.
+fbadmin exchanges a signed JWT for an OAuth2 access token (scope `devstorage.read_write`) and
+caches it until it expires.
+
+### Testing against emulators
+
+`scripts/storage-test-servers.sh` starts SeaweedFS (S3 with authentication), Azurite and
+fake-gcs-server in Docker and prints the variables for `backend/tests/test_storage_real.py`;
+CI runs the same tests. `backend/tests/test_storage.py` checks the request signing against AWS's
+published Signature V4 examples and needs no network.
+
 ## API overview
 
 | Endpoint | Purpose |
@@ -153,6 +259,9 @@ with **retention**: keep the last N files), **sweeps** and **online validations*
 | `GET …/maintenance/config` | RDB$CONFIG |
 | `/api/servers/{sid}/trace/…` | templates, preview, sessions, events, stop, download |
 | `/api/schedules/…` | schedules CRUD, run, history, backups, cron preview |
+| `POST /api/schedules/{id}/backups/verify` (`{"path": …}`) | test restore of one archived backup (job) |
+| `GET/POST /api/storage/targets`, `GET/PUT/DELETE /api/storage/targets/{id}` | cloud storage targets (admins only in server mode) |
+| `POST /api/storage/targets/{id}/test`, `GET …/targets/{id}/objects?prefix=` | test a target, list its objects (newest first) |
 
 `…` = `/api/servers/{sid}/databases/{db}`.
 

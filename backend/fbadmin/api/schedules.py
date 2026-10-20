@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 from ..maintenance import archive, ops
 from ..maintenance.cron import Cron
-from ..maintenance.scheduler import Schedule, get_scheduler
+from ..maintenance.scheduler import Schedule, UploadOptions, get_scheduler
 from .deps import get_state
 
 router = APIRouter(prefix="/api/schedules", tags=["schedules"])
@@ -25,6 +25,9 @@ class ScheduleIn(BaseModel):
     enabled: bool = True
     keep: int = 7
     options: ops.BackupOptions | None = None
+    verify: bool = False
+    verify_path: str | None = None
+    upload: UploadOptions | None = None
 
 
 class ScheduleUpdate(BaseModel):
@@ -36,6 +39,13 @@ class ScheduleUpdate(BaseModel):
     options: ops.BackupOptions | None = None
     server_id: str | None = None
     database_id: str | None = None
+    verify: bool | None = None
+    verify_path: str | None = None  # null clears it
+    upload: UploadOptions | None = None  # null removes the upload
+
+
+class VerifyIn(BaseModel):
+    path: str  # archive path as listed by /backups ("<folder>/<file>.fbk")
 
 
 @router.get("")
@@ -75,7 +85,9 @@ def get_one(schedule_id: str):
 @router.put("/{schedule_id}")
 def update(schedule_id: str, body: ScheduleUpdate):
     sch = get_scheduler()
-    s = sch.update(schedule_id, body.model_dump(exclude_unset=True, exclude_none=True))
+    changes = {k: v for k, v in body.model_dump(exclude_unset=True).items()
+               if v is not None or k in ("verify_path", "upload")}
+    s = sch.update(schedule_id, changes)
     return sch.view(s)
 
 
@@ -101,3 +113,9 @@ def history(schedule_id: str, limit: int = 100):
 @router.get("/{schedule_id}/backups")
 def backups(schedule_id: str):
     return archive.list_backups(schedule_id)
+
+
+@router.post("/{schedule_id}/backups/verify", status_code=202)
+def verify_backup(schedule_id: str, body: VerifyIn):
+    """Test-restore one archived backup into a scratch database (then dropped), as a background job."""
+    return get_scheduler().verify_now(schedule_id, body.path)
