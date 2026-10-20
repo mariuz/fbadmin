@@ -41,6 +41,9 @@ the first time that administrator logs in.
 Each user has their own connections, Query Tool sessions and background jobs. One user cannot
 reach another user's session IDs.
 
+Two-factor sign-in, API tokens for scripts, and per-database and per-object permissions are
+described in [Two-factor sign-in, API tokens and permissions](PERMISSIONS.md).
+
 **Shared servers.** When an admin ticks *Shared with all fbadmin users* in the server dialog, every
 user sees that registration. Only admins can change it. Passwords are never shared: each user
 enters their own Firebird password, which stays in memory or is saved encrypted in that user's own

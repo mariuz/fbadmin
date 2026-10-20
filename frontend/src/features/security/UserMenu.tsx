@@ -1,11 +1,11 @@
 /** Top-bar button: signed-in user, master password, user admin, audit log, sign out. */
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import type { AppApi } from "../../context";
 import { errMsg } from "../../context";
 import { Modal } from "../../components/Modal";
 import { IconUser } from "../../components/Icons";
 import { secApi } from "./api";
-import { isAdmin, refreshAuth, setAuth, useAuth } from "./state";
+import { isAdmin, refreshAuth, setAuth, useAuth, userMenuItems } from "./state";
 import { VaultDialog } from "./VaultDialog";
 import { t } from "../../i18n";
 
@@ -46,9 +46,11 @@ export function UserMenu(props: { app: AppApi }) {
             app.toast(t("Saved passwords locked"), "info");
           })}
           {auth.server_mode && auth.user?.auth_source === "internal" && item(t("Change password…"), () => app.showDialog(<ChangePasswordDialog app={app} />))}
+          {userMenuItems.filter((i) => !i.admin && i.show(auth)).map((i) => <Fragment key={i.id}>{item(i.label(), () => i.run(app))}</Fragment>)}
           {isAdmin(auth) && <hr />}
           {isAdmin(auth) && auth.server_mode && item(t("Manage users"), () => app.openTab({ kind: "security-users", title: t("fbadmin users") }))}
           {isAdmin(auth) && item(t("Audit log"), () => app.openTab({ kind: "security-audit", title: t("Audit log") }))}
+          {userMenuItems.filter((i) => i.admin && isAdmin(auth) && i.show(auth)).map((i) => <Fragment key={i.id}>{item(i.label(), () => i.run(app))}</Fragment>)}
           {auth.server_mode && <hr />}
           {auth.server_mode && item(t("Sign out"), async () => {
             try { await secApi.logout(); } catch { /* ignore */ }

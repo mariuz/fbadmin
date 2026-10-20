@@ -1,0 +1,27 @@
+/* Two-factor sign-in, API tokens, permissions (features/access). */
+.auth-card.auth-card-wide { width: 560px; }
+.auth-card .btn.link, .btn.link { background: none; border: none; color: var(--accent-2); padding: 0; justify-content: center; cursor: pointer; font-size: 12px; }
+.auth-card .mfa-code { max-width: 220px; }
+.mfa-code { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
+.mfa-code .text { font-family: var(--mono); font-size: 16px; letter-spacing: 2px; width: 200px; }
+.mfa-enrol { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; margin-bottom: 10px; }
+.mfa-enrol-text { flex: 1; min-width: 220px; font-size: 13px; color: var(--fg, inherit); }
+.mfa-enrol-text p { margin: 0 0 8px; }
+.qr-code { border: 1px solid var(--border); border-radius: 6px; background: #fff; flex: none; }
+.mfa-secret { display: inline-block; font-family: var(--mono); font-size: 14px; padding: 6px 8px; background: var(--panel-2); border-radius: 4px; word-break: break-all; }
+.mfa-box { border: 1px dashed var(--border); border-radius: 8px; padding: 12px; margin-top: 8px; }
+.mfa-recovery { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; background: var(--panel-2); font-size: 13px; }
+.mfa-recovery p { margin: 0 0 8px; }
+.mfa-codes { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 4px 12px; list-style: none; padding: 0; margin: 0 0 8px; }
+.mfa-codes code { font-family: var(--mono); font-size: 13px; }
+.token-created { border: 1px solid var(--accent-2); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; }
+.token-created p { margin: 0 0 6px; }
+.token-value { font-family: var(--mono); font-size: 12.5px; padding: 4px 8px; background: var(--panel-2); border-radius: 4px; word-break: break-all; }
+.token-servers { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; }
+.level-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; }
+.access .pill.level-none { color: var(--muted); }
+.access .pill.level-read { color: #0369a1; border-color: #0369a1; }
+.access .pill.level-write { color: #15803d; border-color: #15803d; }
+.access .pill.level-ddl { color: #7c3aed; border-color: #7c3aed; }
+.access .pill.level-admin { color: #b45309; border-color: #b45309; }
+.obj-rule { margin-right: 10px; white-space: nowrap; }

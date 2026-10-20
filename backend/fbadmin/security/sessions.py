@@ -21,6 +21,12 @@ class Principal:
     role: str
     auth_source: str = "internal"
     session_id: str | None = None
+    # API token requests (see tokens.py): the token acts as this user, within its scope
+    token_id: int | None = None
+    token_name: str | None = None
+    token_read_only: bool = False
+    token_servers: list[str] | None = None
+    token_key: bytes | None = field(default=None, repr=False)
 
     @property
     def is_admin(self) -> bool:
