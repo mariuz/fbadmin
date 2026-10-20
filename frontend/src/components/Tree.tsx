@@ -9,6 +9,7 @@ import { ContextMenu, type MenuItem } from "./ContextMenu";
 import { buildMenu } from "./menus";
 import { getTreeNodes } from "../registry";
 import { t } from "../i18n";
+import { useCoarsePointer, useLongPress } from "../features/mobile/responsive";
 
 export interface NodeSpec {
   key: string;
@@ -25,7 +26,7 @@ export interface NodeSpec {
 function TreeNode(props: {
   spec: NodeSpec;
   depth: number;
-  onContext: (e: React.MouseEvent, sel: Selection) => void;
+  onContext: (e: { clientX: number; clientY: number }, sel: Selection) => void;
 }) {
   const app = useApp();
   const { spec } = props;
@@ -33,6 +34,13 @@ function TreeNode(props: {
   const [children, setChildren] = useState<NodeSpec[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // touch: long-press opens the context menu; the selected row also gets a "⋮" button
+  const [pressing, setPressing] = useState(false);
+  const coarse = useCoarsePointer();
+  const longPress = useLongPress((x, y) => {
+    app.select(spec.selection);
+    props.onContext({ clientX: x, clientY: y }, spec.selection);
+  }, setPressing);
   const version = app.versions[spec.key] ?? 0;
   const firstVersion = useRef(version);
   // keys are schema-agnostic (so refreshing a folder refreshes it in every schema); compare the schema too
@@ -68,7 +76,7 @@ function TreeNode(props: {
   return (
     <>
       <div
-        className={"tree-row" + (selected ? " selected" : "") + (spec.dim ? " dim" : "")}
+        className={"tree-row" + (selected ? " selected" : "") + (spec.dim ? " dim" : "") + (pressing ? " pressing" : "")}
         style={{ paddingLeft: 6 + props.depth * 16 }}
         title={spec.title}
         role="treeitem"
@@ -84,8 +92,10 @@ function TreeNode(props: {
         // tables and views can be dragged onto other tools (e.g. the query builder canvas)
         draggable={spec.selection.kind === "object" && RELATIONS.has(spec.selection.otype ?? "") ? true : undefined}
         onDragStart={(e) => e.dataTransfer.setData("application/x-fbadmin-object", JSON.stringify(spec.selection))}
+        {...longPress.handlers}
         onContextMenu={(e) => {
           e.preventDefault();
+          if (longPress.shouldIgnoreContextMenu()) return;
           app.select(spec.selection);
           props.onContext(e, spec.selection);
         }}
@@ -103,6 +113,15 @@ function TreeNode(props: {
         <span className="label">{spec.label}</span>
         {spec.count !== undefined && <span className="count">({spec.count})</span>}
         {spec.sub && <span className="sub">{spec.sub}</span>}
+        {coarse && selected && (
+          // touch path to the context menu (keyboard users have Shift+F10 / the Menu key)
+          <button type="button" className="tree-more" tabIndex={-1} aria-hidden="true" title={t("Actions")}
+            onClick={(e) => {
+              e.stopPropagation();
+              const r = e.currentTarget.getBoundingClientRect();
+              props.onContext({ clientX: r.left, clientY: r.bottom }, spec.selection);
+            }}>⋮</button>
+        )}
       </div>
       {open && error && (
         <div className="tree-error" style={{ paddingLeft: 26 + props.depth * 16 }}>{error}</div>
@@ -259,7 +278,7 @@ export function Tree() {
     e.preventDefault();
   };
 
-  const onContext = (e: React.MouseEvent, sel: Selection) => {
+  const onContext = (e: { clientX: number; clientY: number }, sel: Selection) => {
     setMenu({ x: e.clientX, y: e.clientY, items: buildMenu(app, sel) });
   };
 

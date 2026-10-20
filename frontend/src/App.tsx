@@ -16,6 +16,8 @@ import { setPrefs, usePrefs } from "./prefs";
 import { currentLanguage, N_, t } from "./i18n";
 import { PreferencesDialog } from "./components/Preferences";
 import { Flame, IconActivity, IconMoon, IconPlus, IconRefresh, IconSun, IconTable, IconTerminal, IconX } from "./components/Icons";
+import { currentLayout, useLayout } from "./features/mobile/responsive";
+import { TopbarOverflow, useNavDrawer } from "./features/mobile/Shell";
 
 const FIXED_TABS = [
   { id: "dashboard", title: N_("Dashboard") },
@@ -37,7 +39,13 @@ export default function App() {
   const [detail, setDetail] = useState<ObjectDetail | null>(null);
   const [detailError, setDetailError] = useState<string | null>(null);
   const [runningJobs, setRunningJobs] = useState(0);
-  const [sidebarW, setSidebarW] = useState(300);
+  // tablets start with a narrower Object Explorer
+  const [sidebarW, setSidebarW] = useState(() => (currentLayout() === "tablet" ? 260 : 300));
+  // phones and tablets (features/mobile): drawer / collapsible sidebar, topbar overflow menu
+  const layout = useLayout();
+  const compact = layout !== "desktop";
+  const nav = useNavDrawer(layout);
+  const closeDrawer = nav.closeDrawer;
   const serversRef = useRef(servers);
   serversRef.current = servers;
   const prefs = usePrefs();
@@ -89,6 +97,7 @@ export default function App() {
       return [...cur, { ...tab, id } as WorkTab];
     });
     setTimeout(() => setActive(id!), 0);
+    closeDrawer(); // phone: show the tab that was just opened
   }, []);
 
   const closeTab = useCallback((id: string) => {
@@ -133,7 +142,12 @@ export default function App() {
       if (!srv) return resolve(false);
       setDialog(<PasswordDialog server={srv} resolve={resolve} />);
     }));
-    reloadServers().catch((e) => toast(errMsg(e), "error"));
+    reloadServers()
+      .then((s) => {
+        // phones land on the multi-server overview (features/overview)
+        if (s.length && currentLayout() === "phone" && getTabKind("overview")) openTab({ kind: "overview", title: t("Overview") });
+      })
+      .catch((e) => toast(errMsg(e), "error"));
   }, []);
 
   // poll running jobs count for the badge
@@ -198,6 +212,21 @@ export default function App() {
     return <DependenciesPanel sel={selection} detail={detail} />;
   };
 
+  // small screens: keep the active tab visible in the scrolling tab strip
+  useEffect(() => {
+    if (compact) document.getElementById(`tab-${active}`)?.closest(".tab")?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [active, compact]);
+
+  // phone: tapping an item in the Object Explorer opens it (closes the drawer, shows its dashboard
+  // or properties); the twisty only expands. Keyboard navigation (synthetic clicks) keeps it open.
+  const onNavClick = (e: React.MouseEvent) => {
+    if (!nav.phone || e.detail === 0) return;
+    const el = e.target as Element;
+    if (!el.closest(".tree-row") || el.closest(".twisty, .tree-more")) return;
+    nav.setDrawer(false);
+    setActive("dashboard");
+  };
+
   // --- tab bar accessibility (WAI-ARIA tabs pattern)
   const visibleTabIds = [
     ...FIXED_TABS.map((x) => x.id),
@@ -223,37 +252,84 @@ export default function App() {
     setTimeout(() => document.getElementById(`tab-${next}`)?.focus(), 0);
   };
 
+  // topbar buttons (a row on desktop; partly in the "⋯" sheet on phones and tablets)
+  const addServerBtn = <button className="tb" onClick={() => setDialog(<ServerDialog />)}><IconPlus /> {t("Add server")}</button>;
+  const queryToolBtn = <button className="tb" disabled={!selDb} style={{ opacity: selDb ? 1 : 0.5 }} onClick={() => selDb && openQueryTool(selDb.serverId, selDb.dbId!)}><IconTerminal /> {t("Query Tool")}</button>;
+  const viewDataBtn = (
+    <button className="tb" disabled={!selIsRelation} style={{ opacity: selIsRelation ? 1 : 0.5 }}
+      onClick={() => selection && selIsRelation && openTab({ kind: "data", title: selection.name!, serverId: selection.serverId, dbId: selection.dbId, otype: selection.otype, name: selection.name })}>
+      <IconTable /> {t("View data")}
+    </button>
+  );
+  const processesBtn = (
+    <button className="tb" onClick={() => openTab({ kind: "jobs", title: N_("Processes") })}>
+      <IconActivity /> {t("Processes")} {runningJobs > 0 && <span className="badge">{runningJobs}</span>}
+    </button>
+  );
+  const prefsBtn = (labelled: boolean) => labelled
+    ? <button className="tb" onClick={() => setDialog(<PreferencesDialog />)}><span aria-hidden="true">⚙</span> {t("Preferences")}</button>
+    : <button className="tb" title={t("Preferences")} aria-label={t("Preferences")} onClick={() => setDialog(<PreferencesDialog />)}>⚙</button>;
+  const themeBtn = (labelled: boolean) => (
+    <button className="tb" title={t("Toggle theme")} aria-label={labelled ? undefined : t("Toggle theme")} onClick={() => setTheme(theme === "dark" ? "light" : theme === "light" ? "contrast" : theme === "contrast" ? "" : "dark")}>
+      {theme === "dark" ? <IconMoon /> : theme === "light" ? <IconSun /> : theme === "contrast" ? <span style={{ fontWeight: 700 }}>◐</span> : <><IconSun /><span style={{ fontSize: 11 }}>{t("auto")}</span></>}
+      {labelled && <> {t("Toggle theme")}</>}
+    </button>
+  );
+
   return (
     <AppCtx.Provider value={app}>
       <div className="app">
         <header className="topbar">
+          {compact && (
+            <button ref={nav.toggleRef} className="tb nav-toggle" aria-controls="object-explorer" aria-expanded={nav.open}
+              title={t("Object Explorer")} aria-label={t("Object Explorer")} onClick={nav.toggle}>
+              <span aria-hidden="true">☰</span>
+            </button>
+          )}
           <div className="brand"><Flame /> fbadmin <small>{t("Firebird administration")}</small></div>
-          <button className="tb" onClick={() => setDialog(<ServerDialog />)}><IconPlus /> {t("Add server")}</button>
-          <button className="tb" disabled={!selDb} style={{ opacity: selDb ? 1 : 0.5 }} onClick={() => selDb && openQueryTool(selDb.serverId, selDb.dbId!)}><IconTerminal /> {t("Query Tool")}</button>
-          <button className="tb" disabled={!selIsRelation} style={{ opacity: selIsRelation ? 1 : 0.5 }}
-            onClick={() => selection && selIsRelation && openTab({ kind: "data", title: selection.name!, serverId: selection.serverId, dbId: selection.dbId, otype: selection.otype, name: selection.name })}>
-            <IconTable /> {t("View data")}
-          </button>
-          {getTopbarItems().map((it) => <span key={it.id}>{it.render(app)}</span>)}
-          <span className="spacer" />
-          <button className="tb" onClick={() => openTab({ kind: "jobs", title: N_("Processes") })}>
-            <IconActivity /> {t("Processes")} {runningJobs > 0 && <span className="badge">{runningJobs}</span>}
-          </button>
-          <button className="tb" title={t("Preferences")} aria-label={t("Preferences")} onClick={() => setDialog(<PreferencesDialog />)}>⚙</button>
-          <button className="tb" title={t("Toggle theme")} aria-label={t("Toggle theme")} onClick={() => setTheme(theme === "dark" ? "light" : theme === "light" ? "contrast" : theme === "contrast" ? "" : "dark")}>
-            {theme === "dark" ? <IconMoon /> : theme === "light" ? <IconSun /> : theme === "contrast" ? <span style={{ fontWeight: 700 }}>◐</span> : <><IconSun /><span style={{ fontSize: 11 }}>{t("auto")}</span></>}
-          </button>
+          {!compact ? (
+            <>
+              {addServerBtn}
+              {queryToolBtn}
+              {viewDataBtn}
+              {getTopbarItems().map((it) => <span key={it.id}>{it.render(app)}</span>)}
+              <span className="spacer" />
+              {processesBtn}
+              {prefsBtn(false)}
+              {themeBtn(false)}
+            </>
+          ) : (
+            <>
+              {/* the overview stays in the bar; on tablets the Query Tool too */}
+              {getTopbarItems().filter((it) => it.id === "overview").map((it) => <span key={it.id}>{it.render(app)}</span>)}
+              {layout === "tablet" && queryToolBtn}
+              <span className="spacer" />
+              <TopbarOverflow badge={runningJobs > 0 ? <span className="badge">{runningJobs}</span> : null}>
+                {layout === "phone" && queryToolBtn}
+                {viewDataBtn}
+                {addServerBtn}
+                {getTopbarItems().filter((it) => it.id !== "overview").map((it) => <span key={it.id}>{it.render(app)}</span>)}
+                {processesBtn}
+                {prefsBtn(true)}
+                {themeBtn(true)}
+              </TopbarOverflow>
+            </>
+          )}
         </header>
         <div className="main">
-          <nav className="sidebar" style={{ width: sidebarW }} aria-label={t("Object Explorer")}>
+          {nav.phone && nav.drawer && <div className="drawer-back" aria-hidden="true" onClick={nav.closeDrawer} />}
+          <nav ref={nav.navRef} id="object-explorer" style={{ width: layout === "phone" ? undefined : sidebarW }} aria-label={t("Object Explorer")}
+            className={"sidebar" + (nav.phone ? " drawer" + (nav.drawer ? " open" : "") : "") + (layout === "tablet" && !nav.open ? " collapsed" : "")}
+            onClick={onNavClick} {...nav.navTouch}>
             <div className="sidebar-head">
               <span className="grow">{t("Object Explorer")}</span>
               <button className="btn icon small" title={t("Reload servers")} onClick={() => reloadServers()}><IconRefresh size={13} /></button>
               <button className="btn icon small" title={t("Register server")} onClick={() => setDialog(<ServerDialog />)}><IconPlus size={13} /></button>
+              {nav.phone && <button className="btn icon small" title={t("Close")} aria-label={t("Close")} onClick={nav.closeDrawer}><IconX size={13} /></button>}
             </div>
             <Tree />
           </nav>
-          <div className="splitter-v" onMouseDown={startResize} />
+          {!(layout === "tablet" && !nav.open) && <div className="splitter-v" onMouseDown={startResize} />}
           <main className="workspace">
             {/* WAI-ARIA tabs: arrows/Home/End move between tabs, Delete closes a work tab */}
             <div className="tabs" role="tablist" aria-label={t("Panels")} onKeyDown={onTabsKey}>

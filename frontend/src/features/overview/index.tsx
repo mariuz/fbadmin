@@ -82,19 +82,19 @@ function DbRow(props: { srv: OverviewServer; d: OverviewDb; timeout: number }) {
         {d.code && <div className={d.code === "unreachable" || d.code === "timeout" ? "err small" : "muted small"}>{codeText(d.code, props.timeout)}{d.error ? `: ${d.error}` : ""}</div>}
         {d.issues.map((i, k) => <div key={k} className={`small ov-issue ov-${i.level}`}>{issueText(i)}</div>)}
       </td>
-      <td>{reachable ? <>{d.engine_version}{d.ods ? <span className="muted"> · ODS {d.ods}</span> : null}</> : "–"}</td>
-      <td className="num">{reachable ? fmtBytes(d.size_bytes) : "–"}{reachable && d.pages ? <div className="muted small">{t("{pages} pages", { pages: d.pages.toLocaleString() })}</div> : null}</td>
-      <td className="num">{reachable ? d.attachments ?? "–" : "–"}</td>
-      <td className="num">{reachable ? d.transactions ?? "–" : "–"}</td>
-      <td className="num">{reachable && gap !== undefined ? gap.toLocaleString() : "–"}</td>
-      <td className="num">{reachable ? (d.long_transactions ? <span className="warn">{d.long_transactions} · {fmtAge(d.oldest_transaction_age)}</span> : 0) : "–"}</td>
-      <td>{reachable ? since(d.open_since) : "–"}</td>
-      <td>{backup ? <>{t("{age} ago", { age: since(backup.at) })}<div className="muted small">{backup.what}</div></> : <span className="muted">{t("none known")}</span>}</td>
-      <td>{repl ? (
-        repl.replica_mode !== "none" ? <>{t("replica ({mode})", { mode: repl.replica_mode })}{repl.lag_segments !== undefined && <div className="small">{t("{count} segment(s) behind", { count: repl.lag_segments })}</div>}</>
-          : repl.publication_enabled ? <>{t("primary")}<div className="muted small">{t("{count} published table(s)", { count: repl.published_tables })}</div></> : <span className="muted">{t("off")}</span>
+      <td data-label={t("Version")}>{reachable ? <span>{d.engine_version}{d.ods ? <span className="muted"> · ODS {d.ods}</span> : null}</span> : "–"}</td>
+      <td className="num" data-label={t("Size")}><span>{reachable ? fmtBytes(d.size_bytes) : "–"}{reachable && d.pages ? <div className="muted small">{t("{pages} pages", { pages: d.pages.toLocaleString() })}</div> : null}</span></td>
+      <td className="num" data-label={t("Attachments")}>{reachable ? d.attachments ?? "–" : "–"}</td>
+      <td className="num" data-label={t("Transactions")}>{reachable ? d.transactions ?? "–" : "–"}</td>
+      <td className="num" data-label={t("OAT gap")}>{reachable && gap !== undefined ? gap.toLocaleString() : "–"}</td>
+      <td className="num" data-label={t("Long transactions")}>{reachable ? (d.long_transactions ? <span className="warn">{d.long_transactions} · {fmtAge(d.oldest_transaction_age)}</span> : 0) : "–"}</td>
+      <td data-label={t("Open for")}>{reachable ? since(d.open_since) : "–"}</td>
+      <td data-label={t("Last backup")}>{backup ? <span>{t("{age} ago", { age: since(backup.at) })}<div className="muted small">{backup.what}</div></span> : <span className="muted">{t("none known")}</span>}</td>
+      <td data-label={t("Replication")}>{repl ? (
+        repl.replica_mode !== "none" ? <span>{t("replica ({mode})", { mode: repl.replica_mode })}{repl.lag_segments !== undefined && <div className="small">{t("{count} segment(s) behind", { count: repl.lag_segments })}</div>}</span>
+          : repl.publication_enabled ? <span>{t("primary")}<div className="muted small">{t("{count} published table(s)", { count: repl.published_tables })}</div></span> : <span className="muted">{t("off")}</span>
       ) : <span className="muted">–</span>}</td>
-      <td>
+      <td className="ov-actions">
         <button className="btn small" onClick={() => openDashboard(app, srv.id, d.id)}>{t("Dashboard")}</button>{" "}
         {reachable && <button className="btn small" onClick={() => openPerformance(app, srv.id, d.id)}>{t("Performance")}</button>}
       </td>

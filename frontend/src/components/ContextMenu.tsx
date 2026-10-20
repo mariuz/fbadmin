@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { useLayout } from "../features/mobile/responsive";
 
 export type MenuItem =
   | { label: string; icon?: ReactNode; onClick: () => void; danger?: boolean; disabled?: boolean }
@@ -34,6 +35,16 @@ export function groupLongMenu(items: MenuItem[]): MenuItem[] {
   return out.filter((it, i, a) => !("separator" in it) || (i > 0 && i < a.length - 1 && !("separator" in a[i - 1])));
 }
 
+/** Phones: one scrolling list (a bottom sheet) instead of fly-out submenus. */
+export function flattenMenu(items: MenuItem[]): MenuItem[] {
+  const out: MenuItem[] = [];
+  for (const it of items) {
+    if ("children" in it) out.push({ header: it.label }, ...flattenMenu(it.children));
+    else out.push(it);
+  }
+  return out;
+}
+
 /** Arrow keys, Home/End within one menu level (WAI-ARIA menu pattern). */
 function onMenuKey(e: React.KeyboardEvent<HTMLDivElement>, onBack?: () => void) {
   const items = Array.from(e.currentTarget.querySelectorAll<HTMLButtonElement>(":scope > button[role=menuitem], :scope > .ctx-sub > button[role=menuitem]"))
@@ -51,7 +62,7 @@ function onMenuKey(e: React.KeyboardEvent<HTMLDivElement>, onBack?: () => void) 
   next.focus();
 }
 
-function MenuList(props: { items: MenuItem[]; onClose: () => void; x: number; y: number; sub?: boolean; onBack?: () => void }) {
+function MenuList(props: { items: MenuItem[]; onClose: () => void; x: number; y: number; sub?: boolean; onBack?: () => void; sheet?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ x: props.x, y: props.y });
   const [open, setOpenNow] = useState<number | null>(null);
@@ -78,7 +89,7 @@ function MenuList(props: { items: MenuItem[]; onClose: () => void; x: number; y:
     el.querySelector<HTMLButtonElement>("button[role=menuitem]:not(:disabled)")?.focus();
   }, []);
   return (
-    <div className="ctx" ref={ref} role="menu" style={{ left: pos.x, top: pos.y }} onContextMenu={(e) => e.preventDefault()}
+    <div className={"ctx" + (props.sheet ? " sheet" : "")} ref={ref} role="menu" style={props.sheet ? undefined : { left: pos.x, top: pos.y }} onContextMenu={(e) => e.preventDefault()}
       onKeyDown={(e) => onMenuKey(e, props.onBack)}>
       {props.items.map((it, i) => {
         if ("separator" in it) return <hr key={i} role="separator" />;
@@ -123,6 +134,8 @@ function SubMenu(props: { items: MenuItem[]; onClose: () => void; onBack: () => 
 
 export function ContextMenu(props: { x: number; y: number; items: MenuItem[]; onClose: () => void }) {
   const root = useRef<HTMLDivElement>(null);
+  // phones: a bottom sheet over a backdrop (tap outside closes it)
+  const sheet = useLayout() === "phone";
   // give focus back to where the menu was opened from (e.g. the tree row)
   useEffect(() => {
     const opener = document.activeElement as HTMLElement | null;
@@ -145,7 +158,8 @@ export function ContextMenu(props: { x: number; y: number; items: MenuItem[]; on
   // portal: a menu must not end up inside the tree (role=tree) or another widget
   return createPortal(
     <div ref={root}>
-      <MenuList items={groupLongMenu(props.items)} onClose={props.onClose} x={props.x} y={props.y} />
+      {sheet && <div className="ctx-back" aria-hidden="true" onClick={props.onClose} />}
+      <MenuList items={sheet ? flattenMenu(props.items) : groupLongMenu(props.items)} onClose={props.onClose} x={props.x} y={props.y} sheet={sheet} />
     </div>,
     document.body,
   );

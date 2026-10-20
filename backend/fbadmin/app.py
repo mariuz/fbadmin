@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import mimetypes
 import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -25,6 +26,8 @@ from .monitoring.history import start_sampler
 from .middleware import install_middleware
 
 STATIC_DIR = Path(__file__).parent / "static"
+# the web app manifest (add to home screen); not in every platform's MIME table
+mimetypes.add_type("application/manifest+json", ".webmanifest")
 
 
 def _reaper(stop: threading.Event) -> None:

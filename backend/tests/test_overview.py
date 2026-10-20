@@ -47,6 +47,20 @@ def test_unreachable_and_password_not_saved(client):
     assert s["databases"][0]["code"] == "password_not_saved" and s["databases"][0]["status"] == "unknown"
 
 
+def test_cache_is_dropped_when_registrations_change(client):
+    a = client.post("/api/servers", json={"name": "first", "host": "127.0.0.1", "port": 1, "password": "x"}).json()
+    assert [s["name"] for s in client.get("/api/overview").json()["servers"]] == ["first"]
+    assert client.get("/api/overview").json()["cached"] is True
+    b = client.post("/api/servers", json={"name": "second", "host": "127.0.0.1", "port": 1, "password": "x"}).json()
+    ov = client.get("/api/overview").json()
+    assert ov["cached"] is False and sorted(s["name"] for s in ov["servers"]) == ["first", "second"]
+    client.post(f"/api/servers/{b['id']}/databases", json={"name": "db", "path": "/x.fdb"})
+    ov = client.get("/api/overview").json()
+    assert ov["cached"] is False and _srv(ov, "second")["databases"][0]["name"] == "db"
+    client.delete(f"/api/servers/{a['id']}")
+    assert [s["name"] for s in client.get("/api/overview").json()["servers"]] == ["second"]
+
+
 def test_timeout_does_not_stall_and_reuses_running_check(client, monkeypatch):
     from fbadmin.monitoring import overview
 

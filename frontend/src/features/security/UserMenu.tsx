@@ -30,7 +30,7 @@ export function UserMenu(props: { app: AppApi }) {
 
   return (
     <div className="user-menu" ref={ref}>
-      <button className="tb" onClick={() => setOpen(!open)} title={auth.server_mode ? t("Signed in as {user}", { user: String(auth.user?.username) }) : t("Security")}>
+      <button className="tb" aria-expanded={open} onClick={() => setOpen(!open)} title={auth.server_mode ? t("Signed in as {user}", { user: String(auth.user?.username) }) : t("Security")}>
         <IconUser /> {label}{locked && <span className="badge" title={t("Saved passwords are locked")}>{t("locked")}</span>}
       </button>
       {open && (

@@ -7,6 +7,7 @@ Exits non-zero (with a message) when something is missing.
 
 from __future__ import annotations
 
+import json
 import re
 import sys
 import tarfile
@@ -22,9 +23,17 @@ def check_wheel(path: Path) -> list[str]:
             errors.append(f"{path.name}: fbadmin/static/index.html missing (build the frontend first)")
         else:
             html = z.read("fbadmin/static/index.html").decode()
-            for ref in re.findall(r'(?:src|href)="/(assets/[^"]+)"', html):
+            # the bundles under assets/, the web app manifest and the home-screen icons
+            for ref in re.findall(r'(?:src|href)="/([^"/][^"]*)"', html):
                 if f"fbadmin/static/{ref}" not in names:
                     errors.append(f"{path.name}: index.html references {ref}, which is not in the wheel")
+            if "fbadmin/static/manifest.webmanifest" in names:
+                manifest = json.loads(z.read("fbadmin/static/manifest.webmanifest"))
+                for icon in manifest.get("icons", []):
+                    if f"fbadmin/static/{icon['src'].lstrip('/')}" not in names:
+                        errors.append(f"{path.name}: manifest.webmanifest references {icon['src']}, which is not in the wheel")
+            else:
+                errors.append(f"{path.name}: fbadmin/static/manifest.webmanifest missing")
         if not any(n.startswith("fbadmin/static/assets/") and n.endswith(".js") for n in names):
             errors.append(f"{path.name}: no JavaScript bundle under fbadmin/static/assets/")
         eps = next((n for n in names if n.endswith(".dist-info/entry_points.txt")), None)

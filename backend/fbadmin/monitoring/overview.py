@@ -39,7 +39,7 @@ _pool = ThreadPoolExecutor(max_workers=int(os.environ.get("FBADMIN_OVERVIEW_WORK
                            thread_name_prefix="fbadmin-overview")
 _lock = threading.Lock()
 _inflight: dict[tuple, Future] = {}
-_cache: dict[Any, tuple[float, dict]] = {}
+_cache: dict[Any, tuple[float, dict, tuple]] = {}
 
 
 def worst(levels: list[str]) -> str:
@@ -279,12 +279,14 @@ def build(refresh: bool = False, timeout: float | None = None) -> dict[str, Any]
     uid, _p = _principal_key()
     now = time.time()
     ttl = TTL
+    st = get_state()
+    # a cached result is only reused while the same servers and databases are registered
+    registered = tuple((srv.id, srv.host, srv.port, tuple((db.id, db.path) for db in srv.databases)) for srv in st.store.list())
     with _lock:
         hit = _cache.get(uid)
-    if hit and not refresh and now - hit[0] < ttl:
+    if hit and not refresh and now - hit[0] < ttl and hit[2] == registered:
         return {**hit[1], "cached": True}
 
-    st = get_state()
     mgr = st.manager.for_user(uid) if hasattr(st.manager, "for_user") and uid is not None else st.manager
     timeout = TIMEOUT if timeout is None else timeout
     started = time.monotonic()
@@ -357,7 +359,7 @@ def build(refresh: bool = False, timeout: float | None = None) -> dict[str, Any]
         "servers": out_servers,
     })
     with _lock:
-        _cache[uid] = (now, result)
+        _cache[uid] = (now, result, registered)
     return result
 
 

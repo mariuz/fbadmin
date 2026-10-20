@@ -1,4 +1,7 @@
 import { useEffect, useId, useRef, type ReactNode } from "react";
+import { useLayout } from "../features/mobile/responsive";
+import { t } from "../i18n";
+import { IconX } from "./Icons";
 
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"]), [contenteditable="true"]';
 
@@ -8,7 +11,11 @@ export function Modal(props: {
   onClose: () => void;
   footer?: ReactNode;
   wide?: boolean;
+  /** extra class on the dialog box (e.g. "sheet": a bottom sheet on phones and tablets) */
+  className?: string;
 }) {
+  // phones and tablets have no Escape key at hand: show a close button in the title bar
+  const compact = useLayout() !== "desktop";
   const titleId = useId();
   const ref = useRef<HTMLDivElement>(null);
   // captured during the first render, before autoFocus moves focus into the dialog
@@ -39,9 +46,14 @@ export function Modal(props: {
   };
   return (
     <div className="modal-back" onMouseDown={(e) => e.target === e.currentTarget && props.onClose()}>
-      <div className={"modal" + (props.wide ? " wide" : "")} role="dialog" aria-modal="true" aria-labelledby={titleId}
+      <div className={"modal" + (props.wide ? " wide" : "") + (props.className ? " " + props.className : "")} role="dialog" aria-modal="true" aria-labelledby={titleId}
         ref={ref} tabIndex={-1} onKeyDown={trap}>
-        <div className="modal-head" id={titleId}>{props.title}</div>
+        {compact ? (
+          <div className="modal-head">
+            <span className="modal-title" id={titleId}>{props.title}</span>
+            <button type="button" className="btn icon modal-close" aria-label={t("Close")} onClick={props.onClose}><IconX /></button>
+          </div>
+        ) : <div className="modal-head" id={titleId}>{props.title}</div>}
         <div className="modal-body">{props.children}</div>
         {props.footer && <div className="modal-foot">{props.footer}</div>}
       </div>
