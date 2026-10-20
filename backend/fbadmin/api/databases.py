@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Query
 from pydantic import BaseModel
 
+from .. import schemahistory as schema_history
 from ..config import settings
 from ..metadata import OBJECT_TYPES, Catalog
 from ..metadata.catalog import drop_statement
@@ -119,7 +120,9 @@ def completion(server_id: str, db_id: str):
 def execute(server_id: str, db_id: str, body: ExecuteIn):
     """Run a script in autocommit mode (used by create/alter dialogs)."""
     with get_state().manager.meta(server_id, db_id) as conn:
-        return run_script(conn, body.sql, autocommit=True, max_rows=settings.max_rows)
+        res = run_script(conn, body.sql, autocommit=True, max_rows=settings.max_rows)
+    schema_history.after_sql(server_id, db_id, body.sql)
+    return res
 
 
 # ------------------------------------------------------------------ data

@@ -50,7 +50,7 @@ export interface TraceEvent { seq: number; time: string; pid: number; type: stri
 export interface TraceTemplate { id: string; label: string; description: string; params: Record<string, number> }
 
 export interface Schedule {
-  id: string; name: string; kind: "backup" | "sweep" | "validate"; server_id: string; database_id: string; cron: string;
+  id: string; name: string; kind: "backup" | "sweep" | "validate" | "schema_snapshot"; server_id: string; database_id: string; cron: string;
   enabled: boolean; keep: number; options: Record<string, any>; created_at: number; last_run: number | null;
   last_status: string | null; next_run: number | null;
   verify: boolean; verify_path: string | null; upload: { target_id: string; prefix: string; keep: number } | null;

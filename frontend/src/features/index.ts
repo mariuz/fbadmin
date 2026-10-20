@@ -15,3 +15,4 @@ import "./embedded";
 import "./upgrade";
 import "./events";
 import "./debugger";
+import "./schema-history";

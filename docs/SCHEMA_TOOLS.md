@@ -114,13 +114,42 @@ null) and the foreign keys between them (crow's foot at the referencing table). 
   database (in the browser)
 - mouse wheel zooms around the pointer, dragging the background pans, dragging a table header moves
   the table, **Fit** shows everything, **Keys only** hides other columns
-- **SVG** and **PNG** export the whole diagram (colors of the current theme)
+- **Export image…** saves the diagram as SVG or PNG, or copies it to the clipboard (see
+  [ERD export](#erd-export-svg-and-png) below)
 
 Designing: **Add table** creates a table (edit its name, columns, types, primary key and NOT NULL in
 the side panel); existing tables can get new columns; drag the ● handle at the right of a column onto
 the referenced column of another table to add a foreign key (a new column takes the referenced
 type). **Generate DDL** opens the `CREATE TABLE` / `ALTER TABLE ADD` / `ADD CONSTRAINT … FOREIGN KEY`
 statements in the Query Tool, where you review and run them.
+
+### ERD export (SVG and PNG)
+
+*Added in 2.0.* **Export image…** in the ERD toolbar opens a dialog with a preview:
+
+| Option | Choices |
+|---|---|
+| Format | **SVG** (vector, any size) or **PNG** |
+| Area | **Whole diagram** (every table, wherever you scrolled) or **Visible area** (what the tab shows now) |
+| Colours | **Light** (the light theme's colours, good for documents and printing) or **Current theme** (for example dark) |
+| Background | **White** (or the theme's background) or **Transparent** |
+| Title block | database name, date and time, number of tables above the diagram |
+| Resolution (PNG) | **1×** or **2×** (for high-DPI screens and slides) |
+
+The files are named `<database>-erd.svg` and `<database>-erd.png`.
+
+The SVG is standalone: colours are written as values (no CSS variables), the font is a common
+monospace font list (`DejaVu Sans Mono, Menlo, Consolas, Liberation Mono, Courier New, monospace`),
+and the editing handles and the selection highlight are left out. It opens the same in a browser, an
+image viewer, Inkscape or a word processor; the exact font depends on what the viewing system has.
+
+The PNG is the same SVG drawn on a canvas. Browsers limit canvas sizes, so a PNG is at most
+16384 px on each side and 64 megapixels: a larger diagram is scaled down to fit (the dialog says so
+and shows the final size). Use SVG for very large schemas.
+
+**Copy as image** puts the PNG on the clipboard. It appears only where the browser supports images
+on the clipboard (`ClipboardItem`: Chrome, Edge, Safari, recent Firefox) and needs a secure context
+(`https://` or `localhost`).
 
 ## Import and export
 
@@ -208,6 +237,7 @@ Every entry links to the object in the Object Explorer.
   export), `copydata.py`, `generator.py`, `search.py`, `report.py`; API in
   `backend/fbadmin/api/schema.py`
 - frontend: `frontend/src/features/schema/` (one tab kind per tool, menus and the top bar button are
-  registered in `index.tsx`)
+  registered in `index.tsx`; the ERD export is `ErdExport.tsx`)
+- schema history in git: see [SCHEMA_HISTORY.md](SCHEMA_HISTORY.md)
 - tests: `backend/tests/test_schema_tools.py`, schemas `complex_schema.sql` and
   `complex_schema_changes.sql`

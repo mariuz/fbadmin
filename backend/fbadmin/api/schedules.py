@@ -18,7 +18,7 @@ router = APIRouter(prefix="/api/schedules", tags=["schedules"])
 
 class ScheduleIn(BaseModel):
     name: str
-    kind: Literal["backup", "sweep", "validate"] = "backup"
+    kind: Literal["backup", "sweep", "validate", "schema_snapshot"] = "backup"
     server_id: str
     database_id: str
     cron: str
@@ -32,7 +32,7 @@ class ScheduleIn(BaseModel):
 
 class ScheduleUpdate(BaseModel):
     name: str | None = None
-    kind: Literal["backup", "sweep", "validate"] | None = None
+    kind: Literal["backup", "sweep", "validate", "schema_snapshot"] | None = None
     cron: str | None = None
     enabled: bool | None = None
     keep: int | None = None

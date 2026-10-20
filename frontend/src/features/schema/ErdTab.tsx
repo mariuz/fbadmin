@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { errMsg, useApp } from "../../context";
 import type { WorkTab } from "../../context";
 import { IconDownload, IconKey, IconPlus, IconRefresh, IconTerminal, IconTrash } from "../../components/Icons";
-import { saveBlob, schemaApi, type ErdColumn, type ErdRelation } from "./api";
+import { buildErdSvg, ErdExportDialog } from "./ErdExport";
+import { schemaApi, type ErdColumn, type ErdRelation } from "./api";
 import { quoteIdent } from "./common";
 import { t } from "../../i18n";
 
@@ -79,12 +80,6 @@ function autoLayout(nodes: Node[], rels: Rel[], keysOnly: boolean): Node[] {
     x += w + GAP_X;
   }
   return out;
-}
-
-function resolveVars(svg: string): string {
-  const cs = getComputedStyle(document.documentElement);
-  // values go into XML attributes: no double quotes (font lists quote family names)
-  return svg.replace(/var\((--[\w-]+)\)/g, (_, v) => (cs.getPropertyValue(v).trim() || "#888").replace(/"/g, "'"));
 }
 
 // ------------------------------------------------------------------ component
@@ -265,44 +260,16 @@ export function ErdTab({ tab, visible }: { tab: WorkTab; visible: boolean }) {
     return out.join("\n\n");
   }, [nodes, rels]);
 
-  // ---- export
-  const svgText = () => {
-    const el = svgRef.current!;
-    const clone = el.cloneNode(true) as SVGSVGElement;
-    clone.querySelectorAll("[data-noexport]").forEach((x) => x.remove());
-    const g = clone.querySelector("g.erd-root") as SVGGElement;
-    g.removeAttribute("transform");
-    const b = bbox();
-    const m = 20;
-    clone.setAttribute("viewBox", `${b.x - m} ${b.y - m} ${b.w + 2 * m} ${b.h + 2 * m}`);
-    clone.setAttribute("width", String(Math.round(b.w + 2 * m)));
-    clone.setAttribute("height", String(Math.round(b.h + 2 * m)));
-    clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
-    clone.removeAttribute("class");
-    const bg = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-    bg.setAttribute("x", String(b.x - m)); bg.setAttribute("y", String(b.y - m));
-    bg.setAttribute("width", String(b.w + 2 * m)); bg.setAttribute("height", String(b.h + 2 * m));
-    bg.setAttribute("fill", "var(--bg)");
-    clone.insertBefore(bg, clone.firstChild);
-    return { text: resolveVars(new XMLSerializer().serializeToString(clone)), w: b.w + 2 * m, h: b.h + 2 * m };
-  };
+  // ---- export (see ErdExport.tsx)
   const dbLabel = app.servers.find((s) => s.id === sid)?.databases.find((d) => d.id === dbid)?.name ?? "erd";
-  const exportSvg = () => saveBlob(new Blob([svgText().text], { type: "image/svg+xml" }), `${dbLabel}-erd.svg`);
-  const exportPng = () => {
-    const { text, w, h } = svgText();
-    const img = new Image();
-    const scale = Math.min(2, 16000 / Math.max(w, h));
-    img.onload = () => {
-      const canvas = document.createElement("canvas");
-      canvas.width = Math.round(w * scale);
-      canvas.height = Math.round(h * scale);
-      const ctx = canvas.getContext("2d")!;
-      ctx.scale(scale, scale);
-      ctx.drawImage(img, 0, 0, w, h);
-      canvas.toBlob((blob) => blob && saveBlob(blob, `${dbLabel}-erd.png`), "image/png");
-    };
-    img.onerror = () => app.toast(t("PNG export failed"), "error");
-    img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(text);
+  const openExport = () => {
+    const el = svgRef.current;
+    if (!el) return;
+    const v = view, rect = el.getBoundingClientRect();
+    const visible = { x: -v.tx / v.k, y: -v.ty / v.k, w: rect.width / v.k, h: rect.height / v.k };
+    const all = bbox();
+    app.showDialog(<ErdExportDialog dbName={dbLabel} tables={nodes.length}
+      build={(o, meta) => buildErdSvg(el, o.scope === "view" ? visible : all, o, meta)} />);
   };
 
   // ---- geometry of relation lines
@@ -344,8 +311,7 @@ export function ErdTab({ tab, visible }: { tab: WorkTab; visible: boolean }) {
         <button className="btn" disabled={!ddl} onClick={() => app.openQueryTool(sid, dbid, ddl)}><IconTerminal /> {t("Generate DDL")}</button>
         <span className="grow" />
         <span className="muted">{t("{tables} tables · {relations} relations", { tables: nodes.length, relations: rels.length })}</span>
-        <button className="btn" onClick={exportSvg}><IconDownload /> SVG</button>
-        <button className="btn" onClick={exportPng}><IconDownload /> PNG</button>
+        <button className="btn" disabled={!nodes.length} onClick={openExport}><IconDownload /> {t("Export image…")}</button>
       </div>
       {error && <div className="pad err">{error}</div>}
       <div className="sch-erd">
@@ -359,7 +325,7 @@ export function ErdTab({ tab, visible }: { tab: WorkTab; visible: boolean }) {
               const stroke = r.isNew ? "var(--ok)" : hl ? "var(--accent)" : "var(--muted)";
               const f = p.adir * 10;
               return (
-                <g key={r.name + r.from_table}>
+                <g key={r.name + r.from_table} data-hl={hl ? (r.isNew ? "var(--ok)" : "var(--muted)") : undefined}>
                   <title>{`${r.name}: ${r.from_table} (${r.from_columns.join(", ")}) → ${r.to_table} (${r.to_columns.join(", ")})`}</title>
                   <path d={p.d} fill="none" stroke={stroke} strokeWidth={hl ? 2 : 1.3} strokeDasharray={r.isNew ? "5 4" : undefined} />
                   {/* many (crow's foot) at the child, one (bar) at the parent */}
@@ -374,7 +340,7 @@ export function ErdTab({ tab, visible }: { tab: WorkTab; visible: boolean }) {
               const isSel = n.name === selected;
               return (
                 <g key={n.name} transform={`translate(${n.x},${n.y})`} data-table={n.name} className="erd-node">
-                  <rect width={w} height={h} rx={6} fill="var(--panel)" stroke={isSel ? "var(--accent)" : n.isNew ? "var(--ok)" : "var(--border)"}
+                  <rect width={w} height={h} rx={6} fill="var(--panel)" data-sel={isSel ? (n.isNew ? "var(--ok)" : "var(--border)") : undefined} stroke={isSel ? "var(--accent)" : n.isNew ? "var(--ok)" : "var(--border)"}
                     strokeWidth={isSel ? 2 : 1} strokeDasharray={n.isNew ? "5 3" : undefined} />
                   <path d={`M 0 6 a 6 6 0 0 1 6 -6 h ${w - 12} a 6 6 0 0 1 6 6 v ${HEAD_H - 6} h ${-w} z`}
                     fill={n.isNew ? "var(--new)" : "var(--accent-soft)"} style={{ cursor: "move" }} onMouseDown={(e) => onNodeDown(e, n)} />

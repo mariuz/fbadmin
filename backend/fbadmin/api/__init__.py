@@ -26,6 +26,7 @@ from . import embedded
 from . import upgrade
 from . import events
 from . import debug
+from . import schema_history
 
 ROUTERS: list[APIRouter] = [
     servers.router,
@@ -54,4 +55,5 @@ ROUTERS: list[APIRouter] = [
     upgrade.router,
     events.router,
     debug.router,
+    schema_history.router,
 ]

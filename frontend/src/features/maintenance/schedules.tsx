@@ -131,7 +131,7 @@ export function SchedulesPanel(props: { visible: boolean; serverId?: string; dbI
             <input className="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
             <label className="l">{t("Job")}</label>
             <select className="text" value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value as Schedule["kind"] })}>
-              <option value="backup">{t("Backup (gbak, into the fbadmin archive)")}</option><option value="sweep">{t("Sweep")}</option><option value="validate">{t("Online validation")}</option>
+              <option value="backup">{t("Backup (gbak, into the fbadmin archive)")}</option><option value="sweep">{t("Sweep")}</option><option value="validate">{t("Online validation")}</option><option value="schema_snapshot">{t("Schema snapshot (commit the DDL to the schema history repository)")}</option>
             </select>
             <label className="l">{t("Server / database")}</label>
             <div className="mt-row">

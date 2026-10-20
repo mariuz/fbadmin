@@ -13,6 +13,7 @@ import os
 import threading
 import time
 import uuid
+from contextlib import nullcontext
 from datetime import datetime
 from pathlib import Path
 from typing import Literal
@@ -37,7 +38,7 @@ class UploadOptions(BaseModel):
 class Schedule(BaseModel):
     id: str = Field(default_factory=lambda: uuid.uuid4().hex[:10])
     name: str
-    kind: Literal["backup", "sweep", "validate"] = "backup"
+    kind: Literal["backup", "sweep", "validate", "schema_snapshot"] = "backup"
     server_id: str
     database_id: str
     cron: str
@@ -186,9 +187,12 @@ class Scheduler:
             extra: dict = {}
             failure: str | None = None
             try:
-                with st.manager.service(s.server_id) as svc:
-                    major = ops.engine_major(svc)
-                    if s.kind == "backup":
+                snap = s.kind == "schema_snapshot"  # no service connection needed
+                with nullcontext() if snap else st.manager.service(s.server_id) as svc:
+                    major = 0 if snap else ops.engine_major(svc)
+                    if snap:
+                        extra, failure = self._schema_snapshot(s, log)
+                    elif s.kind == "backup":
                         extra, failure = self._backup(s, db, svc, major, log)
                     elif s.kind == "sweep":
                         log(f"Sweeping {db.path}")
@@ -216,6 +220,17 @@ class Scheduler:
         job = st.jobs.start(f"scheduled-{s.kind}", f"Scheduled {s.kind}: {s.name} ({db.name})", s.server_id, fn)
         job_ref["id"] = job.id
         return job.summary()
+
+    def _schema_snapshot(self, s: Schedule, log) -> tuple[dict, str | None]:
+        """Commit the schema to the database's history repository (see ``fbadmin.schemahistory``)."""
+        from .. import schemahistory
+
+        res = schemahistory.snapshot(s.server_id, s.database_id, trigger=f"schedule {s.name}", log=log)
+        extra = {"commit": res["commit"] if res["committed"] else None,
+                 "changes": res["changes"], "push": res["push"]}
+        if res["push"] and not res["push"].get("ok"):
+            return extra, f"Committed, but the push failed: {res['push'].get('error')}"
+        return extra, None
 
     def _backup(self, s: Schedule, db, svc, major: int, log) -> tuple[dict, str | None]:
         """Back up, then optionally test-restore and upload. Old backups are only pruned (locally and in

@@ -87,7 +87,7 @@ function MenuList(props: { items: MenuItem[]; onClose: () => void; x: number; y:
           return (
             <div key={i} className="ctx-sub" onMouseEnter={() => setOpen(i, open === null ? 0 : 250)} onMouseLeave={() => setOpen((o) => (o === i ? null : o), 300)}>
               <button role="menuitem" aria-haspopup="menu" aria-expanded={open === i}
-                onClick={() => setOpen(open === i ? null : i)}
+                onClick={() => setOpen(i)} /* hovering already opened it: a click must not close it again */
                 onKeyDown={(e) => { if (e.key === "ArrowRight" || e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); setOpen(i); } }}>
                 {it.icon}{it.label}<span className="ctx-arrow">▸</span>
               </button>
