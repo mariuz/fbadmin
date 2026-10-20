@@ -89,6 +89,8 @@ def blocked_request(method: str, path: str) -> tuple[str | None, str]:
         return None, ""
     if method == "DELETE" and len(parts) >= 3 and parts[-2] == "statements" and "monitor" in parts:
         return None, ""  # cancelling a running statement does not change data
+    if "event-monitor" in parts and parts[-1] != "post":
+        return None, ""  # listening for events (fbadmin's own monitor session) changes no data
     if method == "POST" and parts and parts[-1] in READ_ACTIONS:
         return None, ""
     return sid, f"Server is registered as read-only: {method} {rest or '/'} is not allowed"

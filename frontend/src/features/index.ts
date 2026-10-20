@@ -13,3 +13,4 @@ import "./storage";
 import "./datacompare";
 import "./embedded";
 import "./upgrade";
+import "./events";
