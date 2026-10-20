@@ -1,0 +1,27 @@
+/* Data compare (features/datacompare). Classes are prefixed with dc-; the layout reuses sch- classes. */
+.dc .mono { font-family: var(--mono); font-size: 12px; }
+.dc-tables, .dc-results { max-height: 360px; }
+.dc-tables td { vertical-align: top; }
+.dc-where { width: 100%; min-width: 160px; padding: 2px 6px; }
+.dc-notes { margin: 0; padding-left: 14px; font-size: 12px; }
+.dc-others { margin-top: 8px; font-size: 12px; }
+.dc-others summary { cursor: pointer; color: var(--muted); }
+.dc-others ul { margin: 4px 0; padding-left: 18px; }
+.dc .linkish { background: none; border: 0; padding: 0; color: var(--text); cursor: pointer; text-align: left; text-decoration: underline; }
+.dc .linkish:disabled { color: var(--text); cursor: default; text-decoration: none; }
+.dc table.grid tr.sel td:first-child { box-shadow: inset 4px 0 0 var(--accent); }
+.dc table.grid tr.sel td { font-weight: 600; }
+.dc-n-ins { color: var(--ok); font-weight: 600; }
+.dc-n-upd { color: var(--warn); font-weight: 600; }
+.dc-n-del { color: var(--danger); font-weight: 600; }
+.dc-ok { color: var(--text); }
+.dc-actions { padding-top: 4px; }
+.dc-details { margin-top: 12px; }
+.dc-details h3 { margin: 8px 0 4px; font-size: 14px; }
+.dc-samples { max-height: 420px; }
+.dc-samples td { font-family: var(--mono); font-size: 12px; max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dc-samples th.dc-key { text-decoration: underline; }
+.dc-samples td.dc-new { background: var(--new); }
+.dc-samples td.dc-old { background: var(--deleted); }
+.dc-samples td.dc-same { color: var(--muted); }
+.dc-samples tr.dc-pair-end td { border-bottom: 2px solid var(--border); }

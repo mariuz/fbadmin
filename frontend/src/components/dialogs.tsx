@@ -257,7 +257,7 @@ export function ConfirmDialog(props: {
       {props.confirmText && (
         <>
           <p className="muted">{typePre}<b>{props.confirmText}</b>{typePost}</p>
-          <input className="text" autoFocus value={typed} onChange={(e) => setTyped(e.target.value)} style={{ width: "100%" }} />
+          <input className="text" autoFocus aria-label={t("Type {text} to confirm.", { text: props.confirmText })} value={typed} onChange={(e) => setTyped(e.target.value)} style={{ width: "100%" }} />
         </>
       )}
     </Modal>

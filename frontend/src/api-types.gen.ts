@@ -483,6 +483,94 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/datacompare/compare": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Compare */
+        post: operations["compare_api_datacompare_compare_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/datacompare/jobs/{job_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Result */
+        get: operations["result_api_datacompare_jobs__job_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/datacompare/jobs/{job_id}/samples": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Samples */
+        get: operations["samples_api_datacompare_jobs__job_id__samples_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/datacompare/jobs/{job_id}/script": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Script */
+        get: operations["script_api_datacompare_jobs__job_id__script_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/datacompare/tables": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Tables
+         * @description The tables of both databases and how each would be compared (key, columns) or why not.
+         */
+        post: operations["tables_api_datacompare_tables_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -1201,6 +1289,26 @@ export interface paths {
         put?: never;
         /** Connect Database */
         post: operations["connect_database_api_servers__server_id__databases__db_id__connect_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/servers/{server_id}/databases/{db_id}/datacompare/{job_id}/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Apply
+         * @description Run the sync script on the target in one transaction (rolled back on any error).
+         */
+        post: operations["apply_api_servers__server_id__databases__db_id__datacompare__job_id__apply_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3323,6 +3431,14 @@ export interface components {
             /** Sql */
             sql?: string | null;
         };
+        /** ApplyIn */
+        ApplyIn: {
+            /**
+             * Confirm
+             * @default false
+             */
+            confirm?: boolean;
+        };
         /** AskIn */
         AskIn: {
             /** Database Id */
@@ -3446,6 +3562,38 @@ export interface components {
             settings?: {
                 [key: string]: unknown;
             } | null;
+        };
+        /** CompareIn */
+        CompareIn: {
+            /**
+             * Deletes
+             * @default true
+             */
+            deletes?: boolean;
+            /**
+             * Ignore Columns
+             * @default []
+             */
+            ignore_columns?: string[];
+            /**
+             * Inserts
+             * @default true
+             */
+            inserts?: boolean;
+            /**
+             * Max Differences
+             * @default 100
+             */
+            max_differences?: number;
+            source: components["schemas"]["Endpoint"];
+            /** Tables */
+            tables: components["schemas"]["TableIn"][];
+            target: components["schemas"]["Endpoint"];
+            /**
+             * Updates
+             * @default true
+             */
+            updates?: boolean;
         };
         /** ConfIn */
         ConfIn: {
@@ -3811,6 +3959,16 @@ export interface components {
              * @default true
              */
             wait?: boolean;
+        };
+        /** PairIn */
+        PairIn: {
+            /**
+             * Ignore Columns
+             * @default []
+             */
+            ignore_columns?: string[];
+            source: components["schemas"]["Endpoint"];
+            target: components["schemas"]["Endpoint"];
         };
         /** PasswordChangeIn */
         PasswordChangeIn: {
@@ -4258,6 +4416,18 @@ export interface components {
             password?: string | null;
             /** Security Db */
             security_db?: string | null;
+        };
+        /** TableIn */
+        TableIn: {
+            /**
+             * Ignore Columns
+             * @default []
+             */
+            ignore_columns?: string[];
+            /** Name */
+            name: string;
+            /** Where */
+            where?: string | null;
         };
         /** TablesIn */
         TablesIn: {
@@ -5572,6 +5742,167 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["VaultIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    compare_api_datacompare_compare_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompareIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    result_api_datacompare_jobs__job_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    samples_api_datacompare_jobs__job_id__samples_get: {
+        parameters: {
+            query: {
+                table: string;
+            };
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    script_api_datacompare_jobs__job_id__script_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    tables_api_datacompare_tables_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PairIn"];
             };
         };
         responses: {
@@ -7106,6 +7437,43 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    apply_api_servers__server_id__databases__db_id__datacompare__job_id__apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                server_id: string;
+                db_id: string;
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApplyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
                 headers: {
                     [name: string]: unknown;
                 };
