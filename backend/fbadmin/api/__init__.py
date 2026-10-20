@@ -21,6 +21,7 @@ from . import auth
 from . import fbsecurity
 from . import storage
 from . import alerts
+from . import debug
 
 ROUTERS: list[APIRouter] = [
     servers.router,
@@ -44,4 +45,5 @@ ROUTERS: list[APIRouter] = [
     fbsecurity.router,
     storage.router,
     alerts.router,
+    debug.router,
 ]
