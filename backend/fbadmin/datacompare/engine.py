@@ -19,10 +19,9 @@ to temporary files, then merged with ``heapq.merge``). The result is always comp
 consistent ordering, so collation differences cannot produce false differences, and the common
 case costs nothing extra.
 
-Values are compared as returned by the driver, with a few normalisations: INT128 and
-NUMERIC/DECIMAL backed by INT128 are read as text and converted (the pure-Python driver decodes
-large values wrongly), TIME/TIMESTAMP WITH TIME ZONE are read as text (the driver loses the zone),
-CHAR values have their padding removed (by the driver), NaN equals NaN, and BLOBs are compared by
+Values are compared as returned by the driver, with a few normalisations: TIME/TIMESTAMP WITH
+TIME ZONE are read as Firebird's text (so the zone counts: Python compares aware datetimes by
+instant only), CHAR values have their padding removed (by the driver), NaN equals NaN, and BLOBs are compared by
 content.
 
 Script
@@ -95,13 +94,11 @@ def column_info(c: dict) -> Column:
     col = Column(name=c["name"], data_type=c["data_type"], select=q, identity=c.get("identity"),
                  not_null=bool(c.get("not_null")), has_default=bool(c.get("default")),
                  computed=bool(c.get("computed")))
-    if ft == 26:  # INT128, and NUMERIC/DECIMAL with precision > 18 (Firebird 4+)
-        col.select = f"CAST({q} AS VARCHAR(48))"
-        if c["data_type"].upper().startswith(("NUMERIC", "DECIMAL")):
-            col.kind, col.conv = "numeric", decimal.Decimal
-        else:
-            col.kind, col.conv = "int", int
-    elif ft == 28:
+    # INT128 (ft 26) needs nothing special: fbadmin.driver_patches decodes it (and NUMERIC/DECIMAL
+    # with precision > 18) correctly. The time zone types are read as Firebird's text on purpose:
+    # the zone is part of the value (Python compares aware datetimes by instant only, so
+    # 10:00 Europe/Bucharest would equal 08:00 UTC) and the text is the literal of the script.
+    if ft == 28:
         col.kind, col.select = "time_tz", f"CAST({q} AS VARCHAR(80))"
     elif ft == 29:
         col.kind, col.select = "timestamp_tz", f"CAST({q} AS VARCHAR(80))"

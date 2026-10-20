@@ -13,6 +13,7 @@ import decimal
 import io
 import itertools
 import json
+import math
 import re
 import tempfile
 import time
@@ -23,7 +24,7 @@ from typing import Any
 
 from ..config import settings
 from ..metadata.types import quote_ident
-from ..serialize import to_json
+from ..serialize import fb_temporal_text, to_json
 
 FORMATS = ("csv", "json", "xlsx")
 
@@ -421,6 +422,20 @@ def converter(data_type: str, empty_as_null: bool = True):
                 return s == "1"
             raise ValueError(f"not a boolean: {v!r}")
         return conv
+    if "TIME ZONE" in t:
+        ts = t.startswith("TIMESTAMP")
+
+        def conv(v):
+            if blank(v):
+                return None
+            if isinstance(v, (dt.datetime, dt.time)):
+                return v
+            s = str(v).strip()
+            try:  # ISO 8601 with an offset ("2024-07-01T10:11:12+02:00", "...Z")
+                return dt.datetime.fromisoformat(s.replace("Z", "+00:00")) if ts else dt.time.fromisoformat(s)
+            except ValueError:  # Firebird's own text, e.g. "2024-07-01 10:11:12.3456 Europe/Bucharest"
+                return s
+        return conv
     if t.startswith("TIMESTAMP"):
         def conv(v):
             if blank(v):
@@ -556,9 +571,14 @@ def sql_literal(v: Any) -> str:
     if isinstance(v, bool):
         return "TRUE" if v else "FALSE"
     if isinstance(v, (int, float, decimal.Decimal)):
-        return str(v)
+        s = str(v)
+        # NaN/Infinity, and DECFLOAT exponents as text (a bare 1E+384 would be a DOUBLE literal)
+        quote = (isinstance(v, decimal.Decimal) and "E" in s) or (isinstance(v, float) and not math.isfinite(v))
+        return f"'{s}'" if quote or s in ("NaN", "Infinity", "-Infinity", "sNaN") else s
     if isinstance(v, (bytes, bytearray, memoryview)):
         return f"x'{bytes(v).hex().upper()}'"
+    if isinstance(v, (dt.datetime, dt.time)) and (v.tzinfo is not None or v.microsecond):
+        return f"'{fb_temporal_text(v)}'"  # zone name kept; Firebird parses at most 4 fraction digits
     if isinstance(v, dt.datetime):
         return f"'{v.isoformat(sep=' ')}'"
     if isinstance(v, (dt.date, dt.time)):
@@ -571,6 +591,8 @@ def _text(v: Any) -> str:
         return ""
     if isinstance(v, bool):
         return "true" if v else "false"
+    if isinstance(v, (dt.datetime, dt.time)) and v.tzinfo is not None:
+        return fb_temporal_text(v)
     if isinstance(v, dt.datetime):
         return v.isoformat(sep=" ")
     if isinstance(v, (bytes, bytearray, memoryview)):
@@ -647,11 +669,11 @@ def _xlsx_value(v: Any) -> Any:
     if isinstance(v, (bytes, bytearray, memoryview)):
         return "0x" + bytes(v).hex().upper()
     if isinstance(v, decimal.Decimal):
-        return float(v) if abs(v) < 10**15 else str(v)
+        # a number only if the float is exact (NUMERIC(38,x), DECFLOAT(34) can have more digits)
+        f = float(v) if v.is_finite() else None
+        return f if f is not None and decimal.Decimal(repr(f)) == v else str(v)
     if isinstance(v, int) and abs(v) > 2**53:
         return str(v)
-    if isinstance(v, dt.datetime) and v.tzinfo:
-        return v.replace(tzinfo=None)
-    if isinstance(v, dt.time) and v.tzinfo:
-        return v.replace(tzinfo=None)
+    if isinstance(v, (dt.datetime, dt.time)) and v.tzinfo:
+        return fb_temporal_text(v)  # Excel has no time zones: keep Firebird's text with the zone
     return v

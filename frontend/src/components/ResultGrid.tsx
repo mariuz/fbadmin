@@ -11,12 +11,16 @@ const NUMERIC = /INT|NUMERIC|DOUBLE|FLOAT|DECFLOAT|SMALLINT|BIGINT/;
 /** Text shown in grid cells: honours the date format preference. */
 export function displayValue(v: unknown, type: string): string {
   const s = cellText(v);
-  if (getPrefs().dateFormat === "locale" && typeof v === "string" && /TIMESTAMP|DATE|TIME/.test(type)) {
+  // WITH TIME ZONE values keep Firebird's text (zone name or offset), not the browser's zone.
+  if (getPrefs().dateFormat === "locale" && typeof v === "string" && /TIMESTAMP|DATE|TIME/.test(type) && !/TIME ZONE/.test(type)) {
     const d = /^\d{4}-\d{2}-\d{2}/.test(s) ? new Date(s.length === 10 ? s + "T00:00:00" : s) : null;
     if (d && !isNaN(d.getTime())) return type.startsWith("DATE") ? d.toLocaleDateString() : d.toLocaleString();
   }
-  return s.replace("T", /TIMESTAMP/.test(type) ? " " : "T");
+  return /TIMESTAMP/.test(type) ? isoSpace(s) : s;
 }
+
+/** "2024-07-01T10:11:12" -> "2024-07-01 10:11:12": only the date/time separator (zone names contain "T"). */
+const isoSpace = (s: string) => s.replace(/^(\d{4}-\d{2}-\d{2})T/, "$1 ");
 
 export function cellText(v: unknown): string {
   if (v === null || v === undefined) return "";
@@ -42,7 +46,8 @@ function sqlLiteral(v: unknown, type: string): string {
   const s = String(v);
   if (NUMERIC.test(type) && /^-?\d+(\.\d+)?(e[-+]?\d+)?$/i.test(s)) return s;
   if (/^0x[0-9A-F]+$/.test(s) && /BLOB|CHAR/.test(type)) return `x'${s.slice(2)}'`;
-  if (/TIMESTAMP|DATE|TIME/.test(type)) return `'${s.replace("T", " ")}'`;
+  // Firebird parses "YYYY-MM-DD HH:MM:SS.ffff [zone]": no "T", at most 4 fraction digits
+  if (/TIMESTAMP|DATE|TIME/.test(type)) return `'${isoSpace(s).replace(/(:\d{2}\.\d{4})\d+/, "$1")}'`;
   return `'${s.replace(/'/g, "''")}'`;
 }
 
