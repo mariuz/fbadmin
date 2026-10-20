@@ -165,7 +165,7 @@ exact DDL before it runs, like pgAdmin.
 - ✅ Official multi-arch Docker image (amd64 and arm64), Helm chart, Kubernetes example with the Firebird operator (`deploy/k8s`: StatefulSet. `deploy/k8s-operator`: a `FirebirdCluster` from the [cloudnative-firebird](https://github.com/mariuz/cloudnative-firebird) operator, with fbadmin registered from a ConfigMap; a kind workflow runs it end to end. Helm `firebirdServers` for preconfigured servers)
 - ✅ **Desktop app:** pywebview or Tauri shell with auto-update, for Windows (MSI), macOS (dmg) and Linux (AppImage, deb, rpm, Flatpak). Verified in CI on every packaging change: the MSI installs, runs and uninstalls on Windows; the dmg mounts and the app runs on macOS arm64 and Intel; the deb installs and the AppImage runs on Linux; the rpm and Flatpak bundle are built. Self-update downloads the package, verifies it against `SHA256SUMS`, then runs the MSI, replaces the AppImage or opens the dmg; this was exercised on a real AppImage, which replaced itself and restarted. Builds ship unsigned by the owner's decision (signing is deferred); the signing steps (macOS codesign + notarization, Windows signtool for the exe and MSI) are ready and run once the signing secrets are configured, and packages are attached to GitHub Releases only for version tags
 - ✅ Preferences dialog: editor font, keymap, grid NULL display, date formats, confirmations
-- ✅ Internationalisation (i18n): English, Romanian, Portuguese (Brazil), Spanish, Russian, German, French and Czech (2587 strings in each language; CI checks that every catalog is complete)
+- ✅ Internationalisation (i18n): English, Romanian, Portuguese (Brazil), Spanish, Russian, German, French and Czech (2589 strings in each language; CI checks that every catalog is complete)
 - ✅ Accessibility: keyboard tree navigation, ARIA roles, high-contrast theme (landmarks, ARIA tabs, menus and dialogs, labelled fields, axe-core audit in e2e in three themes)
 - ✅ Documentation site (MkDocs), a user guide with screenshots, and an admin guide for server mode (built with `mkdocs build --strict` in CI; it deploys to GitHub Pages as soon as Pages is enabled in the repository settings, Source: GitHub Actions)
 - ✅ Plugin API for extra tree nodes, dashboard panels and tools
@@ -175,7 +175,7 @@ exact DDL before it runs, like pgAdmin.
 
 ## Engineering backlog ✅
 
-- ✅ Frontend end-to-end tests with Playwright, run in CI against a Firebird container (70 specs: core flows, every feature module, Firebird 6 schemas, accessibility, languages, alerts, backup storage, data compare, local databases, events, upgrade checks, PSQL debugging, 2FA/tokens/permissions, query library, overview, query builder, charts, schema history)
+- ✅ Frontend end-to-end tests with Playwright, run in CI against a Firebird container (83 specs: core flows, every feature module, Firebird 6 schemas, accessibility, languages, alerts, backup storage, data compare, local databases, events, upgrade checks, PSQL debugging, 2FA/tokens/permissions, query library, overview, query builder, charts, schema history, phones and tablets)
 - ✅ Generate a typed API client from FastAPI's OpenAPI schema (request bodies typed through `Body<path, method>`; most responses are still hand-typed)
 - ✅ Code-split the frontend bundle (CodeMirror and grid chunks)
 - ✅ Async driver (`firebirdsql.aio`) or a worker pool for long-running statements, so one slow query never blocks the metadata connection
@@ -221,7 +221,7 @@ Also fixed in this milestone:
 
 - ⬜ **Code signing** of the desktop builds (deferred; the workflow is ready and needs the owner's certificates as repository secrets)
 - ⬜ **Community translations** through Weblate, and more languages
-- ⬜ **Phone and tablet layout** for checking on servers away from a desk
+- ✅ **Phone and tablet layout** for checking on servers away from a desk: the Object Explorer as a drawer, a ⋯ menu for the toolbar, touch-sized targets, long-press and ⋮ action sheets, full-screen dialogs, the server overview as the phone landing page, a collapsible sidebar on tablets, and add-to-home-screen icons; tested on emulated Pixel, iPhone and iPad screens with accessibility audits in all themes ([docs/MOBILE.md](docs/MOBILE.md))
 
 ## How to contribute to the roadmap
 

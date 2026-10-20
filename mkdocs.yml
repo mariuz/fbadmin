@@ -83,6 +83,7 @@ nav:
       - Monitoring and maintenance: user-guide/monitoring.md
       - Monitoring and performance: MONITORING.md
       - Server overview: OVERVIEW.md
+      - Phones and tablets: MOBILE.md
       - Event monitor: EVENTS.md
   - Administration:
       - Overview: admin/index.md
