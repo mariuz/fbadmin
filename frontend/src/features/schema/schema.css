@@ -100,3 +100,10 @@ table.sch-erd-cols td { padding: 2px 3px; font-family: var(--mono); }
 table.sch-erd-cols td input.text { width: 100%; padding: 2px 4px; font-family: var(--mono); font-size: 12px; }
 table.sch-erd-cols tr.new td { background: var(--new); }
 .sch-erd-rel { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-family: var(--mono); font-size: 11.5px; padding: 2px 0; }
+
+/* ERD export dialog */
+.erd-export-preview { border: 1px solid var(--border); border-radius: var(--radius); height: 200px; display: flex; align-items: center; justify-content: center; overflow: hidden;
+  background-image: linear-gradient(45deg, var(--hover) 25%, transparent 25%, transparent 75%, var(--hover) 75%), linear-gradient(45deg, var(--hover) 25%, transparent 25%, transparent 75%, var(--hover) 75%);
+  background-size: 16px 16px; background-position: 0 0, 8px 8px; }
+.erd-export-preview img { max-width: 100%; max-height: 196px; display: block; }
+.erd-export .seg { justify-self: start; }

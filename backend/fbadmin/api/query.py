@@ -8,6 +8,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from ..config import settings
+from .. import schemahistory as schema_history
 from ..query import ISOLATIONS, TxOptions, end_transaction, explain, fetch_more, run_script
 from ..sqlsplit import script_params
 from .deps import get_state
@@ -96,9 +97,11 @@ def execute(sid: str, body: ExecuteIn):
         if body.with_stats and sess.attachment_id is not None:
             def stats():
                 return st.manager.attachment_stats(sess.server_id, sess.db_id, sess.attachment_id)
-        return run_script(sess.conn, body.sql, autocommit=autocommit, max_rows=max_rows,
-                          with_plan=body.with_plan, state=sess, params=body.params, stats=stats,
-                          keep_cursor=body.keep_cursor)
+        res = run_script(sess.conn, body.sql, autocommit=autocommit, max_rows=max_rows,
+                         with_plan=body.with_plan, state=sess, params=body.params, stats=stats,
+                         keep_cursor=body.keep_cursor)
+    schema_history.after_sql(sess.server_id, sess.db_id, body.sql, res["transaction_open"])
+    return res
 
 
 @router.post("/sessions/{sid}/fetch")
@@ -140,6 +143,7 @@ def commit(sid: str):
         sess.close_cursor()
         end_transaction(sess.conn, commit=True)
         sess.dirty = False
+    schema_history.after_commit(sess.server_id, sess.db_id)
     return {"transaction_open": False}
 
 
