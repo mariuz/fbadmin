@@ -1,0 +1,22 @@
+/* Event monitor (milestone 1.2) */
+.ev .ev-side { width: 440px; flex: none; overflow: auto; padding: 12px 14px; border-right: 1px solid var(--border); background: var(--panel-2); }
+.ev .ev-main { flex: 1; min-width: 0; }
+.ev .ev-title { font-size: 16px; margin: 0 0 12px; }
+.ev .ev-title .muted { font-weight: 400; font-size: 13px; }
+.ev .small { font-size: 12px; }
+.ev .ev-openerr { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; border: 1px solid var(--danger); border-radius: 8px; padding: 10px 12px; margin-bottom: 14px; white-space: pre-wrap; }
+.ev table.ev-names { width: 100%; margin-top: 10px; min-width: 0; }
+.ev table.ev-names td, .ev table.ev-names th { vertical-align: middle; }
+.ev table.ev-names td.mono { word-break: break-all; }
+.ev .ev-empty { margin-top: 8px; }
+.ev tr.ev-flash td { background: var(--accent-soft); transition: background .6s; }
+.ev .ev-spark { display: block; }
+.ev .ev-spark polyline { stroke: var(--accent); stroke-width: 1.5; stroke-linejoin: round; }
+.ev .ev-spark .base { stroke: var(--border); stroke-width: 1; }
+.ev .ev-sugg { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.ev .ev-sugg li { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.ev .ev-sugg li .btn { align-self: center; }
+@media (max-width: 900px) {
+  .ev { flex-direction: column; }
+  .ev .ev-side { width: auto; border-right: 0; border-bottom: 1px solid var(--border); max-height: 55%; }
+}

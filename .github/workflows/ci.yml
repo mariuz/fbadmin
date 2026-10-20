@@ -31,6 +31,13 @@ jobs:
       - run: ruff check backend
       - name: Wait for Firebird
         run: for _ in $(seq 1 30); do (echo > /dev/tcp/127.0.0.1/3050) 2>/dev/null && break; sleep 1; done
+      # events need a reachable RemoteAuxPort: a second container with a fixed, published aux port
+      # (the service above keeps the default random one, for the "unreachable" test)
+      - name: Firebird with a fixed RemoteAuxPort (event monitor tests)
+        shell: bash
+        run: scripts/events-test-server.sh "${FB_VERSION%%-*}" | sed -n 's/^export //p' >> "$GITHUB_ENV"
+        env:
+          FB_VERSION: ${{ matrix.firebird }}
       # includes the hypothesis fuzz tests of the SQL splitter and the generated-schema DDL round trips
       - run: pytest -q backend/tests
         env:
@@ -208,12 +215,15 @@ jobs:
         run: npm ci && npx playwright install --with-deps chromium
       - name: Wait for Firebird
         run: for _ in $(seq 1 30); do (echo > /dev/tcp/127.0.0.1/3050) 2>/dev/null && break; sleep 1; done
+      - name: Firebird 5 with a fixed RemoteAuxPort (event monitor)
+        run: scripts/events-test-server.sh 5
       - name: Run the e2e tests
         working-directory: e2e
         run: npx playwright test
         env:
           FBADMIN_PYTHON: python
           FB_DB_DIR: /var/lib/firebird/data
+          FB_EVENTS_PORT: "3060"
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
