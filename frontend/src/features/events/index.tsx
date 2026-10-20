@@ -148,11 +148,16 @@ export function EventMonitorPanel(props: { serverId: string; dbId: string; visib
   useEffect(() => { loadSuggestions(); }, [props.serverId, props.dbId]);
 
   const registered = new Set(session?.names.map((n) => n.name) ?? []);
-  const add = (names: string[]) => {
+  /** ``typed``: the text box content being submitted; the box is cleared afterwards only if it still
+   * holds that text (a registration from a suggestion must not wipe what the user typed meanwhile). */
+  const add = (names: string[], typed?: string) => {
     if (!session) return;
     const fresh = names.filter((n) => !registered.has(n));
     if (!fresh.length) return;
-    run(async () => { apply(await eapi.register(props.serverId, props.dbId, session.id, fresh)); setAddText(""); });
+    run(async () => {
+      apply(await eapi.register(props.serverId, props.dbId, session.id, fresh));
+      if (typed !== undefined) setAddText((cur) => (cur === typed ? "" : cur));
+    });
   };
   const remove = (name: string) => session && run(async () => apply(await eapi.unregister(props.serverId, props.dbId, session.id, [name])));
   const reconnect = () => session && run(async () => {
@@ -183,7 +188,7 @@ export function EventMonitorPanel(props: { serverId: string; dbId: string; visib
         )}
         <Section title={t("Registered events")} wide
           hint={t("Counts are per name since it was registered (or the counters were reset). Events posted in a transaction arrive when it commits.")}>
-          <form className="mt-row" onSubmit={(e) => { e.preventDefault(); add(splitNames(addText)); }}>
+          <form className="mt-row" onSubmit={(e) => { e.preventDefault(); add(splitNames(addText), addText); }}>
             <label htmlFor={ids + "add"} className="sr-only">{t("Event names to register")}</label>
             <input id={ids + "add"} className="text" style={{ flex: 1, minWidth: 160 }} placeholder={t("EVENT_NAME, OTHER_EVENT …")}
               value={addText} onChange={(e) => setAddText(e.target.value)} disabled={!session} />
