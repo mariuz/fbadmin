@@ -74,6 +74,7 @@ nav:
       - Schema tools: SCHEMA_TOOLS.md
       - Data compare: DATA_COMPARE.md
       - Firebird 6 and SQL schemas: FIREBIRD6.md
+      - Upgrade assistant: UPGRADE.md
       - Monitoring and maintenance: user-guide/monitoring.md
       - Monitoring and performance: MONITORING.md
   - Administration:

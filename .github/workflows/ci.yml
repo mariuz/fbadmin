@@ -13,6 +13,10 @@ jobs:
       fail-fast: false
       matrix:
         firebird: ["3", "4", "5", "6-snapshot"]
+        include:  # a newer server for the upgrade assistant's cross-version trial restore
+          - { firebird: "3", next: "5" }
+          - { firebird: "4", next: "5" }
+          - { firebird: "5", next: "6-snapshot" }
     # Firebird 6 is pre-release: report, but do not fail the build
     continue-on-error: ${{ matrix.firebird == '6-snapshot' }}
     services:
@@ -22,6 +26,13 @@ jobs:
           FIREBIRD_ROOT_PASSWORD: masterkey
         ports:
           - 3050:3050
+      firebird_next:
+        # an empty image (Firebird 6, no newer version) skips this service
+        image: ${{ matrix.next && format('firebirdsql/firebird:{0}', matrix.next) || '' }}
+        env:
+          FIREBIRD_ROOT_PASSWORD: masterkey
+        ports:
+          - 3057:3050
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -32,9 +43,13 @@ jobs:
       - name: Wait for Firebird
         run: for _ in $(seq 1 30); do (echo > /dev/tcp/127.0.0.1/3050) 2>/dev/null && break; sleep 1; done
       # includes the hypothesis fuzz tests of the SQL splitter and the generated-schema DDL round trips
+      - name: Wait for the newer Firebird (upgrade trial restore)
+        if: matrix.next
+        run: for _ in $(seq 1 60); do (echo > /dev/tcp/127.0.0.1/3057) 2>/dev/null && break; sleep 1; done
       - run: pytest -q backend/tests
         env:
           FBADMIN_TEST_DIR: /var/lib/firebird/data
+          FBADMIN_TEST_UPGRADE_PORT: ${{ matrix.next && '3057' || '' }}
       - name: Native driver adapter (firebird-driver + libfbclient)
         if: matrix.firebird == '5'
         run: |

@@ -12,3 +12,4 @@ import "./alerts";
 import "./storage";
 import "./datacompare";
 import "./embedded";
+import "./upgrade";

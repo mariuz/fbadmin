@@ -23,6 +23,7 @@ from . import storage
 from . import alerts
 from . import datacompare
 from . import embedded
+from . import upgrade
 
 ROUTERS: list[APIRouter] = [
     servers.router,
@@ -48,4 +49,5 @@ ROUTERS: list[APIRouter] = [
     alerts.router,
     datacompare.router,
     embedded.router,
+    upgrade.router,
 ]
