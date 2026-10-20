@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 from fastapi import APIRouter, Query
 from pydantic import BaseModel
 
@@ -184,6 +186,19 @@ def table_count(server_id: str, db_id: str, name: str):
         return {"count": cur.fetchone()[0]}
 
 
+# DATE, TIME, TIMESTAMP, TIME / TIMESTAMP WITH TIME ZONE (RDB$FIELD_TYPE)
+_TEMPORAL_TYPES = {12, 13, 35, 28, 29}
+_ISO_T = re.compile(r"^(\d{4}-\d{2}-\d{2})T(?=\d)")
+_LONG_FRACTION = re.compile(r"(\d{2}:\d{2}:\d{2}\.\d{4})\d+")
+
+
+def _temporal_text(s: str) -> str:
+    """Grid text of a date/time value in a form Firebird parses: the JSON of plain TIMESTAMPs is
+    ISO 8601 (``2024-07-01T10:11:12.345600``) but Firebird wants a space and at most 4 fraction
+    digits. The WITH TIME ZONE values already are Firebird's text (``... Europe/Bucharest``)."""
+    return _LONG_FRACTION.sub(r"\1", _ISO_T.sub(r"\1 ", s.strip()))
+
+
 def _param(v):
     """Grid values: {"$hex": "..."} is binary data (file upload); everything else is passed as-is."""
     if isinstance(v, dict) and "$hex" in v:
@@ -196,6 +211,11 @@ def save_table_data(server_id: str, db_id: str, name: str, body: DataChanges):
     """Apply grid edits in one transaction. Rows are identified by primary key (or DB_KEY)."""
     statements = []
     qn = quote_ident(name)
+    temporal: set[str] = set()
+
+    def val(col: str, v):
+        v = _param(v)
+        return _temporal_text(v) if col in temporal and isinstance(v, str) else v
 
     def where(key: dict) -> tuple[str, list]:
         parts, params = [], []
@@ -207,31 +227,32 @@ def save_table_data(server_id: str, db_id: str, name: str, body: DataChanges):
                 parts.append(f"{quote_ident(k)} IS NULL")
             else:
                 parts.append(f"{quote_ident(k)} = ?")
-                params.append(v)
+                params.append(val(k, v))
         if not parts:
             raise ValueError("Row key is required for update/delete")
         return " AND ".join(parts), params
 
-    for d in body.deletes:
-        w, p = where(d.key or {})
-        statements.append((f"DELETE FROM {qn} WHERE {w}", p))
-    for u in body.updates:
-        if not u.values:
-            continue
-        w, p = where(u.key or {})
-        sets = ", ".join(f"{quote_ident(k)} = ?" for k in u.values)
-        statements.append((f"UPDATE {qn} SET {sets} WHERE {w}", [_param(x) for x in u.values.values()] + p))
-    for i in body.inserts:
-        vals = i.values or {}
-        if vals:
-            cols = ", ".join(quote_ident(k) for k in vals)
-            marks = ", ".join("?" for _ in vals)
-            statements.append((f"INSERT INTO {qn} ({cols}) VALUES ({marks})", [_param(x) for x in vals.values()]))
-        else:
-            statements.append((f"INSERT INTO {qn} DEFAULT VALUES", []))
-
     affected = 0
     with get_state().manager.meta(server_id, db_id) as conn:
+        temporal.update(c["name"] for c in Catalog(conn).columns(name) if c.get("field_type") in _TEMPORAL_TYPES)
+        for d in body.deletes:
+            w, p = where(d.key or {})
+            statements.append((f"DELETE FROM {qn} WHERE {w}", p))
+        for u in body.updates:
+            if not u.values:
+                continue
+            w, p = where(u.key or {})
+            sets = ", ".join(f"{quote_ident(k)} = ?" for k in u.values)
+            statements.append((f"UPDATE {qn} SET {sets} WHERE {w}", [val(k, x) for k, x in u.values.items()] + p))
+        for i in body.inserts:
+            vals = i.values or {}
+            if vals:
+                cols = ", ".join(quote_ident(k) for k in vals)
+                marks = ", ".join("?" for _ in vals)
+                statements.append((f"INSERT INTO {qn} ({cols}) VALUES ({marks})", [val(k, x) for k, x in vals.items()]))
+            else:
+                statements.append((f"INSERT INTO {qn} DEFAULT VALUES", []))
+
         cur = conn.cursor()
         for sql, params in statements:
             cur.execute(sql, params)

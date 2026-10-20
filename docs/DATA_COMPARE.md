@@ -115,8 +115,8 @@ collation difference never produces false differences.
 
 Values are compared as Firebird returns them: `NULL` equals only `NULL`, numbers by value
 (`1.50` equals `1.5`), `CHAR` without trailing padding, BLOBs by content, time zone values
-including their zone. `INT128`, large `NUMERIC`/`DECIMAL` and the time zone types are read as
-text on Firebird 4+ to keep their exact value.
+including their zone (the time zone types are read as Firebird's text, so `10:00 Europe/Bucharest`
+and `08:00 UTC` differ even though they are the same instant).
 
 ## Limitations
 

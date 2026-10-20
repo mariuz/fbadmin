@@ -14,6 +14,18 @@
    as text by the driver and raise ``UnicodeDecodeError``. Return ``bytes`` for them, and fall
    back to ``bytes`` for any value that is not valid in the connection charset.
 
+4. Firebird 4+ types (see ``fbadmin/fb4types.py``): the driver decodes INT128 (and NUMERIC/DECIMAL
+   with precision > 18, stored as INT128) wrongly when the low 64 bits have the top bit set, drops
+   the time zone of offset zones (``+05:30`` comes back as UTC), converts TIME WITH TIME ZONE
+   in region zones with today's date instead of Firebird's base date (2020-01-01), and cannot
+   read the ``EXTENDED`` variants (``SET BIND OF TIME ZONE TO EXTENDED``). As parameters, integers
+   beyond BIGINT and decimals with more than 18 digits are silently truncated to 64 bits, offset
+   time zones raise ``KeyError`` and DECFLOAT-range decimals raise ``ValueError``. DECFLOAT values
+   with all 16 / 34 digits and a leading 8 or 9 are decoded wrongly (operator precedence in
+   ``decfloat.py``). Values are decoded by ``fb4types.decode``, time zone values are fetched in
+   the EXTENDED format (with the server's offset), and such parameters are encoded by
+   ``fb4types.encode_param`` (INT128, DECFLOAT(34), TIME/TIMESTAMP WITH TIME ZONE).
+
 Each patch only applies if the driver source still looks the way we expect.
 """
 
@@ -35,9 +47,12 @@ def apply() -> None:
         return
     _applied = True
     _patch_octets_fetch()
+    _patch_fb4_types()
     _patch_calc_blr()
     try:
         from firebirdsql import wireprotocol
+
+        from . import fb4types
 
         fn = wireprotocol.WireProtocol.params_to_blr
         src = textwrap.dedent(inspect.getsource(fn))
@@ -48,6 +63,15 @@ def apply() -> None:
         indent = m.group(1)
         # first occurrences: the str->bytes conversion and the short-bytes branch
         src = src.replace(m.group(0), f"\n{indent}_was_str = isinstance(p, str)\n{indent}if _was_str:\n", 1)
+        hook = re.search(r"\n( +)t = type\(p\)\n\1if p is None:\n", src)
+        if hook is None:
+            log.info("firebirdsql params_to_blr changed upstream; INT128/time zone parameter patch skipped")
+        else:
+            h = hook.group(1)
+            src = src[: hook.start()] + (
+                f"\n{h}t = type(p)\n{h}_x = _special_param(self, p)\n{h}if _x is not None:\n"
+                f"{h}    v, _b = _x\n{h}    blr += _b\n{h}elif p is None:\n"
+            ) + src[hook.end():]
         block = re.search(
             r"\n( +)v = p\n\1nbytes = len\(v\)\n\1pad_length = \(\(4-nbytes\) & 3\)\n"
             r"\1v \+= bytes\(\[0\]\) \* pad_length\n\1blr \+= bytes\(\[14, nbytes & 255, nbytes >> 8\]\)\n",
@@ -64,6 +88,7 @@ def apply() -> None:
         src = src[: block.start()] + replacement + src[block.end():]
         ns: dict = {}
         wireprotocol._param_value = _param_value
+        wireprotocol._special_param = fb4types.encode_param
         exec(compile(src, "<fbadmin driver patch>", "exec"), wireprotocol.__dict__, ns)  # noqa: S102
         wireprotocol.WireProtocol.params_to_blr = ns["params_to_blr"]
     except Exception:  # noqa: BLE001 - never break startup because of a patch
@@ -102,6 +127,33 @@ def _patch_octets_fetch() -> None:
         xsqlvar.XSQLVAR.value = value
     except Exception:  # noqa: BLE001
         log.exception("could not patch firebirdsql XSQLVAR.value")
+
+
+def _patch_fb4_types() -> None:
+    try:
+        from firebirdsql import xsqlvar
+
+        from . import fb4types
+
+        # Fetch time zone values in the EXTENDED format (with the server's offset); the EXTENDED
+        # types themselves (SET BIND OF TIME ZONE TO EXTENDED) are unknown to the driver.
+        xsqlvar.XSQLVAR.type_length.update(fb4types.WIRE_LENGTH)
+        xsqlvar.XSQLVAR.type_display_length.update(fb4types.DISPLAY_LENGTH)
+        xsqlvar.sqltype2blr.update(fb4types.OUTPUT_BLR)
+        original = xsqlvar.XSQLVAR.value
+
+        def value(self, raw_value):
+            if self.sqltype in fb4types.FB4_TYPES:
+                try:
+                    return fb4types.decode(self.sqltype, self.sqlscale or 0, bytes(raw_value))
+                except Exception:  # noqa: BLE001 - raising here would break the fetch stream
+                    log.exception("could not decode a value of type %s", self.sqltype)
+                    return bytes(raw_value)
+            return original(self, raw_value)
+
+        xsqlvar.XSQLVAR.value = value
+    except Exception:  # noqa: BLE001
+        log.exception("could not patch firebirdsql INT128 / time zone decoding")
 
 
 def _patch_calc_blr() -> None:

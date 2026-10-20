@@ -6,7 +6,7 @@ and in the "Apply to target" job. ``kind`` is a hint derived from the target col
 
 * ``decfloat``: ``CAST('1.5E+300' AS DECFLOAT(34))`` (also NaN/Infinity, huge exponents)
 * ``time_tz`` / ``timestamp_tz``: the value is the server's own text form (the columns are
-  selected as ``CAST(.. AS VARCHAR)`` because the driver loses the zone), e.g.
+  selected as ``CAST(.. AS VARCHAR)`` so the zone counts in the comparison), e.g.
   ``TIMESTAMP '2024-03-01 10:20:30.1234 Europe/Bucharest'``
 * ``blob_text`` / ``blob``: long values are split into chunks joined with ``||``, the first one
   cast to a BLOB so the concatenation is not limited to 32 KB
