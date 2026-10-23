@@ -15,7 +15,9 @@ The version lives in one place: `__version__` in `backend/fbadmin/__init__.py`
    chart changed) and the `<release>` entry in
    `packaging/flatpak/io.github.mariuz.fbadmin.metainfo.xml`.
 2. Run `scripts/gen-api-types.sh` if the API changed; make sure CI is green.
-3. Tag and push: `git tag -a v1.0.1 -m "fbadmin 1.0.1" && git push origin v1.0.1`.
+3. Write the release notes in `docs/release-notes/vX.Y.Z.md`; the release workflow puts them
+   at the top of the GitHub Release, above the generated list of changes.
+4. Tag and push: `git tag -a v2.0.0 -m "fbadmin 2.0.0" && git push origin v2.0.0`.
 
 The tag starts three workflows:
 

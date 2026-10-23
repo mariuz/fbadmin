@@ -80,6 +80,17 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: docs/release-notes
+      # hand-written notes in docs/release-notes/<tag>.md come first; GitHub's list of merged
+      # changes is appended below them
+      - name: Release notes
+        id: notes
+        shell: bash
+        run: |
+          f="docs/release-notes/${GITHUB_REF_NAME}.md"
+          if [ -f "$f" ]; then echo "path=$f" >> "$GITHUB_OUTPUT"; else echo "path=" >> "$GITHUB_OUTPUT"; fi
       - uses: actions/download-artifact@v4
         with:
           name: python-dist
@@ -87,5 +98,6 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           files: dist/*
+          body_path: ${{ steps.notes.outputs.path }}
           generate_release_notes: true
           prerelease: ${{ contains(github.ref_name, 'rc') || contains(github.ref_name, 'a') || contains(github.ref_name, 'b') }}
