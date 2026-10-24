@@ -18,6 +18,7 @@
   <launchable type="desktop-id">io.github.mariuz.fbadmin.desktop</launchable>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="2.1.0" date="2026-10-24"/>
     <release version="2.0.0" date="2026-10-23"/>
     <release version="1.0.1" date="2026-10-19"/>
     <release version="1.0.0" date="2026-10-19"/>

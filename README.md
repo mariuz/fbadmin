@@ -17,7 +17,7 @@ as a container next to your server.
 > - installers on Windows, macOS and Linux
 >
 > The UI speaks English, Romanian, Portuguese (Brazil), Spanish, Russian, German, French and
-> Czech. Current release: **2.0.0**, on [PyPI](https://pypi.org/project/firebird-admin/) (`pip install firebird-admin`) and as desktop installers on the
+> Czech. Current release: **2.1.0**, on [PyPI](https://pypi.org/project/firebird-admin/) (`pip install firebird-admin`) and as desktop installers on the
 > [GitHub Releases](https://github.com/mariuz/fbadmin/releases) page.
 
 ## Features
