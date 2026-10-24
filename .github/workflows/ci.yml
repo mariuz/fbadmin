@@ -66,7 +66,10 @@ jobs:
         if: matrix.firebird == '5'
         run: |
           PYTHON=python scripts/embedded-test-setup.sh "$RUNNER_TEMP/firebird-embedded"
-          FBADMIN_TEST_EMBEDDED_DIR="$RUNNER_TEMP/firebird-embedded" pytest -q backend/tests/test_embedded.py -rs
+          # as in the desktop app: the embedded engine's client library is the process's libfbclient
+          # from the start (the runner's system libfbclient2 must not be loaded first)
+          FBADMIN_EMBEDDED_DIR="$RUNNER_TEMP/firebird-embedded" FBADMIN_TEST_EMBEDDED_DIR="$RUNNER_TEMP/firebird-embedded" \
+            pytest -q backend/tests/test_embedded.py -rs
 
   backend-native:
     # The whole backend suite again with the native driver (firebird-driver + libfbclient), which

@@ -28,6 +28,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import sys
 import threading
 from contextlib import contextmanager
@@ -169,12 +170,28 @@ def status() -> dict:
         except Exception as exc:  # noqa: BLE001
             out["reason"] = f"Cannot load the Firebird client library: {exc}"
         else:
-            loaded = driver.driver_config.fb_client_library.value
+            loaded = _loaded_library(driver)
             if loaded and Path(loaded).resolve() != client_library(root).resolve():
-                out["reason"] = f"Another Firebird client library is already loaded ({loaded})."
+                out["reason"] = (f"Another Firebird client library is already loaded ({loaded}); one process can "
+                                 "use only one. Restart fbadmin to use the embedded engine.")
             else:
                 out["available"] = True
     return out
+
+
+def _loaded_library(driver) -> str | None:
+    """The libfbclient this process actually loaded: the configured path, or the one found on the
+    system library path (then the configured value is empty)."""
+    try:
+        from firebird.driver import fbapi
+
+        name = getattr(getattr(fbapi, "api", None), "client_library_name", None)
+        if name:
+            found = shutil.which(name) if os.sep not in str(name) else None
+            return str(found or name)
+    except Exception:  # noqa: BLE001
+        pass
+    return driver.driver_config.fb_client_library.value or None
 
 
 def require_available() -> None:
