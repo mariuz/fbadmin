@@ -42,8 +42,14 @@ jobs:
         run: |
           docker build -t cloudnative-firebird:ci operator-src/operator
           docker build -t fbadmin:ci .
-          docker pull firebirdsql/firebird:5
-          for i in cloudnative-firebird:ci fbadmin:ci firebirdsql/firebird:5; do kind load docker-image "$i" --name fbadmin-e2e; done
+          docker pull --platform linux/amd64 firebirdsql/firebird:5
+          # `kind load docker-image` fails with "content digest ... not found" for multi-platform
+          # images (and builds with attestations) when Docker uses the containerd image store, as on
+          # the ubuntu-26.04 runners: load single-platform archives instead
+          for i in cloudnative-firebird:ci fbadmin:ci firebirdsql/firebird:5; do
+            docker save --platform linux/amd64 -o "$RUNNER_TEMP/image.tar" "$i"
+            kind load image-archive "$RUNNER_TEMP/image.tar" --name fbadmin-e2e
+          done
       - name: Install the operator
         working-directory: operator-src
         run: |
