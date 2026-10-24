@@ -21,3 +21,4 @@ import "./overview";
 import "./charts";
 import "./querybuilder";
 import "./access";
+import "./driver";

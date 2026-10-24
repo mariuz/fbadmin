@@ -25,7 +25,6 @@ See docs/EMBEDDED.md for the file set, licences and the design.
 
 from __future__ import annotations
 
-import ctypes
 import json
 import os
 import re
@@ -35,7 +34,8 @@ from contextlib import contextmanager
 from pathlib import Path
 
 import firebirdsql
-from firebirdsql.services import Services
+
+from .native import NativeServices
 
 ENV_DIR = "FBADMIN_EMBEDDED_DIR"
 BUNDLED_SUBDIR = "firebird"  # inside the PyInstaller bundle
@@ -242,52 +242,14 @@ _UNSUPPORTED_ACTIONS = {
 }
 
 
-class EmbeddedServices(Services):
-    """``firebirdsql.services.Services`` running on the embedded service manager.
+class EmbeddedServices(NativeServices):
+    """:class:`fbadmin.native.NativeServices` on the embedded service manager: the same mapping
+    of the wire primitives to ``IService.start`` / ``IService.query`` used for remote servers
+    with the native driver, minus the actions a local file cannot support."""
 
-    fbadmin's maintenance code (and firebirdsql's own service helpers) talk to a service
-    through three wire operations: ``_op_service_start``, ``_op_service_info`` and
-    ``_op_response``. Here they map to ``IService.start`` / ``IService.query`` of the native
-    API, which take exactly the same parameter and info buffers, so backup/restore (also
-    streamed), gstat, validation, sweep, properties, nbackup and server info work unchanged.
-    """
-
-    def __init__(self, server, errors: tuple[type[Exception], ...]):  # noqa: D107 - no socket
-        self._server = server
-        self._svc = server._svc
-        self._errors = errors
-        self._pending: tuple | None = None
-        self.charset = "UTF8"
-        self.sock = None
-        self.db_handle = 0
-        self.svc_handle = 0
-        self.timeout = None
-
-    def _call(self, fn, *args) -> None:
-        from .native import _translate
-
-        try:
-            fn(*args)
-        except self._errors as exc:
-            raise _translate(exc) from exc
-
-    def _op_service_start(self, param) -> None:
-        param = bytes(param)
+    def _check_action(self, param: bytes) -> None:
         if param and param[0] in _UNSUPPORTED_ACTIONS:
             raise EmbeddedUnavailable(_UNSUPPORTED_ACTIONS[param[0]])
-        self._call(self._svc.start, param)
-        self._pending = (0, 0, b"")
-
-    def _op_service_info(self, param, item, buffer_length: int = 512) -> None:
-        buf = ctypes.create_string_buffer(max(16, min(int(buffer_length), 65535)))
-        self._call(self._svc.query, bytes(param) or None, bytes(item), buf)
-        self._pending = (0, 0, buf.raw)
-
-    def _op_response(self):
-        if self._pending is None:
-            raise firebirdsql.OperationalError("No pending service response")
-        r, self._pending = self._pending, None
-        return r
 
     def getLog(self) -> str:  # noqa: N802 - firebirdsql naming
         """firebird.log of the embedded engine (in its root directory, if it was writable)."""
@@ -296,12 +258,6 @@ class EmbeddedServices(Services):
         if log and log.is_file():
             return log.read_text("utf-8", "replace")
         return ""
-
-    def close(self) -> None:
-        try:
-            self._server.close()
-        except Exception:  # noqa: BLE001
-            pass
 
 
 _svc_config: str | None = None

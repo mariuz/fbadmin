@@ -70,16 +70,33 @@ It runs weekly in `.github/workflows/compat.yml`. It already found three splitte
 
 ### Native driver tests
 
-`tests/test_native_driver.py` runs when `firebird-driver` is installed and libfbclient
-can be loaded. To run the whole suite through the native adapter:
+The native driver (`firebird-driver` + libfbclient, see [DRIVERS.md](DRIVERS.md)) needs a
+client library. Use the Firebird 5 one from the embedded file set: it is pinned and
+checksummed, and unlike a Firebird 3 client (Ubuntu's `libfbclient2`) it handles INT128,
+DECFLOAT and the time zone types of Firebird 4+ servers.
 
 ```bash
 pip install -e "backend[native]"
-FBADMIN_DRIVER=native FBADMIN_FBCLIENT=/path/to/libfbclient.so python -m pytest -q
+scripts/embedded-test-setup.sh                       # → build/firebird-embedded
+export FBADMIN_FBCLIENT=$PWD/build/firebird-embedded/lib/libfbclient.so.2
+cd backend
+python -m pytest -q tests/test_native_driver.py tests/test_driver_equivalence.py   # both drivers
+FBADMIN_DRIVER=native python -m pytest -q             # the whole suite through the native driver
+FBADMIN_DRIVER=native FBADMIN_TEST_PORT=3053 python -m pytest -q   # ... against Firebird 3
 ```
 
-(A libfbclient can be copied out of the Firebird container:
-`docker cp -L fb5:/opt/firebird/lib/libfbclient.so.2 .`; it also needs `libtommath`.)
+- `tests/test_native_driver.py`: the driver setting and its API, Query Tool sessions,
+  services, wire options, error classes, BLOBs, and switching drivers at run time.
+- `tests/test_driver_equivalence.py` runs the same queries and API calls through both drivers
+  and requires identical serialized results (INT128, NUMERIC(38), DECFLOAT, time zones,
+  BLOBs, UTF8/WIN1252/NONE/OCTETS, parameters, plans, errors, metadata endpoints). When it
+  fails it prints the path of every differing value.
+- Without a loadable libfbclient these tests skip; with `FBADMIN_DRIVER=native` and no
+  library every connection fails with the reason.
+- The `backend-native` CI job runs the whole suite this way against Firebird 3, 4, 5 and 6,
+  and the `e2e` job runs the Playwright suite once per driver.
+
+`scripts/driver-compare.py` benchmarks both drivers (see [DRIVERS.md](DRIVERS.md#benchmarks)).
 
 ### Local (embedded) database tests
 
@@ -115,8 +132,10 @@ npx playwright show-report               # after a failure: traces and screensho
 Playwright starts `python -m fbadmin` from `backend/` on port `E2E_PORT` (default 5106)
 with a temporary data directory. Variables: `FB_HOST`, `FB_PORT` (3050), `FB_PASSWORD`,
 `FB_DB_DIR` (a directory on the Firebird server), `E2E_BASE_URL` (test an already running
-instance), `PW_CHROMIUM_PATH` (use a specific Chromium binary). The `e2e` CI job runs them
-against a Firebird 5 service container.
+instance), `PW_CHROMIUM_PATH` (use a specific Chromium binary). The fbadmin server inherits
+the environment, so `FBADMIN_DRIVER=native FBADMIN_FBCLIENT=…` (or `FBADMIN_EMBEDDED_DIR`)
+runs the suite through the native driver. The `e2e` CI job runs them against a Firebird 5
+service container, once with each driver.
 
 ## API types
 

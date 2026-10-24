@@ -57,19 +57,57 @@ jobs:
         env:
           FBADMIN_TEST_DIR: /var/lib/firebird/data
           FBADMIN_TEST_UPGRADE_PORT: ${{ matrix.next && '3057' || '' }}
-      - name: Native driver adapter (firebird-driver + libfbclient)
-        if: matrix.firebird == '5'
-        run: |
-          sudo apt-get update && sudo apt-get install -y libfbclient2
-          pip install -e "backend[native]"
-          pytest -q backend/tests/test_native_driver.py -rs
-        env:
-          FBADMIN_TEST_DIR: /var/lib/firebird/data
       - name: Local databases (Firebird 5 embedded engine, no server)
         if: matrix.firebird == '5'
         run: |
+          pip install -e "backend[native]"
           PYTHON=python scripts/embedded-test-setup.sh "$RUNNER_TEMP/firebird-embedded"
           FBADMIN_TEST_EMBEDDED_DIR="$RUNNER_TEMP/firebird-embedded" pytest -q backend/tests/test_embedded.py -rs
+
+  backend-native:
+    # The whole backend suite again with the native driver (firebird-driver + libfbclient), which
+    # local databases rely on. The client library is the Firebird 5 one from the pinned, SHA-256
+    # checked embedded file set (a Firebird 3 client, e.g. Ubuntu's libfbclient2, cannot handle
+    # INT128/DECFLOAT/time zones). test_driver_equivalence.py compares both drivers result by result.
+    name: Backend tests (native driver, Firebird ${{ matrix.firebird }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        firebird: ["3", "4", "5", "6-snapshot"]
+    continue-on-error: ${{ matrix.firebird == '6-snapshot' }}
+    services:
+      firebird:
+        image: firebirdsql/firebird:${{ matrix.firebird }}
+        env:
+          FIREBIRD_ROOT_PASSWORD: masterkey
+        ports:
+          - 3050:3050
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e "backend[dev,native]"
+      - name: Cache the Firebird release archive (SHA-256 pinned in fetch-embedded.py)
+        uses: actions/cache@v4
+        with:
+          path: /tmp/fbadmin-embedded-cache
+          key: firebird-embedded-linux-x64-${{ hashFiles('packaging/embedded/fetch-embedded.py') }}
+      - name: Firebird 5 client library (embedded file set)
+        run: PYTHON=python scripts/embedded-test-setup.sh "$RUNNER_TEMP/firebird-embedded"
+      - name: Wait for Firebird
+        run: for _ in $(seq 1 30); do (echo > /dev/tcp/127.0.0.1/3050) 2>/dev/null && break; sleep 1; done
+      - name: Firebird with a fixed RemoteAuxPort (event monitor tests)
+        shell: bash
+        run: scripts/events-test-server.sh "${FB_VERSION%%-*}" | sed -n 's/^export //p' >> "$GITHUB_ENV"
+        env:
+          FB_VERSION: ${{ matrix.firebird }}
+      - run: pytest -q backend/tests -rs
+        env:
+          FBADMIN_TEST_DIR: /var/lib/firebird/data
+          FBADMIN_DRIVER: native
+          FBADMIN_FBCLIENT: ${{ runner.temp }}/firebird-embedded/lib/libfbclient.so.2
 
   integrations:
     name: Real services (crypt plugin, OpenLDAP, Dex OIDC)
@@ -207,9 +245,14 @@ jobs:
           path: dist/
 
   e2e:
-    name: End-to-end (Playwright, Firebird 5)
+    name: End-to-end (Playwright, Firebird 5, ${{ matrix.driver }} driver)
     # Playwright does not support Ubuntu 26.04 (the current ubuntu-latest) yet
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        # the native run uses the embedded file set's Firebird 5 client (FBADMIN_EMBEDDED_DIR below)
+        driver: [firebirdsql, native]
     services:
       firebird:
         image: firebirdsql/firebird:5
@@ -249,10 +292,11 @@ jobs:
           FBADMIN_PYTHON: python
           FB_DB_DIR: /var/lib/firebird/data
           FB_EVENTS_PORT: "3060"
+          FBADMIN_DRIVER: ${{ matrix.driver == 'native' && 'native' || '' }}
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.driver }}
           path: |
             e2e/playwright-report/
             e2e/test-results/

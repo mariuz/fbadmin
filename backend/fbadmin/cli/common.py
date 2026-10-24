@@ -107,9 +107,11 @@ class Target:
         from firebirdsql import services
 
         from ..connections import wire_options
+        from ..native import connect_services, driver_name
 
+        svc_connect = connect_services if driver_name() == "native" else services.connect
         try:
-            svc = services.connect(host=self.srv.host, port=self.srv.port, user=self.srv.user,
+            svc = svc_connect(host=self.srv.host, port=self.srv.port, user=self.srv.user,
                                    password=self.password, wire_crypt=self.srv.wire_crypt, timeout=60,
                                    **wire_options(self.srv))
         except Exception as exc:  # noqa: BLE001

@@ -31,6 +31,7 @@ from . import library
 from . import overview
 from . import querybuilder
 from . import access
+from . import driver as driver_api
 
 ROUTERS: list[APIRouter] = [
     servers.router,
@@ -64,4 +65,5 @@ ROUTERS: list[APIRouter] = [
     overview.router,
     querybuilder.router,
     access.router,
+    driver_api.router,
 ]

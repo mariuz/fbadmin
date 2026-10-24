@@ -29,7 +29,9 @@ def _connector(server_id: str, db_id: str):
     srv = st.store.get(server_id)
     db = st.store.get_database(server_id, db_id)
     password = st.manager._password(server_id)  # 401 before anything is opened
-    return lambda: connect(srv, db.path, password)
+    # the event monitor speaks the auxiliary-port protocol itself (events/wire.py), on top of
+    # firebirdsql's socket: it stays on the pure-Python driver whatever driver is selected
+    return lambda: connect(srv, db.path, password, driver="firebirdsql")
 
 
 @router.get("/suggestions")

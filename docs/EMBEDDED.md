@@ -120,12 +120,12 @@ versions included.
 
 | Feature | Local databases | How |
 |---|---|---|
-| Object explorer, properties, DDL extraction, schema tools | ✅ | Metadata connections use `NativeConnection` (already used by `FBADMIN_DRIVER=native`) |
+| Object explorer, properties, DDL extraction, schema tools | ✅ | Metadata connections use `NativeConnection` (the same adapter remote servers use with the native driver, see [DRIVERS.md](DRIVERS.md)) |
 | Create / open / drop database | ✅ | `firebird-driver` `create_database` / `connect` / `drop_database` |
 | Data grid (view, edit, insert, delete) | ✅ | Same metadata connection |
 | Query Tool (transactions, isolation, read-only, lock and statement timeouts, plans, parameters, fetch more, statistics, cancel) | ✅ | `query.py` calls three hooks when present: `set_tpb` (the raw TPB `TxOptions` builds becomes firebird-driver's `default_tpb`), `end_transaction`, and `plan` (`Statement.plan` / `detailed_plan`). Cancel uses `DELETE FROM MON$STATEMENTS` from another attachment, as on servers |
 | Monitoring (MON$), dashboards, attachment stats | ✅ | Ordinary SQL |
-| Backup/restore (server file, streamed download, upload restore), nbackup, validation, sweep, limbo, shutdown/online, properties, gstat, server info | ✅ | `EmbeddedServices` subclasses `firebirdsql.services.Services`. It maps the three wire primitives the maintenance code uses (`_op_service_start`, `_op_service_info`, `_op_response`) to `IService.start` / `IService.query` of the embedded service manager, which take the same parameter buffers. All existing maintenance code runs unchanged |
+| Backup/restore (server file, streamed download, upload restore), nbackup, validation, sweep, limbo, shutdown/online, properties, gstat, server info | ✅ | `EmbeddedServices` (a `NativeServices`, the class remote servers use with the native driver, which subclasses `firebirdsql.services.Services`) maps the three wire primitives the maintenance code uses (`_op_service_start`, `_op_service_info`, `_op_response`) to `IService.start` / `IService.query` of the embedded service manager, which take the same parameter buffers. All existing maintenance code runs unchanged |
 | Trace | ❌ hidden | The trace plugin is not bundled. Service actions 22–26 raise "Trace is not available for local (embedded) databases" |
 | Firebird users / mappings | ❌ hidden | The embedded engine does not authenticate, and there is no security database or user manager in the file set |
 | Encryption | ❌ hidden | No crypt plugin is bundled |
@@ -183,7 +183,7 @@ before the library loads.
 
   `prepare_client()` sets `FIREBIRD` (the root) and `FIREBIRD_LOCK`, and points
   firebird-driver at the bundled libfbclient. With an engine present, that one library also
-  serves remote native connections (`FBADMIN_DRIVER=native`), because a process can load
+  serves remote native connections (the "native" database driver, see [DRIVERS.md](DRIVERS.md)), because a process can load
   only one libfbclient. `GET /api/embedded/status` reports availability and the reason when
   local databases are unavailable.
 - **Registrations.** Local databases are `DatabaseEntry`s under a single `ServerEntry` with

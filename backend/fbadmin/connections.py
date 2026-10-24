@@ -24,7 +24,7 @@ from contextlib import contextmanager
 import firebirdsql
 from firebirdsql import services
 
-from .native import connect_native, native_enabled
+from .native import connect_native, connect_services, driver_name
 from .metadata.types import quote_ident
 from .query import QuerySession, TxOptions, apply_tpb, end_transaction
 from .schema_ctx import current_schema
@@ -60,7 +60,13 @@ def connect(
     *,
     create: bool = False,
     page_size: int = 16384,
+    driver: str | None = None,
 ) -> firebirdsql.Connection:
+    """A connection to ``db_path`` on ``srv`` with the selected driver (:mod:`fbadmin.drivers`).
+
+    ``driver="firebirdsql"`` forces the pure-Python driver, for features built on its wire
+    internals (the event monitor). Local (embedded) registrations always use the native driver.
+    """
     if srv.embedded:  # local file through the embedded engine (native driver)
         from .embedded import connect_local
 
@@ -81,10 +87,13 @@ def connect(
         timeout=30,
         **wire_options(srv),
     )
-    if create:
+    if (driver or driver_name()) == "native":
+        conn = connect_native(create=create, page_size=page_size if create else None, **kwargs)
+    elif create:
         return firebirdsql.create_database(page_size=page_size, **kwargs)
-    conn = firebirdsql.connect(**kwargs)
-    if srv.read_only:  # production safety: every transaction of this server is read-only
+    else:
+        conn = firebirdsql.connect(**kwargs)
+    if srv.read_only and not create:  # production safety: every transaction of this server is read-only
         apply_tpb(conn, TxOptions(read_only=True).tpb())
     return conn
 
@@ -123,14 +132,7 @@ class ConnectionManager:
         return FbConnection(connect(srv, db.path, self._password(server_id)))
 
     def _open_meta(self, key: tuple[str, str]) -> FbConnection:
-        """Metadata connections may use the optional native driver (FBADMIN_DRIVER=native)."""
-        if not native_enabled() or self.store.get(key[0]).embedded:
-            return self._open(*key)
-        srv = self.store.get(key[0])
-        db: DatabaseEntry = self.store.get_database(*key)
-        return FbConnection(connect_native(host=srv.host, port=srv.port, database=db.path, user=srv.user,
-                                           password=self._password(key[0]), role=srv.role,
-                                           charset=srv.charset or "UTF8"))
+        return self._open(*key)
 
     # --- metadata connections -----------------------------------------
     # Each database has a small pool of metadata connections (FBADMIN_META_POOL_SIZE,
@@ -218,7 +220,8 @@ class ConnectionManager:
             with embedded_services() as svc:
                 yield svc
             return
-        svc = services.connect(
+        svc_connect = connect_services if driver_name() == "native" else services.connect
+        svc = svc_connect(
             host=srv.host,
             port=srv.port,
             user=srv.user,
@@ -324,6 +327,19 @@ class ConnectionManager:
                 "DELETE FROM MON$STATEMENTS WHERE MON$ATTACHMENT_ID = ? AND MON$STATE <> 0", [sess.attachment_id]
             )
             return cur.rowcount
+
+    def close_pools(self) -> int:
+        """Close every pooled metadata connection (after the driver setting changed, new ones use
+        the newly selected driver). Query Tool sessions keep their connection until closed."""
+        with self._lock:
+            pools = list(self._meta.values())
+            self._meta.clear()
+        n = 0
+        for pool in pools:
+            for fbc in pool:
+                fbc.close()
+                n += 1
+        return n
 
     def close_all(self) -> None:
         with self._lock:

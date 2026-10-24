@@ -937,6 +937,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/driver": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Driver */
+        get: operations["get_driver_api_driver_get"];
+        /**
+         * Put Driver
+         * @description Save the driver choice. Pooled metadata connections are closed so new ones use the selected
+         *     driver; open Query Tool sessions keep their connection (and driver) until they are closed.
+         */
+        put: operations["put_driver_api_driver_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/embedded/databases": {
         parameters: {
             query?: never;
@@ -4869,6 +4891,13 @@ export interface components {
             source: components["schemas"]["Side"];
             target: components["schemas"]["Side"];
         };
+        /** DriverIn */
+        DriverIn: {
+            /** Driver */
+            driver?: string | null;
+            /** Fbclient */
+            fbclient?: string | null;
+        };
         /** EncryptIn */
         EncryptIn: {
             /** Key Name */
@@ -8103,6 +8132,59 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["PairIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_driver_api_driver_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    put_driver_api_driver_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DriverIn"];
             };
         };
         responses: {

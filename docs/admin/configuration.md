@@ -25,8 +25,8 @@ fbadmin-desktop [--port PORT] [--browser] [--log-level LEVEL]
 | `FBADMIN_RATE_LIMIT_TRUST_PROXY` | `0` | `1`: identify clients by `X-Forwarded-For` (only behind a trusted proxy) |
 | `FBADMIN_MAX_REQUEST_BYTES` | `33554432` (32 MiB) | Maximum request body; larger requests get HTTP 413. `0` = unlimited |
 | `FBADMIN_META_POOL_SIZE` | `3` | Metadata connections per database (see below) |
-| `FBADMIN_DRIVER` | `firebirdsql` | `native` to use `firebird-driver` + libfbclient for metadata connections |
-| `FBADMIN_FBCLIENT` | | Path of `libfbclient` for the native driver |
+| `FBADMIN_DRIVER` | `firebirdsql` | `native`: use `firebird-driver` + libfbclient for every server connection. Overrides the setting in the UI (see [Drivers](../DRIVERS.md)) |
+| `FBADMIN_FBCLIENT` | | Path of `libfbclient` for the native driver. Overrides the setting in the UI |
 | `FBADMIN_UPDATE_CHECK` | `ask` | `off` forbids the opt-in update check (see [Privacy](../PRIVACY.md)) |
 | `FBADMIN_SERVERS_FILE` | unset | YAML/JSON file of Firebird servers to register at startup; see [Deployment](deployment.md#preconfigured-servers) |
 | `FBADMIN_PLUGINS` | on | `off` loads no plugins: a safe mode for troubleshooting, also used when generating the API types |
@@ -63,16 +63,17 @@ connection, separate from the pool.
 
 ## Native driver (optional)
 
-`FBADMIN_DRIVER=native` uses [`firebird-driver`](https://pypi.org/project/firebird-driver/)
-on top of the Firebird client library for metadata connections:
+The **Database driver** setting (user menu → *Database driver…*, administrators only in
+server mode) switches every server connection between the pure-Python `firebirdsql`
+(default) and [`firebird-driver`](https://pypi.org/project/firebird-driver/) on top of the
+Firebird client library: object explorer, Query Tool, create/drop database and the Services
+API. It is stored in `driver.json` in the data directory. `FBADMIN_DRIVER` and
+`FBADMIN_FBCLIENT` override it:
 
 ```bash
-pip install "firebird-admin[native]"      # plus libfbclient: apt install libfbclient2, or a Firebird install
+pip install "firebird-admin[native]"      # plus a libfbclient, ideally Firebird 4 or newer
 FBADMIN_DRIVER=native FBADMIN_FBCLIENT=/opt/firebird/lib/libfbclient.so fbadmin
 ```
 
-Limitations: Query Tool sessions, creating and dropping databases and the Services API
-(backup, restore, gstat, log) keep using the pure-Python driver, because they rely on its
-transaction parameter blocks and statement information. Wire encryption follows the client
-library's `firebird.conf` (`WireCrypt`), not the per-server checkbox. The official Docker
-image does not contain libfbclient.
+The event monitor stays on `firebirdsql`. The official Docker image contains no libfbclient.
+See [Drivers](../DRIVERS.md) for the per-feature table, how to choose, and the benchmarks.

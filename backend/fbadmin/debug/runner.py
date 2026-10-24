@@ -232,6 +232,8 @@ def _fetch(conn, sql: str, limit: int, params: list | None = None,
     Returns (rows, column names, error message, stopped at ``limit``).
     """
     cur = conn.cursor()
+    if not hasattr(cur, "transaction"):  # native driver (fbadmin.native): plain cursor fetches
+        return _fetch_cursor(cur, sql, limit, params)
     cur.transaction.check_trans_handle()
     stmt = cur._get_stmt(sql)  # compile errors are raised here
     names = [x.aliasname for x in stmt.xsqlda]
@@ -262,6 +264,36 @@ def _fetch(conn, sql: str, limit: int, params: list | None = None,
     finally:
         try:
             cur.close()
+        except Exception:  # noqa: BLE001
+            pass
+    return rows, names, error, stopped
+
+
+def _fetch_cursor(cur, sql: str, limit: int, params: list | None) -> tuple[list[tuple], list[str], str | None, bool]:
+    """:func:`_fetch` for the native driver: libfbclient batches the fetches itself and hands
+    out the rows the server sent before an error, then raises the error."""
+    stmt = cur.prepare(sql)  # compile errors are raised here, like in _fetch
+    rows: list[tuple] = []
+    names: list[str] = []
+    error = None
+    stopped = False
+    try:
+        cur.execute(stmt, params or [])
+        names = [d[0] for d in cur.description or ()]
+        while cur.description:
+            if len(rows) >= limit:
+                stopped = True
+                break
+            r = cur.fetchone()
+            if r is None:
+                break
+            rows.append(tuple(r))
+    except Exception as exc:  # noqa: BLE001 - the error is part of the result
+        error = error_message(exc)
+    finally:
+        try:
+            cur.close()
+            stmt.free()
         except Exception:  # noqa: BLE001
             pass
     return rows, names, error, stopped
