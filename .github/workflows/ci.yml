@@ -53,14 +53,15 @@ jobs:
       - name: Wait for the newer Firebird (upgrade trial restore)
         if: matrix.next
         run: for _ in $(seq 1 60); do (echo > /dev/tcp/127.0.0.1/3057) 2>/dev/null && break; sleep 1; done
-      # the pure Python driver, forced: the ubuntu-26.04 runner image ships libfbclient2 (a Firebird 4
-      # client), so the default setting (auto) would pick the native driver here
+      # the pure Python driver, forced. The ubuntu-26.04 runner image ships libfbclient2 (a Firebird 4
+      # client), so the default setting (auto) picks the native driver here, as it does for users on
+      # Ubuntu 25.04+/Debian 13: test_driver_auto.py checks that (it ignores FBADMIN_DRIVER)
       - run: pytest -q backend/tests
         env:
           FBADMIN_TEST_DIR: /var/lib/firebird/data
           FBADMIN_TEST_UPGRADE_PORT: ${{ matrix.next && '3057' || '' }}
           FBADMIN_DRIVER: firebirdsql
-          FBADMIN_TEST_EXPECT_DRIVER: firebirdsql
+          FBADMIN_TEST_EXPECT_DRIVER: native
       - name: Local databases (Firebird 5 embedded engine, no server)
         if: matrix.firebird == '5'
         run: |

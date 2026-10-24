@@ -413,9 +413,12 @@ Correctness: 12 of 12 type groups serialize identically.
   `FBADMIN_FBCLIENT=build/firebird-embedded/lib/libfbclient.so.2 python -m pytest -q` runs the
   whole backend suite with the default setting, which then resolves to the native driver;
   `FBADMIN_DRIVER=firebirdsql` forces the pure-Python one.
-- **CI:** the plain `backend` jobs install `firebird-driver` (a regular dependency) but have no
-  client library, so Automatic resolves to firebirdsql there; `test_driver_auto.py` asserts it
-  (`FBADMIN_TEST_EXPECT_DRIVER=firebirdsql`). The `backend-native` job of
+- **CI:** the plain `backend` jobs run the whole suite with the pure-Python driver
+  (`FBADMIN_DRIVER=firebirdsql`). Their runner image (Ubuntu 26.04) ships `libfbclient2`, a
+  Firebird 4 client, so Automatic itself resolves to native there, as it does for users on
+  Ubuntu 25.04+ and Debian 13; `test_driver_auto.py` asserts it
+  (`FBADMIN_TEST_EXPECT_DRIVER=native`). One more job runs the native driver with that system
+  Firebird 4 client against a Firebird 5 server. The `backend-native` job of
   `.github/workflows/ci.yml` runs the full suite with `FBADMIN_DRIVER=native` against
   Firebird 3, 4, 5 and the 6 snapshot, and checks that Automatic resolves to native with that
   client (`FBADMIN_TEST_EXPECT_DRIVER=native`) and negotiates ChaCha64. Firebird 6 is
