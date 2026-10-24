@@ -173,9 +173,11 @@ def native_status() -> dict:
     loaded = str(getattr(api, "client_library_name", "") or "") or None
     out["library"] = loaded
     try:
-        v = int(api.util.get_client_version())
-        out["client_major"] = v >> 8
-        out["client_version"] = _client_version_string(api) or f"{v >> 8}.{v & 0xFF}"
+        from .native import client_version
+
+        major, minor = client_version(api.util)
+        out["client_major"] = major
+        out["client_version"] = _client_version_string(api) or f"{major}.{minor}"
     except Exception:  # noqa: BLE001
         out["client_version"] = _client_version_string(api)
     target = out["embedded_library"] or wanted

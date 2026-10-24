@@ -24,9 +24,9 @@ def client_major() -> int | None:
     """Major version of the loaded libfbclient (None without the native driver)."""
     if not _ok:
         return None
-    from firebird.driver import get_api
+    from fbadmin.native import client_major
 
-    return int(get_api().util.get_client_version()) >> 8
+    return client_major()
 
 
 def native_suite() -> bool:

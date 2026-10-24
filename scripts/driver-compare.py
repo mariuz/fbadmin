@@ -373,7 +373,7 @@ def run_port(a, port: int) -> dict:
     b = Bench(a, port)
     rows_list = [int(x) for x in a.rows.split(",") if x]
     from fbadmin.connections import connect
-    from firebird.driver import get_api
+    from fbadmin.native import client_major
 
     connect(b.srv, b.path, a.password, create=True, driver="firebirdsql").close()
     c = b.connect("firebirdsql")
@@ -383,7 +383,7 @@ def run_port(a, port: int) -> dict:
     c.drop_database()
     major = int(version.split(".")[0])
     # Firebird 4+ types need a Firebird 4+ client library on the native side
-    fb4 = major >= 4 and (int(get_api().util.get_client_version()) >> 8) >= 4
+    fb4 = major >= 4 and client_major() >= 4
     print(f"== port {port}: Firebird {version}", file=sys.stderr)
     setup(b, fb4, max(rows_list))
     n_objects = setup_metadata(b)

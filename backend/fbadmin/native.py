@@ -475,11 +475,23 @@ def connect_native(*, host: str, port: int, database: str, user: str, password: 
     return NativeConnection(con, errors)
 
 
+def client_version(util=None) -> tuple[int, int]:
+    """(major, minor) of the loaded libfbclient. firebird-driver 2.0 returns the packed integer
+    ``major << 8 | minor`` from ``get_client_version()``, 2.1 returns the tuple."""
+    if util is None:
+        from firebird.driver import get_api
+
+        util = get_api().util
+    v = util.get_client_version()
+    if isinstance(v, tuple):
+        return int(v[0]), int(v[1]) if len(v) > 1 else 0
+    v = int(v)
+    return v >> 8, v & 0xFF
+
+
 def client_major() -> int:
     """Major version of the loaded libfbclient (3 for a Firebird 3 client)."""
-    from firebird.driver import get_api
-
-    return int(get_api().util.get_client_version()) >> 8
+    return client_version()[0]
 
 
 def _legacy_bind(con) -> None:

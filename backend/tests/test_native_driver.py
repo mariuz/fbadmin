@@ -77,7 +77,9 @@ def test_driver_api(client, monkeypatch):
     assert client.put("/api/driver", json={"driver": "odbc"}).status_code == 400
     r = client.put("/api/driver", json={"driver": "native", "fbclient": "/nonexistent/libfbclient.so"})
     if not st["native"]["embedded_library"] and st["fbclient_source"] != "environment":
-        assert r.status_code == 400 and "/nonexistent/libfbclient.so" in r.json()["detail"]
+        # refused because the library does not exist, or because firebird-driver is not installed at all
+        assert r.status_code == 400, r.text
+        assert ("/nonexistent/libfbclient.so" in r.json()["detail"] or "firebird-driver" in r.json()["detail"])
         assert client.get("/api/driver").json()["stored"] == {}  # nothing saved
     # with the driver set by the environment, the API cannot change it
     monkeypatch.setenv("FBADMIN_DRIVER", "firebirdsql")
