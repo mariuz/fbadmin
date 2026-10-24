@@ -260,9 +260,13 @@ class ConnectionManager:
             return
         srv = self.store.get(server_id)
         password = "" if srv.embedded else self._password(server_id)
+        try:  # Firebird 3/4 do not pass the tag on: remember which attachments exist now
+            mark = attachment_mark(connect(srv, db_path, password))
+        except Exception:  # noqa: BLE001 - e.g. the database does not exist yet
+            mark = None
 
         def hook() -> str | None:
-            return detach_tagged(connect(srv, db_path, password), tag)
+            return detach_tagged(connect(srv, db_path, password), tag, mark)
 
         with jobs.on_cancel(hook):
             yield
@@ -381,13 +385,47 @@ class ConnectionManager:
             self._sessions.clear()
 
 
-def detach_tagged(conn, tag: str) -> str | None:
-    """Detach the attachments whose process name is ``tag`` (a job's service actions); closes ``conn``."""
+def _engine_major(cur) -> int:
+    cur.execute("SELECT RDB$GET_CONTEXT('SYSTEM', 'ENGINE_VERSION') FROM RDB$DATABASE")
+    return int(str(cur.fetchone()[0]).split(".")[0])
+
+
+def attachment_mark(conn) -> tuple[int, str | None] | None:
+    """Before a service action starts: (highest attachment id, this client's host as the server sees
+    it), used by ``detach_tagged`` on Firebird 3/4; None on Firebird 5+. Closes ``conn``."""
+    try:
+        cur = conn.cursor()
+        if _engine_major(cur) >= 5:
+            return None
+        cur.execute("SELECT (SELECT MAX(MON$ATTACHMENT_ID) FROM MON$ATTACHMENTS), MON$REMOTE_ADDRESS "
+                    "FROM MON$ATTACHMENTS WHERE MON$ATTACHMENT_ID = CURRENT_CONNECTION")
+        top, addr = cur.fetchone()
+        conn.commit()
+        return int(top or 0), (addr.split("/")[0] if addr else None)
+    finally:
+        _close_quietly(conn)
+
+
+def detach_tagged(conn, tag: str, mark: tuple[int, str | None] | None = None) -> str | None:
+    """Detach the attachments of a job's service actions (gbak, gfix); closes ``conn``.
+
+    Firebird 5+ copies the service connection's process name (``tag``) into them. Firebird 3 and 4
+    do not: there they are the attachments made after ``mark`` (see ``attachment_mark``) by the same
+    user from the same host *without* a process name - client libraries and drivers always send one
+    (fbadmin's own connections included), the attachments of service actions never do."""
     try:
         cur = conn.cursor()
         cur.execute("DELETE FROM MON$ATTACHMENTS WHERE MON$REMOTE_PROCESS = ? "
                     "AND MON$ATTACHMENT_ID <> CURRENT_CONNECTION", [tag])
         n = cur.rowcount
+        if mark is not None:
+            top, host = mark
+            cur.execute(
+                "DELETE FROM MON$ATTACHMENTS WHERE MON$REMOTE_PROCESS IS NULL AND MON$SYSTEM_FLAG = 0 "
+                "AND MON$ATTACHMENT_ID > ? AND MON$ATTACHMENT_ID <> CURRENT_CONNECTION AND MON$USER = CURRENT_USER "
+                + ("AND MON$REMOTE_ADDRESS STARTING WITH ?" if host else "AND MON$REMOTE_ADDRESS IS NULL"),
+                [top, host + "/"] if host else [top])
+            n += cur.rowcount
         conn.commit()
         return f"Stopped the server operation ({n} attachment(s) detached)" if n else None
     finally:

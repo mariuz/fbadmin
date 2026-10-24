@@ -132,8 +132,11 @@ and the database it restores stays in shutdown mode until it is finished, so no 
 can stop it. Restoring through the fbadmin archive (or an upload) can be cancelled.
 
 To find exactly its own server work, a cancellable job attaches to the service manager with the
-process name `fbadmin-job-<job id>`, which Firebird copies into the attachments of the gbak or
-gfix it starts (`MON$REMOTE_PROCESS`). Other attachments are never touched. Cancelling needs
+process name `fbadmin-job-<job id>`, which Firebird 5 and later copy into the attachments of the gbak
+or gfix it starts (`MON$REMOTE_PROCESS`). Firebird 3 and 4 do not copy it. There, fbadmin notes the
+highest attachment id when the job starts, and on cancel detaches the newer attachments of the same
+user, from the same host, that have no process name: client libraries and drivers always send one,
+and service actions never do. Cancelling needs
 the right to delete those attachments: the same user, or SYSDBA/`RDB$ADMIN`.
 
 ## Scheduled jobs

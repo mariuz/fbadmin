@@ -1,7 +1,8 @@
 """The ``fbadmin`` command-line tool for CI and cron jobs: backup, restore, extract, diff, sql, check.
 
 ``fbadmin`` without a subcommand (or ``fbadmin serve``) starts the web server, see ``__main__``.
-Every subcommand talks to Firebird directly with the same code the web app uses. See docs/CLI.md.
+Every subcommand talks to Firebird directly with the same code the web app uses - or, with ``--url``,
+runs through a fbadmin server's REST API with an API token (``remote.py``). See docs/CLI.md.
 """
 
 from __future__ import annotations
@@ -24,7 +25,7 @@ EXIT_CODES = """exit codes:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    from . import backup, misc, schema
+    from . import backup, misc, remote, schema
 
     conn = argparse.ArgumentParser(add_help=False)
     add_connection_options(conn)
@@ -35,6 +36,8 @@ def build_parser() -> argparse.ArgumentParser:
         description="fbadmin command-line tool. Without a subcommand, fbadmin starts the web server "
                     "(fbadmin serve --help).")
     p.add_argument("--version", action="version", version=f"fbadmin {__version__}")
+    remote.add_remote_options(p, top=True)
+    remote.add_remote_options(conn, top=False)
     sub = p.add_subparsers(dest="cmd", metavar="COMMAND")
     sub.add_parser("serve", help="start the web server (the default without a subcommand)", add_help=False)
     common = [conn, outp]
@@ -57,6 +60,10 @@ def main(argv: list[str] | None = None) -> int:
         return USAGE
     out = Out(args)
     try:
+        from . import remote
+
+        if remote.url_from(args) and args.cmd != "serve":
+            return int(remote.run(args, out) or 0)
         return int(args.func(args, out) or 0)
     except CliError as exc:
         if args.debug:

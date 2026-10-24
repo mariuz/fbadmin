@@ -234,12 +234,14 @@ def _cancel_when(client, job_id, pred, timeout=60):
 
 
 def _tagged_attachments(path, job_id):
+    """Attachments of the job's service action (tagged on Firebird 5+; without a process name on 3/4)."""
     import firebirdsql
 
     c = firebirdsql.connect(host=HOST, port=PORT, database=path, user=USER, password=PASSWORD)
     try:
         cur = c.cursor()
-        cur.execute("SELECT COUNT(*) FROM MON$ATTACHMENTS WHERE MON$REMOTE_PROCESS = ?", [f"fbadmin-job-{job_id}"])
+        cur.execute("SELECT COUNT(*) FROM MON$ATTACHMENTS WHERE (MON$REMOTE_PROCESS = ? OR MON$REMOTE_PROCESS IS NULL) "
+                    "AND MON$SYSTEM_FLAG = 0 AND MON$ATTACHMENT_ID <> CURRENT_CONNECTION", [f"fbadmin-job-{job_id}"])
         return cur.fetchone()[0]
     finally:
         c.close()
@@ -283,6 +285,8 @@ def test_cancel_backup_to_server_file(client, big, when):
     assert _tagged_attachments(path, job["id"]) == 0  # gbak is not still running on the server
     if _engine_major(client, sid, dbid) >= 4:  # Firebird 3's gbak leaves the partial file behind
         assert _restore_fails(client, sid, fbk)
+    if when == "running":  # cancelled at once, the backup is never started
+        assert any(ln.startswith("Stopped the server operation") for ln in j["log"]), "\n".join(j["log"])
 
 
 @requires_server

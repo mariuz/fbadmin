@@ -217,7 +217,8 @@ def restore_job(server_id: str, body: RestoreIn):
 async def restore_upload(server_id: str, request: Request, database_path: str, filename: str = "upload.fbk",
                          register_as: str | None = None, keep: bool = False, replace: bool = False,
                          page_size: int | None = None, buffers: int | None = None,
-                         deactivate_indexes: bool = False, no_validity: bool = False, one_at_a_time: bool = False,
+                         deactivate_indexes: bool = False, no_shadow: bool = False, no_validity: bool = False,
+                         one_at_a_time: bool = False,
                          use_all_space: bool = False, metadata_only: bool = False, read_only: bool = False,
                          parallel_workers: int | None = None, skip_data: str | None = None,
                          include_data: str | None = None, crypt_plugin: str | None = None,
@@ -228,7 +229,7 @@ async def restore_upload(server_id: str, request: Request, database_path: str, f
     With ``keep=true`` the upload is kept in the fbadmin archive (folder ``uploads``).
     """
     o = ops.RestoreOptions(replace=replace, page_size=page_size, buffers=buffers,
-                           deactivate_indexes=deactivate_indexes, no_validity=no_validity,
+                           deactivate_indexes=deactivate_indexes, no_shadow=no_shadow, no_validity=no_validity,
                            one_at_a_time=one_at_a_time, use_all_space=use_all_space, metadata_only=metadata_only,
                            read_only=read_only, parallel_workers=parallel_workers, skip_data=skip_data,
                            include_data=include_data, crypt_plugin=crypt_plugin, keyholder=keyholder,

@@ -116,6 +116,11 @@ def retention(directory: Path, prefix: str, keep: int) -> list[str]:
 def stream_backup(svc, t: Target, opts: ops.BackupOptions, major: int, dest: Path | None, kind: str,
                   out: Out) -> dict[str, Any]:
     """Write the backup stream to ``dest`` (None = stdout), compressed with ``kind``."""
+    return write_stream(ops.backup_stream(svc, t.path, opts, major), dest, kind, out)
+
+
+def write_stream(chunks, dest: Path | None, kind: str, out: Out) -> dict[str, Any]:
+    """Write backup chunks to ``dest`` (None = stdout) via ``dest.part``, compressed with ``kind``."""
     raw = 0
     next_report = 64 << 20
     tmp = dest.with_name(dest.name + ".part") if dest else None
@@ -124,7 +129,7 @@ def stream_backup(svc, t: Target, opts: ops.BackupOptions, major: int, dest: Pat
     comp = _compressor(kind, sink)
     w = comp or sink
     try:
-        for chunk in ops.backup_stream(svc, t.path, opts, major):
+        for chunk in chunks:
             w.write(chunk)
             raw += len(chunk)
             if raw >= next_report:
@@ -144,6 +149,8 @@ def stream_backup(svc, t: Target, opts: ops.BackupOptions, major: int, dest: Pat
 
 
 def cmd_backup(args: argparse.Namespace, out: Out) -> int:
+    if args.archive:
+        raise CliError("--archive keeps the backup on a fbadmin server: use it with --url (remote mode)", USAGE)
     t = resolve(args, args.db)
     opts = backup_options(args)
     targets = [x for x in (args.output, args.dir, args.server_file) if x]
@@ -321,6 +328,9 @@ def restore_options(args: argparse.Namespace) -> ops.RestoreOptions:
 
 
 def cmd_restore(args: argparse.Namespace, out: Out) -> int:
+    if args.register_as:
+        raise CliError("--register-as registers the database on a fbadmin server: use it with --url (remote mode)",
+                       USAGE)
     pos = list(args.args)
     if args.server_file:
         if len(pos) > 1:
@@ -388,6 +398,8 @@ def add_parsers(sub, common) -> None:
     d.add_argument("--dir", metavar="DIRECTORY", help="local directory; the file is named NAME_YYYYmmdd-HHMMSS.fbk")
     d.add_argument("--name", help="file name prefix for --dir (default: the database file name)")
     d.add_argument("--server-file", metavar="PATH", help="backup file on the Firebird server (written by the server)")
+    d.add_argument("--archive", action="store_true",
+                   help="remote mode: keep the backup in the fbadmin server's backup archive")
     d.add_argument("--compress", choices=("none", "gzip", "zstd"),
                    help="compress the local file (default: from the -o suffix; zstd needs Python 3.14)")
     d.add_argument("--checksum", action="store_true", help="write FILE.sha256 (sha256sum format)")
@@ -414,6 +426,8 @@ def add_parsers(sub, common) -> None:
                              "       fbadmin restore [options] --server-file PATH DATABASE")
     p.add_argument("args", nargs="*", metavar="BACKUP DATABASE", help=argparse.SUPPRESS)
     p.add_argument("--server-file", metavar="PATH", help="backup file on the Firebird server")
+    p.add_argument("--register-as", metavar="NAME",
+                   help="remote mode: register the restored database on the fbadmin server under this name")
     o = p.add_argument_group("gbak options")
     o.add_argument("--replace", action="store_true", help="overwrite an existing database (otherwise it must not exist)")
     o.add_argument("--page-size", type=int, help="page size of the new database")

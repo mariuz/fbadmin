@@ -70,6 +70,55 @@ Where fbadmin looks:
 
 `--password-env` or `--password` always takes priority over a saved password.
 
+## Remote mode
+
+With `--url`, a command runs through a running fbadmin server instead of connecting to Firebird
+itself. It uses the server's registered servers, saved passwords and permissions, so the machine
+running the command needs neither Firebird access nor any Firebird password: only an
+[API token](PERMISSIONS.md) of a fbadmin user.
+
+```sh
+export FBADMIN_URL=https://fbadmin.example.com
+export FBADMIN_TOKEN=fbat_...          # user menu → "Sign-in & API tokens…" in the web app
+fbadmin servers                        # what this token can see
+fbadmin check @Production/app
+fbadmin backup @Production/app -o app.fbk.gz --checksum
+fbadmin restore app.fbk.gz @Staging/app --replace
+fbadmin --url https://fbadmin.example.com --token-env CI_FBADMIN_TOKEN diff db/schema.sql @Production/app --exit-code
+```
+
+| Option | Meaning |
+|---|---|
+| `--url URL` | The fbadmin server (or `$FBADMIN_URL`). Before or after the command. |
+| `--token-env NAME` | Read the API token from this environment variable. Default `$FBADMIN_TOKEN`. |
+| `--token TOKEN` | The token itself (other users can see it in the process list, so avoid it). |
+| `--ca-cert FILE` | A CA certificate (PEM) for a server certificate signed by your own CA. |
+
+Name databases the way they are registered on the fbadmin server: `@SERVER/DATABASE`, or
+`--server`/`--database` (by name, case-insensitive, or id; the database also by its path). Host
+names, paths and the Firebird connection options (`--host`, `--password-env`, …) are refused, since
+the fbadmin server decides where to connect. `restore` also accepts `@SERVER:PATH` for a new
+database file on that server, and `--register-as NAME` registers it there afterwards.
+
+| Command | In remote mode |
+|---|---|
+| `servers` | The servers and databases the token's user can see. |
+| `check` | Version, ODS and page size of a database, or `--server-only`. |
+| `sql` | Runs the script through the server (each statement committed). `--single-transaction` and `--create` are local only. |
+| `extract` | The full DDL. `--split`, `--types` and `--schema` are local only. |
+| `diff` | Databases on the server, or a `.sql` file (run in a temporary database next to the other side). `--data` compares rows with the server's data compare. |
+| `backup` | `-o FILE`/`--dir`/`-o -`: streamed from the server to this machine, with `--compress`, `--checksum` and `--keep` as usual. `--server-file PATH`: written by the Firebird server. `--archive`: kept in the fbadmin server's backup archive. `--verify` is local only. |
+| `restore` | A local file (plain, `.gz` or `.zst`, or stdin) is uploaded and restored by the server; `--server-file PATH` restores a file on the Firebird server. Replacing a registered database needs `--replace`. |
+
+Backups, restores and data comparisons run as jobs on the server; their log is shown while they
+run (`-v` for every line), and **Ctrl+C cancels the job** on the server (press it twice to stop
+waiting). What a command may do follows the token: a read-only token can run `check`, `extract`,
+`diff` and `SELECT`s, but not change data or restore (exit code 3, "Not allowed").
+
+Uploads count toward the server's request size limit (16 MB by default in server mode; set
+`FBADMIN_MAX_REQUEST_SIZE` on the server). For larger restores, copy the backup to the Firebird
+server and use `--server-file`.
+
 ## Output and exit codes
 
 - Progress messages go to stderr. `-q` turns them off, `-v` adds detail (for example gbak's output).
@@ -82,9 +131,10 @@ Where fbadmin looks:
 | 0 | Success. |
 | 1 | `diff --exit-code` found differences. `check`: the server or database is not healthy. |
 | 2 | Usage error: a bad option, a missing file, no password. |
-| 3 | Cannot connect or log in. |
+| 3 | Cannot connect or log in. In remote mode also: the fbadmin server cannot be reached, the token is invalid, or the token's user is not allowed to do this. |
 | 4 | The operation failed: a gbak error, an SQL error in a script, a failed data comparison. |
 | 5 | `backup --verify`: the backup was written, but the test restore failed. |
+| 130 | Interrupted (Ctrl+C). In remote mode the server's job was cancelled. |
 
 ## backup
 

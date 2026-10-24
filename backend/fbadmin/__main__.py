@@ -20,11 +20,22 @@ from .config import settings
 from .logsetup import LEVELS, configure_logging
 
 
+REMOTE_OPTIONS = ("--url", "--token", "--token-env", "--ca-cert")
+
+
+def _remote_command(argv: list[str], commands) -> bool:
+    """``fbadmin --url URL [--token-env NAME] COMMAND ...``: remote options before the command."""
+    i = 0
+    while i < len(argv) and argv[i].split("=", 1)[0] in REMOTE_OPTIONS:
+        i += 1 if "=" in argv[i] else 2
+    return 0 < i < len(argv) and argv[i] in commands
+
+
 def main(argv: list[str] | None = None) -> None:
     argv = list(sys.argv[1:] if argv is None else argv)
     from .cli import COMMANDS
 
-    if argv and argv[0] in COMMANDS:
+    if argv and (argv[0] in COMMANDS or _remote_command(argv, COMMANDS)):
         from .cli import main as cli_main
 
         sys.exit(cli_main(argv))
