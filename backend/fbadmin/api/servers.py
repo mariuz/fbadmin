@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter
 from pydantic import BaseModel
 
+from .. import jobs
 from ..connections import connect
 from ..metadata.types import quote_ident
 from ..store import DatabaseEntry, ServerEntry
@@ -235,14 +236,14 @@ def backup(server_id: str, body: BackupIn):
 
     def run(log):
         log(f"Backing up {db.path} to {body.backup_file}")
-        with st.manager.service(server_id) as svc:
+        with st.manager.service(server_id) as svc, st.manager.detach_on_cancel(server_id, db.path):
             svc.backup_database(
                 db.path, body.backup_file, transportable=body.transportable, metadataOnly=body.metadata_only,
-                garbageCollect=body.garbage_collect, callback=log,
+                garbageCollect=body.garbage_collect, callback=jobs.interrupting_log(log),
             )
         log("Backup completed")
 
-    return st.jobs.start("backup", f"Backup {db.name}", server_id, run).summary()
+    return st.jobs.start("backup", f"Backup {db.name}", server_id, run, cancellable=True).summary()
 
 
 @router.post("/{server_id}/restore", status_code=202)
@@ -271,11 +272,11 @@ def sweep(server_id: str, db_id: str):
 
     def run(log):
         log(f"Sweeping {db.path}")
-        with st.manager.service(server_id) as svc:
-            svc.sweep(db.path, callback=log)
+        with st.manager.service(server_id) as svc, st.manager.detach_on_cancel(server_id, db.path):
+            svc.sweep(db.path, callback=jobs.interrupting_log(log))
         log("Sweep completed")
 
-    return st.jobs.start("sweep", f"Sweep {db.name}", server_id, run).summary()
+    return st.jobs.start("sweep", f"Sweep {db.name}", server_id, run, cancellable=True).summary()
 
 
 @router.post("/{server_id}/databases/{db_id}/statistics", status_code=202)

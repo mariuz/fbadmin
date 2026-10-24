@@ -15,3 +15,9 @@ def list_jobs():
 @router.get("/{job_id}")
 def get_job(job_id: str):
     return get_state().jobs.get(job_id).summary(with_log=True)
+
+
+@router.post("/{job_id}/cancel")
+def cancel_job(job_id: str):
+    """Ask a running job to stop; it ends with status "cancelled" shortly after."""
+    return get_state().jobs.cancel(job_id).summary(with_log=True)

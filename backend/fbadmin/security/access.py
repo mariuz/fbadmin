@@ -602,7 +602,7 @@ _DB_RULES: list[tuple[str, re.Pattern[str], int, Any, str]] = [
 # Endpoints outside /api/servers/... that need no database rights (or check them themselves).
 _GLOBAL_ALLOWED = re.compile(
     r"^/api/(query/params|query/isolations|schema/uploads(/.*)?|upgrade/render|replication/conf|schedules(/.*)?"
-    r"|jobs(/.*)?|access/me(/.*)?|auth/(logout|password|vault/.*|2fa(/.*)?))$")
+    r"|jobs(/.*)?|datacompare/runs/[^/]+|access/me(/.*)?|auth/(logout|password|vault/.*|2fa(/.*)?))$")
 _TOKEN_FORBIDDEN = re.compile(r"^/api/(auth/(?!status$)|access/me/|admin/tokens(/|$))")
 
 

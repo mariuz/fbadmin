@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 import threading
 import time
+from contextlib import contextmanager
 from typing import Any
 
 from fastapi import APIRouter
@@ -120,8 +121,13 @@ def run_trial(server_id: str, db_id: str, body: TrialIn):
 
     def run(log):
         src_report = build_report(server_id, db_id, target)
+        @contextmanager
+        def source_service():
+            with st.manager.service(server_id) as svc, st.manager.detach_on_cancel(server_id, db.path):
+                yield svc
+
         res = trial.run_trial(
-            source_service=lambda: st.manager.service(server_id), source_path=db.path,
+            source_service=source_service, source_path=db.path,
             target_service=lambda: st.manager.service(body.target_server_id),
             target_connect=lambda p: connect(tsrv, p, tpw), scratch=scratch, registered=registered,
             work_dir=settings.data_dir / "upgrade", metadata_only=body.metadata_only, keep=body.keep,
@@ -135,7 +141,8 @@ def run_trial(server_id: str, db_id: str, body: TrialIn):
                                         trial_result=res)
         log("Upgrade report ready")
 
-    job = st.jobs.start("upgrade", f"Upgrade trial {db.name} → Firebird {target} ({tsrv.name})", server_id, run)
+    job = st.jobs.start("upgrade", f"Upgrade trial {db.name} → Firebird {target} ({tsrv.name})", server_id, run,
+                        cancellable=True)
     with _lock:
         _results[job.id] = result
         for k in list(_results)[:-100]:

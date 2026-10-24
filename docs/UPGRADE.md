@@ -49,7 +49,8 @@ The restored database keeps working even where the recompile fails: gbak restore
 The failure tells you that the next `ALTER`, or any script that recreates the object, will fail.
 
 The trial uses disk space for one backup on the fbadmin host and one database on the target server, and
-loads the source server like any backup. Run it outside peak hours on large databases.
+loads the source server like any backup. Run it outside peak hours on large databases. **Cancel** next to the job's log stops the trial at any
+step (backup, restore or recompile) and drops the scratch database.
 
 ## What is checked
 

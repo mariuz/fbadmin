@@ -285,7 +285,7 @@ def services():
     """Context manager yielding an :class:`EmbeddedServices` (like ``ConnectionManager.service``)."""
     global _svc_config
     require_available()
-    from .native import _load, _translate
+    from .native import _load, _translate, connect_server
 
     driver = _load()
     with _lock:
@@ -296,7 +296,7 @@ def services():
                 cfg.config.value = "Providers = Engine13"  # never a server via Loopback
             _svc_config = name
     try:
-        srv = driver.connect_server(_svc_config, user=EMBEDDED_USER, password="")
+        srv = connect_server(driver, _svc_config, EMBEDDED_USER, "")
     except driver.Error as exc:
         raise _translate(exc) from exc
     svc = EmbeddedServices(srv, (driver.Error,))

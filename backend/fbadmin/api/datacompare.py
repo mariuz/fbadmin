@@ -1,14 +1,20 @@
-"""Data compare API (milestone 1.2): compare table rows of two databases, sync script, apply."""
+"""Data compare API (milestone 1.2): compare table rows of two databases, sync script, apply.
+
+Comparisons are kept on disk (``datacompare.engine.runs``) and survive restarts; a comparison and
+applying its script can be cancelled like other jobs (``POST /api/jobs/{id}/cancel``).
+"""
 
 from __future__ import annotations
 
 import re
+import time
 
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
-from ..connections import PasswordRequired, connect
+from .. import jobs
+from ..connections import PasswordRequired, connect, statements_on_cancel
 from ..datacompare import engine
 from ..serialize import to_json
 from .deps import get_state
@@ -104,42 +110,79 @@ def compare(body: CompareIn):
                       directions=sorted(directions), max_differences=body.max_differences)
 
     def job(log):
+        def tee(line: str) -> None:  # the log is kept with the comparison
+            run.log.append(line)
+            log(line)
+
         try:
             src = _open(body.source)
             try:
                 dst = _open(body.target)
                 try:
-                    engine.compare_tables(src, dst, log, run, tables=[t.model_dump() for t in body.tables],
-                                          ignore=set(body.ignore_columns), directions=directions,
-                                          max_samples=body.max_differences)
+                    with statements_on_cancel(src, lambda: _open(body.source)), \
+                            statements_on_cancel(dst, lambda: _open(body.target)):
+                        engine.compare_tables(src, dst, tee, run, tables=[t.model_dump() for t in body.tables],
+                                              ignore=set(body.ignore_columns), directions=directions,
+                                              max_samples=body.max_differences)
                 finally:
                     dst.close()
             finally:
                 src.close()
+            run.status = "finished"
+        except Exception as exc:
+            if isinstance(exc, jobs.Cancelled) or jobs.cancelling():
+                run.status = "cancelled"
+                tee("Cancelled")
+            else:
+                run.status, run.error = "failed", str(exc) or exc.__class__.__name__
+            raise
         finally:
-            run.finished = True
+            run.finished, run.finished_at = True, time.time()
+            if run.id:
+                run.save()
 
     j = get_state().jobs.start("datacompare", f"Compare data {run.source_name} → {run.target_name}",
-                               body.target.server_id, job)
+                               body.target.server_id, job, cancellable=True)
     run.result["job_id"] = j.id
     engine.runs.add(j.id, run)
     return j.summary()
 
 
-def _run(job_id: str):
-    job = get_state().jobs.get(job_id)  # per-user job scoping in server mode
-    return job, engine.runs.get(job_id)
+def _run(job_id: str) -> engine.Run:
+    return engine.runs.get(job_id)  # in server mode, only the user's own comparisons
+
+
+def _view(run: engine.Run) -> dict:
+    return to_json({**run.result, "job_id": run.id, "status": run.status, "error": run.error,
+                    "applied": run.applied, "created": run.created, "finished_at": run.finished_at,
+                    "source": {"server_id": run.source[0], "db_id": run.source[1]},
+                    "target": {"server_id": run.target[0], "db_id": run.target[1]}})
+
+
+@router.get("/api/datacompare/runs")
+def list_runs():
+    """Recent comparisons (kept across restarts), newest first."""
+    return [to_json(r.summary()) for r in engine.runs.list()]
+
+
+@router.delete("/api/datacompare/runs/{job_id}", status_code=204)
+def delete_run(job_id: str):
+    engine.runs.delete(job_id)
 
 
 @router.get("/api/datacompare/jobs/{job_id}")
 def result(job_id: str):
-    job, run = _run(job_id)
-    return to_json({**run.result, "status": job.status, "error": job.error, "applied": run.applied})
+    return _view(_run(job_id))
+
+
+@router.get("/api/datacompare/jobs/{job_id}/log")
+def run_log(job_id: str):
+    return {"log": _run(job_id).log}
 
 
 @router.get("/api/datacompare/jobs/{job_id}/samples")
 def samples(job_id: str, table: str):
-    _, run = _run(job_id)
+    run = _run(job_id)
     stats = next((t for t in run.result.get("tables", []) if t["name"] == table), None)
     if stats is None:
         raise KeyError(f"Table {table!r} was not compared")
@@ -150,8 +193,8 @@ def samples(job_id: str, table: str):
 
 @router.get("/api/datacompare/jobs/{job_id}/script")
 def script(job_id: str):
-    job, run = _run(job_id)
-    if job.status != "finished":
+    run = _run(job_id)
+    if run.status != "finished":
         raise ValueError("The comparison has not finished")
     name = re.sub(r"[^A-Za-z0-9_.-]", "_", run.target_name.split(" / ")[-1]) or "target"
     return StreamingResponse(run.script_chunks(), media_type="application/sql",
@@ -161,7 +204,7 @@ def script(job_id: str):
 @router.post("/api/servers/{server_id}/databases/{db_id}/datacompare/{job_id}/apply", status_code=202)
 def apply(server_id: str, db_id: str, job_id: str, body: ApplyIn):
     """Run the sync script on the target in one transaction (rolled back on any error)."""
-    job, run = _run(job_id)
+    run = _run(job_id)
     st = get_state()
     if run.target != (server_id, db_id):
         raise ValueError("This comparison has a different target database")
@@ -170,7 +213,7 @@ def apply(server_id: str, db_id: str, job_id: str, body: ApplyIn):
                                                       "code": "read_only"})
     if not body.confirm:
         raise ValueError("Confirm applying the script to the target database")
-    if job.status != "finished":
+    if run.status != "finished":
         raise ValueError("The comparison has not finished")
     if run.applying or run.applied:
         raise ValueError("This script was already applied: compare again")
@@ -184,12 +227,15 @@ def apply(server_id: str, db_id: str, job_id: str, body: ApplyIn):
         try:
             conn = _open(ep)
             try:
-                engine.apply_script(run, conn, log)
+                with statements_on_cancel(conn, lambda: _open(ep)):
+                    engine.apply_script(run, conn, log)
                 run.applied = True
+                run.save()
             finally:
                 conn.close()
         finally:
             run.applying = False
 
-    j = st.jobs.start("datasync", f"Apply data sync script to {run.target_name}", server_id, job_fn)
+    j = st.jobs.start("datasync", f"Apply data sync script to {run.target_name}", server_id, job_fn,
+                      cancellable=True)
     return j.summary()

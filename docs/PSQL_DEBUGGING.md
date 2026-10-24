@@ -22,6 +22,10 @@ Every run (trace, profile, test) uses its own connection and **one transaction t
 at the end. Inserts, updates, deletes and DDL done by the routine (or by the procedures, functions
 and triggers it calls) are undone.
 
+A run that takes too long (a trace, a profiled run or a test run) can be stopped with **Cancel**:
+its running statement is cancelled from a second attachment (like the Query Tool's Cancel button)
+and the transaction is rolled back. Results of a test run that was cancelled are not recorded.
+
 A rollback cannot undo everything:
 
 | Effect | What fbadmin does |
@@ -178,5 +182,6 @@ All under `/api/servers/{server_id}/databases/{db_id}/debug`:
 | `POST /profile` | profiled call (Firebird 5) |
 | `GET/POST /tests`, `PUT/DELETE /tests/{id}` | test cases |
 | `POST /tests/run` `{ids?, otype?, routine?}` | run tests; returns pass/fail and differences |
+| `POST /cancel` `{run_id}` | cancel the trace, run, profile or test run started with this `run_id` (an optional field of the requests above, chosen by the client); that request then answers 409 with `code: "cancelled"` |
 
 `watch` limits the traced variables (all by default), which keeps the block small.

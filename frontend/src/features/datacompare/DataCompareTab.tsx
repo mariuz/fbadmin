@@ -3,10 +3,10 @@ import { errMsg, useApp } from "../../context";
 import type { WorkTab } from "../../context";
 import type { Job } from "../../types";
 import { ConfirmDialog } from "../../components/dialogs";
-import { IconDownload, IconPlay, IconRefresh, IconSpinner, IconTerminal } from "../../components/Icons";
+import { IconDownload, IconPlay, IconRefresh, IconSpinner, IconTerminal, IconTrash } from "../../components/Icons";
 import { JobLog } from "../maintenance/common";
 import { N_, t } from "../../i18n";
-import { dcApi, type CompareResult, type Endpoint, type Listing, type SampleRow, type Samples, type TableResult } from "./api";
+import { dcApi, type CompareResult, type Endpoint, type Listing, type RunSummary, type SampleRow, type Samples, type TableResult, type TablePlan } from "./api";
 
 type Kind = "insert" | "update" | "delete";
 const KIND_LABEL: Record<Kind, string> = {
@@ -15,6 +15,9 @@ const KIND_LABEL: Record<Kind, string> = {
   delete: N_("Only in target (DELETE)"),
 };
 const MAX_EDITOR_SCRIPT = 2 << 20; // larger scripts are only offered as a download
+const TABLE_STATUSES = [N_("pending"), N_("running"), N_("cancelled")]; // shown with t(status)
+void TABLE_STATUSES;
+const fmtWhen = (ts: number) => new Date(ts * 1000).toLocaleString();
 
 const splitList = (s: string) => s.split(/[\s,]+/).map((x) => x.trim()).filter(Boolean);
 
@@ -47,8 +50,9 @@ function fmtCell(v: unknown): string {
   return String(v);
 }
 
-function TableNotes({ p }: { p: { source_only: string[]; target_only: string[]; type_mismatch: Array<{ column: string; source: string; target: string }>; warnings: string[] } }) {
+function TableNotes({ p }: { p: Pick<TablePlan, "source_only" | "target_only" | "type_mismatch" | "warnings" | "self_references"> }) {
   const notes: string[] = [];
+  for (const r of p.self_references ?? []) notes.push(t("References itself ({fk}): rows are inserted parents first and deleted children first", { fk: r.name }));
   if (p.source_only.length) notes.push(t("only in source: {cols}", { cols: p.source_only.join(", ") }));
   if (p.target_only.length) notes.push(t("only in target: {cols}", { cols: p.target_only.join(", ") }));
   for (const m of p.type_mismatch) notes.push(t("{col}: {source} → {target}", { col: m.column, source: m.source, target: m.target }));
@@ -148,8 +152,11 @@ export function DataCompareTab({ tab }: { tab: WorkTab }) {
   const [deletes, setDeletes] = useState(true);
   const [ignore, setIgnore] = useState("");
   const [maxDiffs, setMaxDiffs] = useState(100);
-  const [job, setJob] = useState<Job | null>(null);
+  const [job, setJob] = useState<Job | null>(null); // started in this tab (live log, Cancel)
+  const [runId, setRunId] = useState<string | null>(null); // the comparison shown (also a saved one)
   const [res, setRes] = useState<CompareResult | null>(null);
+  const [runs, setRuns] = useState<RunSummary[]>([]);
+  const [savedLog, setSavedLog] = useState<string[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [sel, setSel] = useState<string | null>(null);
   const [applyJob, setApplyJob] = useState<Job | null>(null);
@@ -157,7 +164,6 @@ export function DataCompareTab({ tab }: { tab: WorkTab }) {
   const same = source.server_id === target.server_id && source.db_id === target.db_id;
   const targetServer = app.servers.find((s) => s.id === target.server_id);
   const targetDb = targetServer?.databases.find((d) => d.id === target.db_id);
-  const readOnly = !!targetServer?.read_only;
 
   const load = async () => {
     if (!source.db_id || !target.db_id || same) { setListing(null); return; }
@@ -182,23 +188,50 @@ export function DataCompareTab({ tab }: { tab: WorkTab }) {
   const chosen = comparable.filter((x) => checked[x.name]);
   const running = res?.status === "running";
 
+  const loadRuns = () => dcApi.runs().then(setRuns).catch(() => undefined);
+  useEffect(() => { loadRuns(); }, []);
+
   // live result while the comparison runs
   useEffect(() => {
-    if (!job) return;
+    if (!runId) return;
     let live = true;
+    setSavedLog(null);
     const tick = async () => {
       try {
-        const r = await dcApi.result(job.id);
+        const r = await dcApi.result(runId);
         if (!live) return;
         setRes(r);
         if (r.status === "running") setTimeout(tick, 700);
+        else loadRuns();
       } catch (e) {
         if (live) setError(errMsg(e));
       }
     };
     tick();
     return () => { live = false; };
-  }, [job?.id]);
+  }, [runId]);
+
+  const exists = (ep: Endpoint) => !!app.servers.find((s) => s.id === ep.server_id)?.databases.some((d) => d.id === ep.db_id);
+  const openRun = (r: RunSummary) => {
+    setError(null);
+    setSel(null);
+    setApplyJob(null);
+    setJob(null);
+    setRes(null);
+    const src = { server_id: r.source[0], db_id: r.source[1] };
+    const tgt = { server_id: r.target[0], db_id: r.target[1] };
+    if (exists(src) && exists(tgt)) { setSource(src); setTarget(tgt); }
+    setRunId(r.job_id);
+  };
+  const deleteRun = async (r: RunSummary) => {
+    try {
+      await dcApi.deleteRun(r.job_id);
+      if (runId === r.job_id) { setRunId(null); setRes(null); setJob(null); }
+      loadRuns();
+    } catch (e) {
+      app.toast(errMsg(e), "error");
+    }
+  };
 
   const start = async () => {
     setError(null);
@@ -212,6 +245,7 @@ export function DataCompareTab({ tab }: { tab: WorkTab }) {
       });
       setRes(null);
       setJob(j);
+      setRunId(j.id);
     } catch (e) {
       setError(errMsg(e));
     }
@@ -232,13 +266,16 @@ export function DataCompareTab({ tab }: { tab: WorkTab }) {
       title={t("Apply the sync script to the target")}
       message={t("Run {n} statement(s) on {target} in one transaction? It is rolled back if any statement fails. Triggers on the target fire as usual.", { n: res!.statements, target: res!.target_name })}
       action={t("Apply to target")}
-      confirmText={targetDb?.name ?? ""}
-      onConfirm={async () => { setApplyJob(await dcApi.apply(target, res!.job_id)); }}
+      confirmText={resServer?.databases.find((d) => d.id === res!.target.db_id)?.name ?? targetDb?.name ?? ""}
+      onConfirm={async () => { setApplyJob(await dcApi.apply(res!.target, res!.job_id)); }}
     />,
   );
 
   const selTable = res?.tables.find((x) => x.name === sel) ?? null;
   const finished = res?.status === "finished";
+  const resServer = res ? app.servers.find((s) => s.id === res.target.server_id) : undefined;
+  const resReadOnly = !!resServer?.read_only;
+  const resTargetGone = !!res && !exists(res.target);
 
   return (
     <div className="sch-col sch-scroll dc">
@@ -256,6 +293,33 @@ export function DataCompareTab({ tab }: { tab: WorkTab }) {
           <p className="muted">{t("Rows are matched by primary key (or a unique key). The sync script makes the target's rows equal to the source: INSERT for rows only in the source, UPDATE for changed rows, DELETE for rows only in the target.")}</p>
           {same && <div className="err">{t("Source and target are the same database")}</div>}
           {listError && <div className="err">{listError}</div>}
+          {runs.length > 0 && (
+            <details className="dc-runs">
+              <summary>{t("Recent comparisons ({n})", { n: runs.length })}</summary>
+              <div className="grid-wrap">
+                <table className="grid">
+                  <thead><tr><th>{t("Compared")}</th><th>{t("Source")}</th><th>{t("Target")}</th><th>{t("Status")}</th>
+                    <th className="num">{t("Statements")}</th><th><span className="sr-only">{t("Actions")}</span></th></tr></thead>
+                  <tbody>
+                    {runs.map((r) => (
+                      <tr key={r.job_id} className={r.job_id === runId ? "sel" : ""} aria-current={r.job_id === runId ? "true" : undefined}>
+                        <td>{fmtWhen(r.created)}</td>
+                        <td>{r.source_name}</td>
+                        <td>{r.target_name}</td>
+                        <td><span className={"pill " + r.status}>{t(r.status)}</span>{r.applied && <span className="muted"> · {t("applied")}</span>}</td>
+                        <td className="num">{r.status === "finished" ? r.statements.toLocaleString() : "—"}</td>
+                        <td className="dc-run-actions">
+                          <button className="btn small" onClick={() => openRun(r)} disabled={r.job_id === runId}>{t("Open")}</button>
+                          <button className="btn small danger" onClick={() => deleteRun(r)} disabled={r.status === "running"}
+                            aria-label={t("Delete the comparison of {time}", { time: fmtWhen(r.created) })}><IconTrash size={12} /></button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </details>
+          )}
         </section>
 
         {listing && (
@@ -321,9 +385,11 @@ export function DataCompareTab({ tab }: { tab: WorkTab }) {
           </section>
         )}
 
-        {job && (
+        {runId && (
           <section>
-            <h3>{t("Result")}</h3>
+            <h3>{t("Result")} {res && <span className="muted">{res.source_name} → {res.target_name} · {t("compared {time}", { time: fmtWhen(res.created) })}</span>}</h3>
+            {res?.status === "cancelled" && <div className="muted">{t("The comparison was cancelled: the results are incomplete and there is no sync script.")}</div>}
+            {res?.status === "failed" && res.error && <div className="err">{res.error}</div>}
             {res && (
               <>
                 <div className="grid-wrap dc-results">
@@ -362,20 +428,31 @@ export function DataCompareTab({ tab }: { tab: WorkTab }) {
                     <button className="btn" disabled={!res.statements || res.script_bytes > MAX_EDITOR_SCRIPT} onClick={openInQueryTool}
                       title={res.script_bytes > MAX_EDITOR_SCRIPT ? t("The script is too large for the editor: download it") : t("Review and run the script on the target")}>
                       <IconTerminal /> {t("Open in Query Tool (target)")}</button>
-                    <button className="btn danger" disabled={!res.statements || readOnly || res.applied || !!applyJob} onClick={confirmApply}
-                      title={readOnly ? t("The target server is registered as read-only") : t("Run the script on the target in one transaction")}>
+                    <button className="btn danger" disabled={!res.statements || resReadOnly || resTargetGone || res.applied || !!applyJob} onClick={confirmApply}
+                      title={resReadOnly ? t("The target server is registered as read-only") : t("Run the script on the target in one transaction")}>
                       <IconPlay /> {t("Apply to target…")}</button>
-                    {readOnly && <span className="muted">{t("The target server is registered as read-only")}</span>}
+                    {resReadOnly && <span className="muted">{t("The target server is registered as read-only")}</span>}
+                    {res.applied && <span className="muted">{t("This script was applied to the target.")}</span>}
+                    {!job && !res.applied && <span className="muted">{t("Compared {time}: the target may have changed since. Applying stops (and rolls back) if a row to update or delete is gone.", { time: fmtWhen(res.created) })}</span>}
                   </div>
                 )}
               </>
             )}
-            <JobLog job={job} maxHeight={160} onDone={() => dcApi.result(job.id).then(setRes).catch(() => undefined)} />
+            {job ? <JobLog job={job} maxHeight={160} onDone={() => dcApi.result(job.id).then(setRes).catch(() => undefined)} />
+              : (
+                <details className="dc-log" onToggle={(e) => {
+                  if ((e.target as HTMLDetailsElement).open && savedLog === null) dcApi.log(runId).then((l) => setSavedLog(l.log)).catch(() => setSavedLog([]));
+                }}>
+                  <summary>{t("Log")}</summary>
+                  <div className="log" style={{ maxHeight: 160 }}>{savedLog === null ? "…" : savedLog.join("\n") || t("(no output)")}</div>
+                </details>
+              )}
             {applyJob && (
               <>
                 <JobLog job={applyJob} maxHeight={160} onDone={(j) => {
                   if (j.status === "finished") app.toast(t("The target was updated"));
-                  dcApi.result(job.id).then(setRes).catch(() => undefined);
+                  dcApi.result(res!.job_id).then(setRes).catch(() => undefined);
+                  loadRuns();
                 }} />
                 <div className="sch-row"><button className="btn" onClick={start} disabled={running}><IconRefresh /> {t("Compare again")}</button></div>
               </>

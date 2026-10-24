@@ -481,3 +481,151 @@ def test_apply_refused_on_read_only_target(client, populated):
     # the comparison belongs to its target
     r = client.post(base(sid, tgt) + f"/datacompare/{j['id']}/apply", json={"confirm": True})
     assert r.status_code == 400
+
+
+# ------------------------------------------------------------------ 2.1: ordering, collations, saved runs
+def test_parents_first_orders_self_references():
+    # rows: ((own key, parent key),) for one foreign key; row 0 references row 2, row 1 references row 0
+    rows = [(((1,), (3,)),), (((2,), (1,)),), (((3,), (None,)),), (((4,), (99,)),)]
+    order, cycles = engine.parents_first(rows)
+    assert cycles == 0
+    assert order.index(2) < order.index(0) < order.index(1)
+    assert sorted(order) == [0, 1, 2, 3]
+    # no row references another row of the list: nothing to reorder
+    assert engine.parents_first([(((1,), (7,)),), (((2,), (None,)),)]) == (None, 0)
+    # a cycle keeps every row and is reported
+    order, cycles = engine.parents_first([(((1,), (2,)),), (((2,), (1,)),)])
+    assert sorted(order) == [0, 1] and cycles == 1
+
+
+def test_statement_file_reorder(tmp_path):
+    f = engine.StmtFile(tmp_path / "s.bin")
+    pos = [f.add(f"INSERT INTO T VALUES ({i})") for i in range(4)]
+    f.reorder([pos[2], pos[0], pos[3], pos[1]])
+    assert [s.sql for s in f] == [f"INSERT INTO T VALUES ({i})" for i in (2, 0, 3, 1)]
+    assert f.count == 4
+
+
+def test_key_normalizer():
+    norm = engine.key_normalizer(ci=True, ai=True, pad=True)
+    assert norm("Ação  ") == norm("acao") == "acao"
+    assert norm(5) == 5
+    assert engine.key_normalizer(ci=False, ai=False, pad=True)("Ab ") == "Ab"
+    assert engine.key_normalizer(ci=True, ai=False, pad=False)("Straße") == "strasse"
+
+
+def test_checked_explains_keys_equal_only_in_the_target():
+    rows = [(("abc",), ["ABC", 1]), (("abc",), ["abc", 2])]
+    with pytest.raises(engine.TableError, match="different in the source database but equal in the target"):
+        list(engine._checked(iter(rows), "source", 1, True))
+
+
+SELF_DDL = """
+CREATE TABLE NODE (ID INTEGER NOT NULL PRIMARY KEY, PARENT_ID INTEGER, NAME VARCHAR(20),
+  CONSTRAINT FK_NODE_PARENT FOREIGN KEY (PARENT_ID) REFERENCES NODE (ID));
+"""
+
+
+@requires_server
+def test_self_referencing_rows_are_inserted_parents_first_and_deleted_children_first(client, pair):
+    sid, src, tgt = pair
+    for dbid in (src, tgt):
+        execute(client, sid, dbid, SELF_DDL)
+    # in key order, each child comes before its parent: 1 -> 2 -> 3 (3 is the root)
+    execute(client, sid, src, "INSERT INTO NODE VALUES (3, NULL, 'root'); INSERT INTO NODE VALUES (2, 3, 'mid');"
+                              "INSERT INTO NODE VALUES (1, 2, 'leaf'); COMMIT;")
+    # rows only in the target: 10 -> 11 -> 12, deleted children first
+    execute(client, sid, tgt, "INSERT INTO NODE VALUES (12, NULL, 'r'); INSERT INTO NODE VALUES (11, 12, 'm');"
+                              "INSERT INTO NODE VALUES (10, 11, 'l'); COMMIT;")
+    listing = client.post("/api/datacompare/tables", json={"source": {"server_id": sid, "db_id": src},
+                                                           "target": {"server_id": sid, "db_id": tgt}}).json()
+    node = next(t for t in listing["tables"] if t["name"] == "NODE")
+    assert node["self_references"] == [{"name": "FK_NODE_PARENT", "columns": ["PARENT_ID"], "ref_columns": ["ID"]}]
+    job_id, _, t = run_compare(client, sid, src, tgt, tables=[{"name": "NODE"}])
+    assert t["NODE"]["only_source"] == 3 and t["NODE"]["only_target"] == 3
+    text = client.get(f"/api/datacompare/jobs/{job_id}/script").text
+    ins = [text.index(f"VALUES ({i}, ") for i in (3, 2, 1)]
+    assert ins == sorted(ins), text
+    dels = [text.index(f"WHERE ID = {i}") for i in (10, 11, 12)]
+    assert dels == sorted(dels), text
+    r = client.post(base(sid, tgt) + f"/datacompare/{job_id}/apply", json={"confirm": True})
+    j = wait_job(client, r.json())
+    assert j["status"] == "finished", j["error"]
+    _, res, _ = run_compare(client, sid, src, tgt, tables=[{"name": "NODE"}])
+    assert res["totals"] == {"only_source": 0, "only_target": 0, "different": 0, "identical": 3}
+
+
+@requires_server
+def test_keys_differing_only_by_case_follow_the_target_collation(client, pair):
+    sid, src, tgt = pair
+    execute(client, sid, src, "CREATE TABLE K (CODE VARCHAR(10) NOT NULL PRIMARY KEY, V INTEGER);")
+    execute(client, sid, tgt, "CREATE TABLE K (CODE VARCHAR(10) CHARACTER SET UTF8 NOT NULL PRIMARY KEY "
+                              "COLLATE UNICODE_CI_AI, V INTEGER);")
+    execute(client, sid, src, "INSERT INTO K VALUES ('abc', 1); INSERT INTO K VALUES ('Café', 2);"
+                              "INSERT INTO K VALUES ('same', 3); INSERT INTO K VALUES ('new', 4); COMMIT;")
+    execute(client, sid, tgt, "INSERT INTO K VALUES ('ABC', 1); INSERT INTO K VALUES ('CAFE', 2);"
+                              "INSERT INTO K VALUES ('same', 3); INSERT INTO K VALUES ('gone', 5); COMMIT;")
+    listing = client.post("/api/datacompare/tables", json={"source": {"server_id": sid, "db_id": src},
+                                                           "target": {"server_id": sid, "db_id": tgt}}).json()
+    k = next(t for t in listing["tables"] if t["name"] == "K")
+    assert k["key_matching"] == [{"column": "CODE", "case": True, "accents": True}]
+    job_id, res, t = run_compare(client, sid, src, tgt, tables=[{"name": "K"}])
+    # 'abc'/'ABC' and 'Café'/'CAFE' are the same rows: their keys are updated, not inserted and deleted
+    assert (t["K"]["only_source"], t["K"]["only_target"], t["K"]["different"], t["K"]["identical"]) == (1, 1, 2, 1)
+    assert t["K"]["changed_columns"] == {"CODE": 2}
+    text = client.get(f"/api/datacompare/jobs/{job_id}/script").text
+    assert "UPDATE K SET CODE = 'abc' WHERE CODE = 'ABC'" in text, text
+    r = client.post(base(sid, tgt) + f"/datacompare/{job_id}/apply", json={"confirm": True})
+    j = wait_job(client, r.json())
+    assert j["status"] == "finished", j["error"]
+    rows = execute(client, sid, tgt, "SELECT CODE FROM K ORDER BY V")["results"][0]["rows"]
+    assert [r[0] for r in rows] == ["abc", "Café", "same", "new"]
+    # two source keys that the target cannot tell apart: a clear error instead of a failing script
+    execute(client, sid, src, "INSERT INTO K VALUES ('ABC', 9); COMMIT;")
+    r = client.post("/api/datacompare/compare", json={"source": {"server_id": sid, "db_id": src},
+                                                      "target": {"server_id": sid, "db_id": tgt},
+                                                      "tables": [{"name": "K"}]})
+    j = wait_job(client, r.json())
+    res = client.get(f"/api/datacompare/jobs/{j['id']}").json()
+    assert res["tables"][0]["status"] == "error"
+    assert "equal in the target" in res["tables"][0]["error"]
+
+
+@requires_server
+def test_comparisons_are_kept_across_restarts(client, populated):
+    sid, src, tgt, _ = populated
+    job_id, res, _ = run_compare(client, sid, src, tgt, tables=[{"name": "PARENT"}, {"name": "CHILD"}])
+    script = client.get(f"/api/datacompare/jobs/{job_id}/script").text
+    runs = client.get("/api/datacompare/runs").json()
+    assert runs[0]["job_id"] == job_id and runs[0]["status"] == "finished"
+    assert runs[0]["source"] == [sid, src] and runs[0]["target"] == [sid, tgt]
+    # a restart: the job manager forgets the job, the comparison is read back from the data directory
+    from fbadmin.api import deps
+
+    deps.reset_state()  # servers are read back from the data directory too
+    engine.runs = engine.Runs()
+    again = client.get(f"/api/datacompare/jobs/{job_id}").json()
+    assert again["status"] == "finished" and again["totals"] == res["totals"]
+    assert again["source"] == {"server_id": sid, "db_id": src}
+    assert client.get(f"/api/datacompare/jobs/{job_id}/script").text == script
+    assert client.get(f"/api/datacompare/jobs/{job_id}/log").json()["log"][-1].startswith("Done:")
+    assert [r["job_id"] for r in client.get("/api/datacompare/runs").json()] == [job_id]
+    assert client.delete(f"/api/datacompare/runs/{job_id}").status_code == 204
+    assert client.get(f"/api/datacompare/jobs/{job_id}").status_code == 404
+    assert client.get("/api/datacompare/runs").json() == []
+
+
+def test_interrupted_comparison_is_marked_failed_when_loaded(tmp_path, monkeypatch):
+    from fbadmin import config
+
+    monkeypatch.setattr(config.settings, "data_dir", tmp_path)
+    run = engine.Run(source=("s", "a"), target=("s", "b"), id="j1")
+    f = engine.StmtFile(run.dir / "0_insert.bin")
+    f.add("INSERT INTO T VALUES (1)")
+    f.close()
+    run.segments = [("T", "INSERT", f)]
+    run.save()  # saved while still running, then fbadmin stopped
+    runs = engine.Runs()
+    loaded = runs.get("j1")
+    assert loaded.status == "failed" and "stopped" in loaded.error
+    assert loaded.statement_count() == 0

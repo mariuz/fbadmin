@@ -194,6 +194,7 @@ pre.plan { margin: 0; padding: 12px; white-space: pre-wrap; }
 .pill.running { color: var(--accent); border-color: var(--accent); }
 .pill.finished { color: var(--ok); border-color: var(--ok); }
 .pill.failed { color: var(--danger); border-color: var(--danger); }
+.pill.cancelled { color: var(--muted); border-color: var(--muted); }
 .coltable input.text, .coltable select.text { width: 100%; padding: 3px 6px; }
 .coltable td { padding: 3px 4px; }
 h2 .btn { font-size: 13px; font-weight: 400; }

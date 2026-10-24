@@ -103,12 +103,15 @@ export interface Job {
   id: string;
   kind: string;
   description: string;
-  status: "running" | "finished" | "failed";
+  status: "running" | "finished" | "failed" | "cancelled";
   started_at: number;
   finished_at: number | null;
   error: string | null;
   log?: string[];
   log_lines?: number;
+  /** the job can be stopped with api.cancelJob */
+  cancellable?: boolean;
+  cancel_requested?: boolean;
 }
 
 export interface ObjectDetail {

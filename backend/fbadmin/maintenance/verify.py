@@ -68,16 +68,19 @@ def verify_backup(svc, srv, password: str, src: Path, target: str, major: int, l
         log(f"Test restore ok: {tables} tables, {indices} indices, {procedures} procedures; scratch database dropped")
         return {"ok": True, "seconds": round(time.time() - t0, 1), "tables": tables, "indices": indices,
                 "procedures": procedures, "path": target}
-    except Exception:
+    except Exception as exc:
         if replace:  # never drop a file fbadmin did not name itself
-            _cleanup(srv, password, target, log)
+            _cleanup(srv, password, target, log, cancelled=isinstance(exc, ops.RestoreCancelled))
         raise
 
 
-def _cleanup(srv, password: str, target: str, log: ops.Log) -> None:
+def _cleanup(srv, password: str, target: str, log: ops.Log, cancelled: bool = False) -> None:
     """Drop a half-restored scratch database, if one was left behind."""
     from ..connections import connect
 
+    if cancelled:  # gbak lets go of the file a moment after its service connection is closed
+        ops.drop_partial(lambda: connect(srv, target, password), target, log)
+        return
     try:
         connect(srv, target, password).drop_database()
         log(f"Dropped the incomplete scratch database {target}")

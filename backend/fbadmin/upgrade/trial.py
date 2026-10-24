@@ -16,6 +16,7 @@ from contextlib import AbstractContextManager, contextmanager
 from pathlib import Path
 from typing import Any
 
+from .. import jobs
 from ..maintenance import ops
 from ..maintenance.verify import check_scratch
 from ..metadata import Catalog
@@ -85,6 +86,7 @@ def recompile(conn, log: ops.Log) -> list[dict[str, Any]]:
     log(f"Recompiling {len(mods)} view(s) and PSQL module(s) on the target server")
     with _quote_all_versions():
         for otype, name in mods:
+            jobs.check()
             try:
                 ddl = cat.get_object(otype, name)["ddl"]
                 conn.commit()
@@ -157,6 +159,10 @@ def run_trial(*, source_service: Callable[[], AbstractContextManager], source_pa
             ops.restore_from_local_file(svc, fbk, scratch, opts, ops.option_major(svc), rlog)
         result["restore_seconds"] = round(time.time() - t0, 1)
         log(f"Restore finished in {result['restore_seconds']} s")
+    except ops.RestoreCancelled as exc:
+        if ours or exc.created:  # gbak may still hold the file for a moment: retry the drop
+            ops.drop_partial(lambda: target_connect(scratch), scratch, log)
+        raise
     except Exception:
         if ours:
             _drop(target_connect, scratch, log)
@@ -190,7 +196,7 @@ def run_trial(*, source_service: Callable[[], AbstractContextManager], source_pa
         result["recompile_failures"] = recompile(conn, log)
         result["restore_messages"] = [ln for ln in restore_log if re.search(r"error|warning", ln, re.I)][:50]
     finally:
-        if keep:
+        if keep and not jobs.cancelling():
             conn.close()
             result["kept"] = True
             log(f"Kept the trial database {scratch} on the target server")

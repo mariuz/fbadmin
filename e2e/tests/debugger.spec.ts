@@ -183,3 +183,24 @@ test("trace an EXECUTE BLOCK and profile it", async () => {
   }
   await audit("execute block trace");
 });
+
+test("a long-running test run can be cancelled", async () => {
+  const base = `/api/servers/${serverId}/databases/${dbId}`;
+  const spin = "CREATE PROCEDURE P_SPIN RETURNS (N BIGINT) AS DECLARE I BIGINT = 0; BEGIN "
+    + "WHILE (I < 4000000000) DO I = I + 1; N = I; SUSPEND; END";
+  const r = await (await page.request.post(`${base}/execute`, { data: { sql: spin } })).json();
+  expect(r.error, JSON.stringify(r.error)).toBeNull();
+  const tc = await page.request.post(`${base}/debug/tests`, { data: { otype: "procedures", routine: "P_SPIN", name: "spin" } });
+  expect(tc.status(), await tc.text()).toBe(201);
+  await menu("P_TRACE", "Debug / trace…");
+  await pane().getByRole("tab", { name: "Tests" }).click();
+  const runAll = pane().locator("button", { hasText: "Run all tests of this database" });
+  await runAll.click();
+  const cancel = pane().getByRole("button", { name: "Cancel", exact: true });
+  await expect(cancel).toBeVisible();
+  await audit("test run in progress");
+  await cancel.click();
+  await expect(page.locator(".toast", { hasText: "The run was cancelled and rolled back" })).toBeVisible({ timeout: 30_000 });
+  await expect(runAll).toBeEnabled();
+  await expect(cancel).toBeHidden();
+});

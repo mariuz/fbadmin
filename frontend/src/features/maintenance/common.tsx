@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { errMsg, useApp } from "../../context";
-import { t } from "../../i18n";
+import { N_, t } from "../../i18n";
 import type { Job } from "../../types";
+import { api } from "../../api";
 import { mapi, waitJob, type Capabilities } from "./api";
 
 /** Fetch server capabilities once per server (cached). */
@@ -36,6 +37,32 @@ export function useBusy() {
   return { busy, error, setError, run };
 }
 
+/** Job statuses, for translation (``t(job.status)``). */
+export const JOB_STATUSES = [N_("running"), N_("finished"), N_("failed"), N_("cancelled")];
+
+/** Cancel button for a running, cancellable job (the job stops at its next safe point). */
+export function CancelJobButton(props: { job: Job; onCancel?: (j: Job) => void }) {
+  const app = useApp();
+  const [sent, setSent] = useState(false);
+  const j = props.job;
+  if (j.status !== "running" || !j.cancellable) return null;
+  const pending = sent || !!j.cancel_requested;
+  return (
+    <button className="btn small" disabled={pending} title={t("Stop this job")}
+      onClick={async () => {
+        setSent(true);
+        try {
+          props.onCancel?.(await api.cancelJob(j.id));
+        } catch (e) {
+          setSent(false);
+          app.toast(errMsg(e), "error");
+        }
+      }}>
+      {pending ? t("Cancelling…") : t("Cancel")}
+    </button>
+  );
+}
+
 /** Live log of a background job, polled until it finishes. */
 export function JobLog(props: { job: Job | null; onDone?: (j: Job) => void; maxHeight?: number }) {
   const [job, setJob] = useState<Job | null>(props.job);
@@ -54,9 +81,10 @@ export function JobLog(props: { job: Job | null; onDone?: (j: Job) => void; maxH
   return (
     <div style={{ marginTop: 10 }}>
       <div className="mt-row" style={{ marginBottom: 4 }}>
-        <span className={"pill " + job.status}>{job.status}</span>
+        <span className={"pill " + job.status}>{t(job.status)}</span>
         <b>{job.description}</b>
         {job.finished_at && <span className="muted">{(job.finished_at - job.started_at).toFixed(1)} s</span>}
+        <CancelJobButton job={job} onCancel={setJob} />
       </div>
       {job.error && <div className="err" style={{ whiteSpace: "pre-wrap" }}>{job.error}</div>}
       <div className="log" ref={ref} style={{ maxHeight: props.maxHeight ?? 260 }}>{(job.log ?? []).join("\n") || "…"}</div>

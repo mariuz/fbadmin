@@ -114,6 +114,28 @@ Read-only `RDB$CONFIG` (Firebird 4+): effective `firebird.conf` / `databases.con
 for the database, with default and source file. On Firebird 3 the page explains that the
 viewer needs Firebird 4.
 
+## Cancelling a job
+
+Long operations run as background jobs (**Processes**, and the log under each form). A job that
+can be stopped shows **Cancel** while it runs; it then ends with the status *cancelled*.
+
+| Job | What Cancel does |
+| --- | --- |
+| Backup (to the fbadmin archive or to a server file), sweep, validation (not *mend*) | Detaches the attachment of the server's gbak or gfix from `MON$ATTACHMENTS`, which stops it at once. gbak removes its unfinished backup file on the server (Firebird 4 and later; Firebird 3 leaves it), and fbadmin removes its partial archive file. |
+| Restore of a backup in the fbadmin archive or an upload | Stops sending the backup. gbak ends, and fbadmin drops the half-restored database when gbak's log shows it created that file. |
+| Test restore of a backup, upgrade trial restore | As above. The scratch database is dropped. |
+| Scheduled backup, sweep or validation | As above. The run is recorded as *cancelled* and raises no "job failed" alert. |
+| Data compare, applying a sync script | Cancels the running statement from a second attachment (`MON$STATEMENTS`). Applying is rolled back. |
+
+A restore from a backup file **on the server** cannot be cancelled. gbak runs inside the server,
+and the database it restores stays in shutdown mode until it is finished, so no other attachment
+can stop it. Restoring through the fbadmin archive (or an upload) can be cancelled.
+
+To find exactly its own server work, a cancellable job attaches to the service manager with the
+process name `fbadmin-job-<job id>`, which Firebird copies into the attachments of the gbak or
+gfix it starts (`MON$REMOTE_PROCESS`). Other attachments are never touched. Cancelling needs
+the right to delete those attachments: the same user, or SYSDBA/`RDB$ADMIN`.
+
 ## Scheduled jobs
 
 pgAgent-like schedules for **backups** (streamed into `<data dir>/backups/<schedule id>/`
@@ -246,6 +268,7 @@ published Signature V4 examples and needs no network.
 | `POST …/databases/{db}/maintenance/backup/stream` → `GET …/maintenance/downloads/{token}` | streamed download |
 | `POST …/databases/{db}/maintenance/backup` | backup job (`target`: `archive` or `server`) |
 | `POST /api/servers/{sid}/maintenance/restore` | restore job from `archive` or `server` file |
+| `POST /api/jobs/{job}/cancel` | cancel a running job (`cancellable: true` in its summary) |
 | `POST /api/servers/{sid}/maintenance/restore/upload?database_path=…` | raw-body upload + restore |
 | `GET/DELETE /api/servers/{sid}/maintenance/archive`, `GET …/archive/download?path=` | archive |
 | `POST …/maintenance/nbackup`, `/nbackup/lock`, `/nbackup/unlock`, `/nbackup/fixup`, `GET /nbackup/history` | nbackup |

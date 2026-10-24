@@ -4,6 +4,7 @@ import { errMsg, useApp } from "../context";
 import type { Job } from "../types";
 import { IconRefresh } from "./Icons";
 import { t } from "../i18n";
+import { CancelJobButton } from "../features/maintenance/common";
 
 export function JobsPanel(props: { visible: boolean }) {
   const app = useApp();
@@ -31,7 +32,7 @@ export function JobsPanel(props: { visible: boolean }) {
         {jobs.map((j) => (
           <div key={j.id} className="history-item" style={open?.id === j.id ? { background: "var(--select)" } : undefined}
             onClick={() => api.job(j.id).then(setOpen).catch((e) => app.toast(errMsg(e), "error"))}>
-            <span className={"pill " + j.status}>{j.status}</span> <b>{j.description}</b>
+            <span className={"pill " + j.status}>{t(j.status)}</span> <b>{j.description}</b>
             <div className="muted">{srvName((j as any).server_id)} · {new Date(j.started_at * 1000).toLocaleString()}
               {j.finished_at ? ` · ${(j.finished_at - j.started_at).toFixed(1)} s` : ""}</div>
           </div>
@@ -40,7 +41,7 @@ export function JobsPanel(props: { visible: boolean }) {
       <div style={{ flex: 1, padding: 14, overflow: "auto" }}>
         {open ? (
           <>
-            <h2>{open.description} <span className={"pill " + open.status}>{open.status}</span></h2>
+            <h2>{open.description} <span className={"pill " + open.status}>{t(open.status)}</span> <CancelJobButton job={open} onCancel={setOpen} /></h2>
             {open.error && <p className="err">{open.error}</p>}
             <div className="log">{(open.log ?? []).join("\n") || t("(no output)")}</div>
           </>

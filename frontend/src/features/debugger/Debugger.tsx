@@ -28,6 +28,40 @@ BEGIN
   END
 END`;
 
+/** Runs that the user can cancel: each run gets a fresh id; Cancel stops its running statement. */
+function useCancellableRun(sid: string, dbid: string) {
+  const app = useApp();
+  const id = useRef<string | null>(null);
+  const [active, setActive] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  return {
+    active, cancelling,
+    next: () => {
+      id.current = Math.random().toString(36).slice(2) + Date.now().toString(36);
+      setActive(true);
+      return id.current;
+    },
+    cancel: async () => {
+      if (!id.current) return;
+      setCancelling(true);
+      try { await dapi.cancel(sid, dbid, id.current); } catch (e) { app.toast(errMsg(e), "error"); }
+    },
+    /** Run fn; a cancelled run ends quietly with a notice instead of an error. */
+    wrap: (fn: () => Promise<void>) => async () => {
+      try {
+        await fn();
+      } catch (e) {
+        if ((e as { code?: string }).code === "cancelled") { app.toast(t("The run was cancelled and rolled back"), "info"); return; }
+        throw e;
+      } finally {
+        id.current = null;
+        setActive(false);
+        setCancelling(false);
+      }
+    },
+  };
+}
+
 export function fmtVal(v: unknown): string {
   if (v === null || v === undefined) return "NULL";
   if (typeof v === "string") return v;
@@ -233,6 +267,7 @@ function TraceView(props: {
   const [showSql, setShowSql] = useState(false);
   const [maxSteps, setMaxSteps] = useState(10000);
   const { busy, error, setError, run } = useBusy();
+  const cancel = useCancellableRun(sid, dbid);
 
   const load = async () => {
     setLoadErr(null);
@@ -251,9 +286,10 @@ function TraceView(props: {
   const body = (i: RoutineInfo) => ({
     otype, name: name ?? null, sql: otype === "block" ? blockRef.current : null,
     inputs: Object.fromEntries(i.inputs.map((p) => [p.name, inputs[p.name] ?? null])), max_steps: maxSteps,
+    run_id: cancel.next(),
   });
 
-  const doTrace = () => run(async () => {
+  const doTrace = () => run(cancel.wrap(async () => {
     const i = otype === "block" ? await load() : info;
     if (!i) return;
     if (!i.traceable) throw new Error(i.reason ?? t("This routine cannot be traced"));
@@ -262,14 +298,14 @@ function TraceView(props: {
     const errIdx = r.steps.length - 1;
     setCur(r.error ? Math.max(0, errIdx) : 0);
     setProfile(null);
-  });
-  const doProfile = () => run(async () => {
+  }));
+  const doProfile = () => run(cancel.wrap(async () => {
     const i = otype === "block" ? await load() : info;
     if (!i) return;
     const p = await dapi.profile(sid, dbid, body(i));
     if (!p.available) { app.toast(p.reason ?? t("The profiler is not available"), "info"); return; }
     setProfile(p);
-  });
+  }));
 
   const tr = traced?.result ?? null;
   const steps = tr?.steps ?? [];
@@ -300,6 +336,8 @@ function TraceView(props: {
         <button className="btn" disabled={busy || !info || (otype !== "block" && info.external)} onClick={doProfile}
           title={profAvail ? t("Run the routine itself under the Firebird 5 profiler (rolled back)") : t("Per-line timings need Firebird 5")}>
           <IconActivity /> {t("Profile")}</button>
+        {busy && cancel.active && <button className="btn" onClick={cancel.cancel} disabled={cancel.cancelling}
+          title={t("Stop the running statement (the transaction is rolled back)")}>{cancel.cancelling ? t("Cancelling…") : t("Cancel")}</button>}
         <span className="sep" />
         <button className="btn icon" disabled={!steps.length || cur === 0} onClick={() => nav(0)} aria-label={t("First step")} title={t("First step")}>⏮</button>
         <button className="btn icon" disabled={!steps.length || cur === 0} onClick={() => nav(cur - 1)} aria-label={t("Step back")} title={t("Step back")}>◀</button>
@@ -402,6 +440,7 @@ function TestsView(props: {
   const [summary, setSummary] = useState<Record<string, number> | null>(null);
   const [info, setInfo] = useState<RoutineInfo | null>(null);
   const { busy, error, run } = useBusy();
+  const cancel = useCancellableRun(sid, dbid);
   const app = useApp();
   const load = async () => {
     try { setTests(await dapi.tests(sid, dbid, otype, name)); } catch (e) { app.toast(errMsg(e), "error"); }
@@ -411,12 +450,12 @@ function TestsView(props: {
     if (otype && name) dapi.routine(sid, dbid, otype, name).then(setInfo).catch(() => setInfo(null));
   }, [sid, dbid, otype, name]);
 
-  const runTests = (body: { ids?: string[]; otype?: string; routine?: string }) => run(async () => {
-    const r = await dapi.runTests(sid, dbid, body as never);
+  const runTests = (body: { ids?: string[]; otype?: string; routine?: string }) => run(cancel.wrap(async () => {
+    const r = await dapi.runTests(sid, dbid, { ...body, run_id: cancel.next() } as never);
     setResults((cur) => ({ ...cur, ...Object.fromEntries(r.results.map((x) => [x.id, x])) }));
     setSummary(r.summary);
     await load();
-  });
+  }));
   const save = () => run(async () => {
     const d = props.draft!;
     let rows: unknown[][] | null = null;
@@ -448,6 +487,7 @@ function TestsView(props: {
         {otype && name && <button className="btn" disabled={busy} onClick={() => props.setDraft(draftFrom(otype, name, defaultInputs(info?.inputs ?? []), null))}><IconPlus /> {t("New test")}</button>}
         {otype && name && <button className="btn primary" disabled={busy || !tests.length} onClick={() => runTests({ otype, routine: name })}><IconPlay /> {t("Run tests of {name}", { name })}</button>}
         <button className={"btn" + (otype ? "" : " primary")} disabled={busy} onClick={() => runTests({})}><IconPlay /> {t("Run all tests of this database")}</button>
+        {busy && cancel.active && <button className="btn" onClick={cancel.cancel} disabled={cancel.cancelling}>{cancel.cancelling ? t("Cancelling…") : t("Cancel")}</button>}
         <span className="grow" />
         {summary && <span aria-live="polite"><span className="pill dbg-pass">{t("{n} passed", { n: summary.pass ?? 0 })}</span> <span className="pill dbg-fail">{t("{n} failed", { n: summary.fail ?? 0 })}</span> {summary.error ? <span className="pill dbg-fail">{t("{n} errors", { n: summary.error })}</span> : null}</span>}
         <button className="btn icon" onClick={load} aria-label={t("Reload")} title={t("Reload")}><IconRefresh /></button>

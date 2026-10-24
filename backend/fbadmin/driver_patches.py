@@ -26,6 +26,10 @@
    the EXTENDED format (with the server's offset), and such parameters are encoded by
    ``fb4types.encode_param`` (INT128, DECFLOAT(34), TIME/TIMESTAMP WITH TIME ZONE).
 
+5. Service connections opened inside a cancellable job send the process name ``jobs.service_tag()``
+   (``isc_spb_process_name``), so the attachments of their gbak/gfix actions can be found in
+   ``MON$ATTACHMENTS`` and detached when the job is cancelled (see ``fbadmin/jobs.py``).
+
 Each patch only applies if the driver source still looks the way we expect.
 """
 
@@ -49,6 +53,7 @@ def apply() -> None:
     _patch_octets_fetch()
     _patch_fb4_types()
     _patch_calc_blr()
+    _patch_service_process_name()
     try:
         from firebirdsql import wireprotocol
 
@@ -93,6 +98,65 @@ def apply() -> None:
         wireprotocol.WireProtocol.params_to_blr = ns["params_to_blr"]
     except Exception:  # noqa: BLE001 - never break startup because of a patch
         log.exception("could not patch firebirdsql params_to_blr")
+
+
+ISC_SPB_PROCESS_NAME = 112
+
+
+def _tag_service_attach(buf: bytes, tag: str) -> bytes:
+    """Insert ``isc_spb_process_name`` into an ``op_service_attach`` packet (unchanged if it is not one)."""
+    try:
+        if int.from_bytes(buf[:4], "big") != 82:  # op_service_attach
+            return buf
+        n = int.from_bytes(buf[8:12], "big")
+        at = 12 + n + (-n & 3)
+        ln = int.from_bytes(buf[at:at + 4], "big")
+        spb = buf[at + 4:at + 4 + ln]
+        if spb[:2] != bytes([2, 2]) or len(buf) != at + 4 + ln + (-ln & 3):
+            return buf
+        name = tag.encode()[:250]
+        spb = spb[:2] + bytes([ISC_SPB_PROCESS_NAME, len(name)]) + name + spb[2:]
+        return buf[:at] + len(spb).to_bytes(4, "big") + spb + bytes(-len(spb) & 3)
+    except Exception:  # noqa: BLE001 - never break the attach
+        return buf
+
+
+class _TaggingSocket:
+    def __init__(self, sock, tag: str):
+        self._sock, self._tag = sock, tag
+
+    def send(self, buf):
+        return self._sock.send(_tag_service_attach(bytes(buf), self._tag))
+
+    def __getattr__(self, name):
+        return getattr(self._sock, name)
+
+
+def _patch_service_process_name() -> None:
+    try:
+        from firebirdsql import wireprotocol
+
+        orig = wireprotocol.WireProtocol._op_service_attach
+        if getattr(orig, "_fbadmin", False):
+            return
+
+        def _op_service_attach(self):
+            from .jobs import service_tag
+
+            tag = service_tag()
+            if not tag or self.sock is None:
+                return orig(self)
+            sock = self.sock
+            self.sock = _TaggingSocket(sock, tag)
+            try:
+                return orig(self)
+            finally:
+                self.sock = sock
+
+        _op_service_attach._fbadmin = True  # type: ignore[attr-defined]
+        wireprotocol.WireProtocol._op_service_attach = _op_service_attach
+    except Exception:  # noqa: BLE001
+        log.exception("could not patch firebirdsql service attach")
 
 
 def _param_value(conn, p: bytes, was_str: bool) -> tuple[bytes, bytes]:

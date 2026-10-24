@@ -134,8 +134,29 @@ test("data compare: download the script, apply it, compare again", async () => {
   await audit("data compare: apply confirmation");
   await apply.click();
   await expect(dlg).toBeHidden();
-  await expect(pane().locator(".pill.finished")).toHaveCount(2, { timeout: 30_000 }); // compare + apply jobs
+  await expect(pane().locator(".mt-row > .pill.finished")).toHaveCount(2, { timeout: 30_000 }); // compare + apply jobs
   await pane().locator("button", { hasText: "Compare again" }).click();
   await expect(pane()).toContainText("Sync script: 0 statement(s)", { timeout: 30_000 });
   await expect(pane().locator(".dc-results tbody tr", { hasText: "identical" })).toHaveCount(2);
+});
+
+test("data compare: comparisons are kept and can be reopened", async () => {
+  await page.reload();
+  await expand(page, SERVER);
+  await menu(SRC, "Compare data…");
+  const recent = pane().locator("details.dc-runs");
+  await recent.locator("summary", { hasText: "Recent comparisons (2)" }).click();
+  const rows = recent.locator("tbody tr");
+  await expect(rows).toHaveCount(2);
+  await expect(rows.nth(1)).toContainText("applied"); // the first comparison, newest first
+  await audit("data compare: recent comparisons");
+  await rows.nth(1).getByRole("button", { name: "Open" }).click();
+  await expect(pane()).toContainText("Sync script: 4 statement(s)");
+  await expect(pane()).toContainText("This script was applied to the target.");
+  await expect(pane().locator("button", { hasText: "Apply to target…" })).toBeDisabled();
+  await pane().locator("details.dc-log summary").click();
+  await expect(pane().locator("details.dc-log .log")).toContainText("statement(s) in the sync script");
+  // delete the newer comparison
+  await rows.nth(0).getByRole("button", { name: /Delete the comparison of/ }).click();
+  await expect(recent.locator("summary")).toContainText("Recent comparisons (1)");
 });

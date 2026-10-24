@@ -9,7 +9,10 @@ backup/restore, new-style shutdown, trace) is available.
 from __future__ import annotations
 
 import struct
+import time
 from collections.abc import Callable, Iterator
+
+from .. import jobs
 
 # --- actions -----------------------------------------------------------------
 ACT_BACKUP = 1
@@ -199,6 +202,7 @@ class Spb:
 
 
 def start(svc, spb: Spb | bytes) -> None:
+    jobs.check()  # never start a service action for a cancelled job
     svc._op_service_start(spb.raw() if isinstance(spb, Spb) else spb)
     h, _oid, _buf = svc._op_response()
     svc.svc_handle = h
@@ -232,11 +236,16 @@ def read_line(svc, timeout: int | None = None) -> tuple[str | None, bool]:
     return None, True
 
 
-def drain(svc, callback: Callable[[str], None] | None = None, timeout: int = 20,
+def drain(svc, callback: Callable[[str], None] | None = None, timeout: int = 5,
           stop: Callable[[], bool] | None = None) -> list[str]:
-    """Read text output of the running service until it finishes."""
+    """Read text output of the running service until it finishes.
+
+    In a job, stops with ``jobs.Cancelled`` when the job is cancelled (checked after each line,
+    and at least every ``timeout`` seconds while the service is quiet)."""
     lines: list[str] = []
     while True:
+        if jobs.cancelling():
+            stop_cancelled(lambda: read_line(svc, 1)[1])
         line, finished = read_line(svc, timeout)
         if finished:
             return lines
@@ -248,7 +257,7 @@ def drain(svc, callback: Callable[[str], None] | None = None, timeout: int = 20,
             return lines
 
 
-def run(svc, spb: Spb | bytes, callback: Callable[[str], None] | None = None, timeout: int = 20) -> list[str]:
+def run(svc, spb: Spb | bytes, callback: Callable[[str], None] | None = None, timeout: int = 5) -> list[str]:
     """Start a service action and collect its text output (calling callback per line)."""
     start(svc, spb)
     return drain(svc, callback, timeout)
@@ -257,6 +266,8 @@ def run(svc, spb: Spb | bytes, callback: Callable[[str], None] | None = None, ti
 def iter_to_eof(svc) -> Iterator[bytes]:
     """Yield raw output (e.g. a gbak backup written to stdout) until the service finishes."""
     while True:
+        if jobs.cancelling():
+            stop_cancelled(lambda: _eof_chunk(svc, 1)[1])
         buf = query(svc, bytes([INFO_SVC_TO_EOF]), timeout_send(30))
         i = 0
         tag = None
@@ -273,11 +284,46 @@ def iter_to_eof(svc) -> Iterator[bytes]:
             return
 
 
+def _eof_chunk(svc, timeout: int) -> tuple[bytes, bool]:
+    """One ``isc_info_svc_to_eof`` read: (data, finished)."""
+    buf = query(svc, bytes([INFO_SVC_TO_EOF]), timeout_send(timeout))
+    data, i, tag = b"", 0, None
+    while i < len(buf):
+        tag = buf[i]
+        if tag != INFO_SVC_TO_EOF:
+            break
+        n = _u16(buf, i + 1)
+        data += bytes(buf[i + 3:i + 3 + n])
+        i += 3 + n
+    return data, tag == INFO_END
+
+
+def stop_cancelled(read_finished: Callable[[], bool], wait: float = 30) -> None:
+    """The job was cancelled while a service action runs: detach the action's attachment (the
+    job's interrupt hooks; repeated, because the action may only just have attached), read until
+    the service ends, then raise ``jobs.Cancelled``. Without hooks there is nothing that could stop
+    the action on the server, so this raises at once."""
+    if jobs.interrupt():
+        deadline = time.time() + wait
+        last = time.time()
+        while time.time() < deadline:
+            try:
+                if read_finished():
+                    break
+            except Exception:  # noqa: BLE001 - the detached action ends the service with an error
+                break
+            if time.time() - last >= 0.5:
+                jobs.interrupt()
+                last = time.time()
+    raise jobs.Cancelled()
+
+
 def feed_stdin(svc, read: Callable[[int], bytes], callback: Callable[[str], None] | None = None,
                verbose: bool = True) -> None:
     """Drive a service that reads ``stdin`` (gbak restore from stdin), sending data when asked."""
     request_len = 0
     while True:
+        jobs.check()  # a cancelled restore stops reading; detaching then ends gbak (see jobs.py)
         send = b""
         if request_len > 0:
             data = read(min(request_len, 32000))

@@ -55,6 +55,8 @@ export const dapi = {
   trace: (sid: string, dbid: string, body: RunBody) => request<TraceResult>("POST", `${base(sid, dbid)}/trace`, body),
   run: (sid: string, dbid: string, body: RunBody) => request<CallResult>("POST", `${base(sid, dbid)}/run`, body),
   profile: (sid: string, dbid: string, body: RunBody) => request<ProfileResult>("POST", `${base(sid, dbid)}/profile`, body),
+  /** Cancel a run started with this run_id (its request then fails with code "cancelled"). */
+  cancel: (sid: string, dbid: string, runId: string) => request<{ cancelled: boolean }>("POST", `${base(sid, dbid)}/cancel`, { run_id: runId }),
   tests: (sid: string, dbid: string, otype?: string, routine?: string) => {
     const q = new URLSearchParams();
     if (otype) q.set("otype", otype);

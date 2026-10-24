@@ -20,7 +20,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from .. import alerts
+from .. import alerts, jobs
 from ..config import settings
 from . import archive, ops, verify
 from .cron import Cron
@@ -203,7 +203,8 @@ class Scheduler:
             failure: str | None = None
             try:
                 snap = s.kind == "schema_snapshot"  # no service connection needed
-                with nullcontext() if snap else st.manager.service(s.server_id) as svc:
+                with (nullcontext() if snap else st.manager.service(s.server_id)) as svc, \
+                        (nullcontext() if snap else st.manager.detach_on_cancel(s.server_id, db.path)):
                     major = 0 if snap else ops.option_major(svc)
                     if snap:
                         extra, failure = self._schema_snapshot(s, log)
@@ -225,14 +226,19 @@ class Scheduler:
                                         details={"errors": errors})
                 log("Done" if not failure else failure)
             except Exception as exc:
-                self._record(s, job_ref.get("id"), started, "failed", str(exc) or exc.__class__.__name__, **extra)
+                if isinstance(exc, jobs.Cancelled) or jobs.cancelling():
+                    self._record(s, job_ref.get("id"), started, "cancelled", None, **extra)
+                else:
+                    self._record(s, job_ref.get("id"), started, "failed", str(exc) or exc.__class__.__name__,
+                                 **extra)
                 raise
             if failure:
                 self._record(s, job_ref.get("id"), started, "failed", failure, **extra)
                 raise RuntimeError(failure)
             self._record(s, job_ref.get("id"), started, "finished", None, **extra)
 
-        job = st.jobs.start(f"scheduled-{s.kind}", f"Scheduled {s.kind}: {s.name} ({db.name})", s.server_id, fn)
+        job = st.jobs.start(f"scheduled-{s.kind}", f"Scheduled {s.kind}: {s.name} ({db.name})", s.server_id, fn,
+                            cancellable=True)
         job_ref["id"] = job.id
         return job.summary()
 
@@ -263,6 +269,8 @@ class Scheduler:
                 target = verify.scratch_path(db.path, s.id, s.verify_path)
                 extra["verify"] = verify.verify_backup(svc, srv, st.store.password_for(s.server_id) or "", dest,
                                                        target, major, log, [d.path for d in srv.databases])
+            except jobs.Cancelled:
+                raise
             except Exception as exc:  # noqa: BLE001
                 err = str(exc).strip() or exc.__class__.__name__
                 extra["verify"] = {"ok": False, "error": err}
@@ -282,6 +290,8 @@ class Scheduler:
             try:
                 extra["upload"] = {"ok": True, **upload_with_retention(s.upload.target_id, dest, s.upload.prefix,
                                                                       s.upload.keep, log)}
+            except jobs.Cancelled:
+                raise
             except Exception as exc:  # noqa: BLE001
                 err = str(exc).strip() or exc.__class__.__name__
                 extra["upload"] = {"ok": False, "error": err}
@@ -311,7 +321,8 @@ class Scheduler:
                 verify.verify_backup(svc, srv, st.store.password_for(s.server_id) or "", src, target,
                                      ops.option_major(svc), log, [d.path for d in srv.databases])
 
-        return st.jobs.start("verify-backup", f"Test restore: {src.name}", s.server_id, fn).summary()
+        return st.jobs.start("verify-backup", f"Test restore: {src.name}", s.server_id, fn,
+                             cancellable=True).summary()
 
     # ------------------------------------------------------------------ thread
     def start(self, interval: float = 15) -> None:

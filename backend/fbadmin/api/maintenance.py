@@ -40,8 +40,8 @@ def _major(server_id: str) -> int:
         return ops.option_major(svc)
 
 
-def _job(kind: str, description: str, server_id: str, fn) -> dict:
-    return get_state().jobs.start(kind, description, server_id, fn).summary()
+def _job(kind: str, description: str, server_id: str, fn, cancellable: bool = False) -> dict:
+    return get_state().jobs.start(kind, description, server_id, fn, cancellable=cancellable).summary()
 
 
 def _register(server_id: str, name: str | None, path: str, log) -> None:
@@ -149,7 +149,7 @@ def backup_job(server_id: str, db_id: str, body: BackupIn):
         raise ValueError("backup_file (a path on the Firebird server) is required")
 
     def run(log):
-        with st.manager.service(server_id) as svc:
+        with st.manager.service(server_id) as svc, st.manager.detach_on_cancel(server_id, db.path):
             major = ops.option_major(svc)
             if body.target == "server":
                 log(f"Backing up {db.path} to {body.backup_file} (on the server)")
@@ -160,7 +160,7 @@ def backup_job(server_id: str, db_id: str, body: BackupIn):
                 ops.backup_to_local_file(svc, db.path, dest, body.options, major, log)
         log("Backup completed")
 
-    return _job("backup", f"Backup {db.name}", server_id, run)
+    return _job("backup", f"Backup {db.name}", server_id, run, cancellable=True)
 
 
 # ==================================================================== restore
@@ -188,11 +188,19 @@ def _restore_job(server_id: str, description: str, local: Path | None, server_fi
                     ops.restore_server_file(svc, server_file, database_path, o, major, log)
             log("Restore completed")
             _register(server_id, register_as, database_path, log)
+        except ops.RestoreCancelled as exc:
+            if exc.created:  # gbak created this file, so the half-restored database is ours to drop
+                srv = st.store.get(server_id)
+                pw = "" if srv.embedded else (st.store.password_for(server_id) or "")
+                ops.drop_partial(lambda: connect(srv, database_path, pw), database_path, log)
+            raise
         finally:
             if cleanup and local is not None:
                 local.unlink(missing_ok=True)
 
-    return _job("restore", description, server_id, run)
+    # A restore from a file on the server cannot be stopped: gbak runs inside the server, and the
+    # database it restores is in shutdown mode, so its attachment cannot be detached from outside.
+    return _job("restore", description, server_id, run, cancellable=local is not None)
 
 
 @router.post("/maintenance/restore", status_code=202)
@@ -383,7 +391,8 @@ def validate(server_id: str, db_id: str, body: ValidateIn):
         get_state().manager.disconnect(server_id, db_id)
 
     def run(log):
-        with get_state().manager.service(server_id) as svc:
+        st = get_state()
+        with st.manager.service(server_id) as svc, st.manager.detach_on_cancel(server_id, db.path):
             if body.mode == "online":
                 log(f"Online validation of {db.path}")
                 out = ops.validate_online(svc, db.path, tables_include=body.tables_include,
@@ -397,7 +406,8 @@ def validate(server_id: str, db_id: str, body: ValidateIn):
             log("No errors reported")
         log("Validation completed")
 
-    return _job("validate", f"Validate ({body.mode}) {db.name}", server_id, run)
+    # interrupting a mend (which changes the database) is not offered; checks only read it
+    return _job("validate", f"Validate ({body.mode}) {db.name}", server_id, run, cancellable=body.mode != "mend")
 
 
 class RepairIn(BaseModel):
@@ -411,11 +421,12 @@ def sweep(server_id: str, db_id: str, body: RepairIn | None = None):
 
     def run(log):
         log(f"Sweeping {db.path}")
-        with get_state().manager.service(server_id) as svc:
+        st = get_state()
+        with st.manager.service(server_id) as svc, st.manager.detach_on_cancel(server_id, db.path):
             ops.repair(svc, db.path, "sweep", parallel_workers=workers, major=ops.option_major(svc), log=log)
         log("Sweep completed")
 
-    return _job("sweep", f"Sweep {db.name}", server_id, run)
+    return _job("sweep", f"Sweep {db.name}", server_id, run, cancellable=True)
 
 
 @router.post(DB + "/icu", status_code=202)

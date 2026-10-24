@@ -25,3 +25,8 @@
 .dc-samples td.dc-old { background: var(--deleted); }
 .dc-samples td.dc-same { color: var(--muted); }
 .dc-samples tr.dc-pair-end td { border-bottom: 2px solid var(--border); }
+.dc-runs { margin-top: 8px; }
+.dc-runs > summary, .dc-log > summary { cursor: pointer; }
+.dc-runs .grid-wrap { max-height: 240px; margin-top: 6px; }
+.dc-run-actions { white-space: nowrap; display: flex; gap: 4px; }
+.dc-log { margin-top: 10px; }

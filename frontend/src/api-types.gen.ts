@@ -883,6 +883,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/datacompare/jobs/{job_id}/log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Run Log */
+        get: operations["run_log_api_datacompare_jobs__job_id__log_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/datacompare/jobs/{job_id}/samples": {
         parameters: {
             query?: never;
@@ -912,6 +929,43 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/datacompare/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Runs
+         * @description Recent comparisons (kept across restarts), newest first.
+         */
+        get: operations["list_runs_api_datacompare_runs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/datacompare/runs/{job_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Run */
+        delete: operations["delete_run_api_datacompare_runs__job_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1041,6 +1095,26 @@ export interface paths {
         get: operations["get_job_api_jobs__job_id__get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/jobs/{job_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel Job
+         * @description Ask a running job to stop; it ends with status "cancelled" shortly after.
+         */
+        post: operations["cancel_job_api_jobs__job_id__cancel_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1900,6 +1974,26 @@ export interface paths {
          * @description Generate the DDL for a dialog. Nothing is executed.
          */
         post: operations["make_ddl_api_servers__server_id__databases__db_id__ddl_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/servers/{server_id}/databases/{db_id}/debug/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel Run
+         * @description Cancel a running trace, run, profile or test run (started with this ``run_id``).
+         */
+        post: operations["cancel_run_api_servers__server_id__databases__db_id__debug_cancel_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4663,6 +4757,11 @@ export interface components {
              */
             zip?: boolean;
         };
+        /** CancelIn */
+        CancelIn: {
+            /** Run Id */
+            run_id: string;
+        };
         /** ChannelIn */
         ChannelIn: {
             /**
@@ -5555,6 +5654,8 @@ export interface components {
              * @enum {string}
              */
             otype: "procedures" | "functions" | "block";
+            /** Run Id */
+            run_id?: string | null;
             /** Sql */
             sql?: string | null;
             /** Watch */
@@ -5568,6 +5669,8 @@ export interface components {
             otype?: ("procedures" | "functions") | null;
             /** Routine */
             routine?: string | null;
+            /** Run Id */
+            run_id?: string | null;
         };
         /** ScheduleIn */
         ScheduleIn: {
@@ -8058,6 +8161,37 @@ export interface operations {
             };
         };
     };
+    run_log_api_datacompare_jobs__job_id__log_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     samples_api_datacompare_jobs__job_id__samples_get: {
         parameters: {
             query: {
@@ -8110,6 +8244,55 @@ export interface operations {
                 content: {
                     "application/json": unknown;
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_runs_api_datacompare_runs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    delete_run_api_datacompare_runs__job_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -8302,6 +8485,37 @@ export interface operations {
         };
     };
     get_job_api_jobs__job_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_job_api_jobs__job_id__cancel_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -10187,6 +10401,42 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["DDLIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_run_api_servers__server_id__databases__db_id__debug_cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                server_id: string;
+                db_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CancelIn"];
             };
         };
         responses: {

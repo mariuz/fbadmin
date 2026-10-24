@@ -183,4 +183,5 @@ export const api = {
   recomputeSelectivity: (sid: string, dbid: string) => request<Job>("POST", db(sid, dbid) + "/recompute-selectivity"),
   jobs: () => request<Job[]>("GET", "/api/jobs"),
   job: (id: string) => request<Job>("GET", `/api/jobs/${id}`),
+  cancelJob: (id: string) => request<Job>("POST", `/api/jobs/${id}/cancel`),
 };

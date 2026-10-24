@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import re
+import time
 from collections.abc import Callable, Iterator
 from pathlib import Path
+from typing import Any
 
 from pydantic import BaseModel
 
+from .. import jobs
 from . import gstat
 from . import svc as S
 
@@ -204,11 +207,33 @@ def backup_to_local_file(svc, db_path: str, dest: Path, o: BackupOptions, major:
     return total
 
 
+class RestoreCancelled(jobs.Cancelled):
+    """A restore from stdin was cancelled. ``created``: gbak had already created the database (so
+    the half-restored file is fbadmin's to drop, see ``drop_partial``)."""
+
+    def __init__(self, created: bool):
+        super().__init__()
+        self.created = created
+
+
+_CREATED = re.compile(r"\bcreated database\b", re.I)
+
+
 def restore_from_local_file(svc, src: Path, db_path: str, o: RestoreOptions, major: int, log: Log = _nolog) -> None:
-    """Restore a local .fbk file by streaming it to the server's gbak via stdin."""
+    """Restore a local .fbk file by streaming it to the server's gbak via stdin.
+
+    Cancelling the job stops sending data and closes ``svc`` (gbak ends when its service
+    connection goes away), then raises ``RestoreCancelled``."""
     size = src.stat().st_size
     sent = 0
     marks = [size * p // 10 for p in range(1, 11)]
+    created = False
+
+    def out(line: str) -> None:
+        nonlocal created
+        created = created or bool(_CREATED.search(line))
+        log(line)
+
     with open(src, "rb") as f:
         def read(n: int) -> bytes:
             nonlocal sent
@@ -220,7 +245,33 @@ def restore_from_local_file(svc, src: Path, db_path: str, o: RestoreOptions, maj
             return data
 
         S.start(svc, restore_spb("stdin", db_path, o, major, verbose=True))
-        S.feed_stdin(svc, read, log)
+        try:
+            S.feed_stdin(svc, read, out)
+        except jobs.Cancelled:
+            try:
+                svc.close()
+            except Exception:  # noqa: BLE001
+                pass
+            log("Restore stopped")
+            raise RestoreCancelled(created) from None
+
+
+def drop_partial(connect: Callable[[], Any], db_path: str, log: Log = _nolog, wait: float = 30) -> bool:
+    """Drop a half-restored database after a cancelled restore. gbak still holds it (in shutdown
+    mode) for a moment after its service connection is closed, so this retries for ``wait`` s."""
+    deadline = time.time() + wait
+    while True:
+        try:
+            connect().drop_database()
+            log(f"Dropped the incomplete database {db_path}")
+            return True
+        except Exception as exc:  # noqa: BLE001
+            msg = str(exc).strip()
+            busy = re.search(r"shutdown|in use|lock|by another", msg, re.I)
+            if not busy or time.time() > deadline:
+                log(f"Could not drop the incomplete database {db_path}: {msg.splitlines()[0] if msg else exc!r}")
+                return False
+            time.sleep(0.5)
 
 
 def backup_server_file(svc, db_path: str, backup_file: str, o: BackupOptions, major: int, log: Log) -> None:

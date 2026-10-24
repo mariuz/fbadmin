@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import ctypes
 import decimal
+import logging
 import os
 import threading
 import warnings
@@ -38,6 +39,8 @@ from typing import Any
 
 import firebirdsql
 from firebirdsql.services import Services
+
+log = logging.getLogger("fbadmin.native")
 
 # A second attachment to a database the embedded engine already has open ignores the DPB's
 # "Providers = Engine13" (the provider is already chosen); harmless, so not worth a warning.
@@ -676,6 +679,54 @@ def _server_config(driver, host: str, port: int | None, config: str, auth_plugin
     return name
 
 
+SPB_PROCESS_NAME = 112  # isc_spb_process_name
+
+
+def connect_server(driver, name: str, user: str | None, password: str | None):
+    """``driver.connect_server`` that also sends ``jobs.service_tag()`` as the process name (if set),
+    so the attachments of the service's gbak/gfix actions can be found and detached on cancel."""
+    from .jobs import service_tag
+
+    tag = service_tag()
+    if tag:
+        try:
+            return _connect_server_tagged(name, user, password, tag)
+        except driver.Error:
+            raise
+        except Exception:  # noqa: BLE001 - firebird-driver internals changed: attach without the tag
+            log.info("could not tag the service attachment; cancelling it may not stop the server work")
+    return driver.connect_server(name, user=user, password=password)
+
+
+def _connect_server_tagged(name: str, user: str | None, password: str | None, tag: str):
+    """firebird-driver's ``connect_server`` with ``isc_spb_process_name`` added to the attach SPB."""
+    from firebird.driver import core
+    from firebird.driver.types import XpbKind
+
+    cfg = core.driver_config.get_server(name) or core.driver_config.server_defaults
+    host, port = cfg.host.value, cfg.port.value
+    if host is None:
+        host = "service_mgr"
+    if not host.endswith("service_mgr"):
+        if host and not host.endswith(":"):
+            if port:
+                host += f"/{port}"
+            host += ":"
+        host += "service_mgr"
+    spb = core.SPB_ATTACH(user=cfg.user.value if user is None else user,
+                          password=cfg.password.value if password is None else password,
+                          config=cfg.config.value, trusted_auth=cfg.trusted_auth.value,
+                          auth_plugin_list=cfg.auth_plugin_list.value, encoding=cfg.encoding.value,
+                          errors=cfg.encoding_errors.value).get_buffer()
+    api = core.a.get_api()
+    with api.util.get_xpb_builder(XpbKind.SPB_ATTACH, spb) as b:
+        b.insert_string(SPB_PROCESS_NAME, tag[:250])
+        spb = b.get_buffer()
+    with api.master.get_dispatcher() as provider:
+        svc = provider.attach_service_manager(host, spb)
+    return core.Server(svc, spb, host, cfg.encoding.value, cfg.encoding_errors.value)
+
+
 def connect_services(*, host: str, port: int | None, user: str, password: str,
                      wire_crypt: bool | None = None, wire_compress: bool | None = None,
                      auth_plugin_name: str | None = None, timeout: int | None = None,
@@ -686,7 +737,7 @@ def connect_services(*, host: str, port: int | None, user: str, password: str,
                          auth_plugin_name=auth_plugin_name, timeout=timeout)
     name = _server_config(driver, host, port, conf, auth_plugin_name)
     try:
-        srv = driver.connect_server(name, user=user, password=password or None)
+        srv = connect_server(driver, name, user, password or None)
     except driver.Error as exc:
         if _client_failure(exc):
             raise _client_error(exc, "service manager") from exc

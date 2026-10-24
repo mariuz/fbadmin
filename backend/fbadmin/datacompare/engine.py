@@ -24,13 +24,23 @@ TIME ZONE are read as Firebird's text (so the zone counts: Python compares aware
 instant only), CHAR values have their padding removed (by the driver), NaN equals NaN, and BLOBs are compared by
 content.
 
+Key matching: the target decides which keys are equal. When a key column's collation in the target
+ignores case, accents or trailing spaces (probed on the target server, see ``key_collations``),
+keys are matched in the same way, so ``'abc'`` in the source and ``'ABC'`` in the target are one
+row (an UPDATE of the key column), not an INSERT that the target's unique index would reject plus
+a DELETE.
+
 Script
 ------
 Statements are written to per-table record files (length-prefixed UTF-8) while comparing, so the
 script never has to be held in memory. Order: INSERTs parents first, then UPDATEs parents first,
 then DELETEs children first (by the foreign keys between the compared tables, from
 ``RDB$REF_CONSTRAINTS`` of both databases). Inserting before deleting lets updated child rows move
-to new parent rows before old parents are deleted.
+to new parent rows before old parents are deleted. Within a table that references itself (a foreign
+key to its own key, e.g. a tree), INSERTs are ordered parents first and DELETEs children first.
+
+Runs (results, sample rows and statement files) are kept in ``<data dir>/datacompare`` and survive
+restarts of fbadmin.
 """
 
 from __future__ import annotations
@@ -39,13 +49,17 @@ import atexit
 import datetime as dt
 import decimal
 import heapq
+import json
+import logging
 import math
+import os
 import pickle
 import shutil
 import struct
 import tempfile
 import threading
 import time
+import unicodedata
 from collections import OrderedDict
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
@@ -53,6 +67,8 @@ from operator import itemgetter
 from pathlib import Path
 from typing import Any
 
+from .. import jobs
+from ..config import settings
 from ..metadata import Catalog
 from ..metadata.types import quote_ident
 from ..query import TxOptions, apply_tpb
@@ -64,6 +80,7 @@ PREVIEW_CHARS = 200  # long text in the sample rows sent to the browser
 SORT_RUN_ROWS = 20000  # rows per in-memory run of the external sort
 FETCH = 500
 PROGRESS_EVERY = 100_000
+log_ = logging.getLogger("fbadmin.datacompare")
 
 
 class OutOfOrder(Exception):
@@ -86,6 +103,7 @@ class Column:
     not_null: bool = False
     has_default: bool = False
     computed: bool = False
+    text: bool = False  # CHAR/VARCHAR
 
 
 def column_info(c: dict) -> Column:
@@ -108,6 +126,7 @@ def column_info(c: dict) -> Column:
         col.kind = "blob_text" if st == 1 else "blob"
     elif ft == 14:
         col.kind = "char"
+    col.text = ft in (14, 37)
     return col
 
 
@@ -191,7 +210,76 @@ def plan_table(name: str, scat: Catalog | None, tcat: Catalog | None, s_rt: int 
     p["comparable"] = True
     p["_scols"] = [scols[n] for n in p["columns"]]
     p["_tcols"] = [tcols[n] for n in p["columns"]]
+    _plan_key_matching(p, tcat, tcols)
+    _plan_self_references(p, tcat)
     return p
+
+
+def key_collation(cat: Catalog, table: str, column: str) -> tuple[bool, bool, bool]:
+    """Whether the server treats values of a text column as equal when they differ only in case, in
+    accents, or in trailing spaces - asked from the server itself (``CAST(... AS TYPE OF COLUMN)``
+    keeps the column's collation), so every collation, built-in or ICU, is covered."""
+    t = f"TYPE OF COLUMN {quote_ident(table)}.{quote_ident(column)}"
+
+    def equal(a: str, b: str) -> bool:
+        try:
+            r = cat.one(f"SELECT IIF(CAST({a} AS {t}) = CAST({b} AS {t}), 1, 0) AS eq FROM RDB$DATABASE",
+                        scoped=False)
+            return bool(r and r["eq"])
+        except Exception:  # noqa: BLE001 - e.g. the column's character set has no such character
+            return False
+
+    return equal("'a'", "'A'"), equal("'e'", "_UTF8 'é'"), equal("'a'", "'a '")
+
+
+def key_normalizer(ci: bool, ai: bool, pad: bool) -> Callable[[Any], Any]:
+    """A function that makes text keys equal exactly when such a collation finds them equal."""
+    def norm(v: Any) -> Any:
+        if not isinstance(v, str):
+            return v
+        if pad:
+            v = v.rstrip(" ")
+        if ai:
+            v = unicodedata.normalize("NFC", "".join(ch for ch in unicodedata.normalize("NFD", v)
+                                                     if not unicodedata.combining(ch)))
+        if ci:
+            v = v.casefold()
+        return v
+
+    return norm
+
+
+def _plan_key_matching(p: dict, tcat: Catalog, tcols: dict[str, Column]) -> None:
+    """Match keys like the target's collation does (see the module doc)."""
+    p["_norm"] = [None] * len(p["key"])
+    p["key_matching"] = []
+    for i, k in enumerate(p["key"]):
+        if not tcols[k].text:
+            continue
+        ci, ai, pad = key_collation(tcat, p["name"], k)
+        if ci or ai or pad:
+            p["_norm"][i] = key_normalizer(ci, ai, pad)
+        if ci or ai:
+            what = "case and accents" if ci and ai else "case" if ci else "accents"
+            p["key_matching"].append({"column": k, "case": ci, "accents": ai})
+            p["warnings"].append(f"Keys are matched ignoring {what}, like the target's collation of {k}")
+
+
+def _plan_self_references(p: dict, tcat: Catalog) -> None:
+    """Foreign keys of the table to itself: INSERTs are ordered parents first, DELETEs children first."""
+    p["_self_fks"] = []
+    p["self_references"] = []
+    idx = {n: i for i, n in enumerate(p["columns"])}
+    for c in tcat.constraints(p["name"]):
+        if c["type"] != "FOREIGN KEY" or c.get("ref_table") != p["name"]:
+            continue
+        cols, refs = c["columns"], c.get("ref_columns") or []
+        if cols and len(cols) == len(refs) and all(x in idx for x in cols + refs):
+            p["_self_fks"].append(([idx[x] for x in cols], [idx[x] for x in refs]))
+            p["self_references"].append({"name": c["name"], "columns": cols, "ref_columns": refs})
+        else:
+            p["warnings"].append(f"The table references itself ({c['name']}), but not all columns of that "
+                                 "foreign key are compared: rows are not ordered by it")
 
 
 def plan_tables(scat: Catalog, tcat: Catalog, ignore: set[str] | None = None) -> list[dict]:
@@ -281,27 +369,47 @@ def make_stmt(pieces: list[Piece]) -> Stmt:
 class StmtFile:
     """Statements (``Stmt``) as length-prefixed pickled records on disk."""
 
-    def __init__(self, path: Path):
+    def __init__(self, path: Path, count: int = 0, nbytes: int = 0):
         self.path = path
         self._f = None
-        self.count = 0
-        self.bytes = 0  # approximate size in the script
+        self._pos = 0
+        self.count = count
+        self.bytes = nbytes  # approximate size in the script
 
-    def add(self, *pieces: Piece) -> None:
+    def add(self, *pieces: Piece) -> int:
+        """Append a statement; returns its position (for ``reorder``)."""
         st = make_stmt(list(pieces))
         if self._f is None:
             self._f = open(self.path, "wb")  # noqa: SIM115 - closed in close()
+            self._pos = 0
         b = pickle.dumps((st.frags, st.values), protocol=pickle.HIGHEST_PROTOCOL)
+        pos = self._pos
         self._f.write(struct.pack(">I", len(b)))
         self._f.write(b)
+        self._pos += 4 + len(b)
         self.count += 1
         self.bytes += sum(len(f) for f in st.frags) + sum(2 * len(v) + 40 for v, _ in st.values) + 2
+        return pos
 
     def reset(self) -> None:
         if self._f is not None:
             self._f.seek(0)
             self._f.truncate()
+        self._pos = 0
         self.count = self.bytes = 0
+
+    def reorder(self, positions: list[int]) -> None:
+        """Rewrite the file with the statements at ``positions`` (from ``add``) in that order."""
+        self.close()
+        tmp = self.path.with_suffix(".tmp")
+        with open(self.path, "rb") as src, open(tmp, "wb") as dst:
+            for pos in positions:
+                src.seek(pos)
+                head = src.read(4)
+                (n,) = struct.unpack(">I", head)
+                dst.write(head)
+                dst.write(src.read(n))
+        os.replace(tmp, self.path)
 
     def close(self) -> None:
         if self._f is not None:
@@ -319,22 +427,43 @@ class StmtFile:
 
 
 # ------------------------------------------------------------------ runs (results + scripts)
-_base_dir: Path | None = None
-_base_lock = threading.Lock()
+KEEP_RUNS = 20  # finished comparisons kept per user (with their scripts)
+_spill_dir: Path | None = None
+_dir_lock = threading.Lock()
 
 
-def _base() -> Path:
-    global _base_dir
-    with _base_lock:
-        if _base_dir is None:
-            _base_dir = Path(tempfile.mkdtemp(prefix="fbadmin-datacompare-"))
-            atexit.register(shutil.rmtree, _base_dir, True)
-        return _base_dir
+def runs_dir() -> Path:
+    """Where comparisons are kept: ``<data dir>/datacompare`` (mode 0700: rows of user tables)."""
+    d = Path(settings.data_dir) / "datacompare"
+    d.mkdir(parents=True, exist_ok=True)
+    try:
+        os.chmod(d, 0o700)
+    except OSError:
+        pass
+    return d
+
+
+def _spill_base() -> Path:
+    """Temporary files of the external sort (deleted at exit)."""
+    global _spill_dir
+    with _dir_lock:
+        if _spill_dir is None:
+            _spill_dir = Path(tempfile.mkdtemp(prefix="fbadmin-datacompare-"))
+            atexit.register(shutil.rmtree, _spill_dir, True)
+        return _spill_dir
+
+
+def _owner() -> int | None:
+    """The fbadmin user (server mode) a comparison belongs to; None in desktop mode."""
+    from ..security.sessions import current_principal
+
+    p = current_principal.get()
+    return p.user_id if p is not None else None
 
 
 @dataclass
 class Run:
-    """One comparison: live result, sample rows and the statement files of the sync script."""
+    """One comparison: result, sample rows and the statement files of the sync script."""
 
     source: tuple[str, str]
     target: tuple[str, str]
@@ -343,11 +472,17 @@ class Run:
     result: dict = field(default_factory=dict)
     samples: dict[str, dict] = field(default_factory=dict)
     segments: list[tuple[str, str, StmtFile]] = field(default_factory=list)  # (table, kind, file)
-    dir: Path = field(default_factory=lambda: Path(tempfile.mkdtemp(dir=_base())))
+    dir: Path = field(default_factory=lambda: Path(tempfile.mkdtemp(prefix="run_", dir=runs_dir())))
+    id: str = ""
+    status: str = "running"  # running | finished | failed | cancelled
+    error: str | None = None
+    log: list[str] = field(default_factory=list)
+    owner: int | None = field(default_factory=_owner)
     finished: bool = False
     applying: bool = False
     applied: bool = False
     created: float = field(default_factory=time.time)
+    finished_at: float | None = None
 
     def statement_count(self) -> int:
         return sum(f.count for _, _, f in self.segments)
@@ -400,28 +535,106 @@ class Run:
         self.close_files()
         shutil.rmtree(self.dir, ignore_errors=True)
 
+    # --- persistence
+    def summary(self) -> dict:
+        return {"job_id": self.id, "status": self.status, "error": self.error, "created": self.created,
+                "finished_at": self.finished_at, "source": list(self.source), "target": list(self.target),
+                "source_name": self.source_name, "target_name": self.target_name,
+                "totals": self.result.get("totals") or {}, "statements": self.result.get("statements", 0),
+                "tables": len(self.result.get("tables") or []), "applied": self.applied}
+
+    def save(self) -> None:
+        data = {
+            "version": 1, "id": self.id, "source": list(self.source), "target": list(self.target),
+            "source_name": self.source_name, "target_name": self.target_name, "status": self.status,
+            "error": self.error, "owner": self.owner, "created": self.created, "finished_at": self.finished_at,
+            "applied": self.applied, "result": self.result, "samples": self.samples, "log": self.log[-1000:],
+            "segments": [[t, k, f.path.name, f.count, f.bytes] for t, k, f in self.segments],
+        }
+        tmp = self.dir / f"run.json.{threading.get_ident()}.tmp"  # the job and the API may save at once
+        tmp.write_text(json.dumps(to_json(data)))
+        os.replace(tmp, self.dir / "run.json")
+
+    @classmethod
+    def load(cls, d: Path) -> Run:
+        data = json.loads((d / "run.json").read_text())
+        run = cls(source=tuple(data["source"]), target=tuple(data["target"]), source_name=data["source_name"],
+                  target_name=data["target_name"], result=data["result"], samples=data["samples"], dir=d,
+                  id=data["id"], status=data["status"], error=data.get("error"), log=data.get("log") or [],
+                  owner=data.get("owner"), applied=data.get("applied", False), created=data["created"],
+                  finished_at=data.get("finished_at"))
+        run.segments = [(t, k, StmtFile(d / name, count, nbytes)) for t, k, name, count, nbytes in data["segments"]]
+        run.finished = True
+        if run.status == "running":  # fbadmin stopped during the comparison
+            run.status, run.error = "failed", "fbadmin was stopped before the comparison finished"
+            for _, _, f in run.segments:
+                f.reset()
+                f.path.unlink(missing_ok=True)
+            run.save()
+        return run
+
 
 class Runs:
-    """Recent comparisons by job id (the oldest finished ones are dropped with their files)."""
+    """Comparisons by job id, kept on disk (``runs_dir``). In server mode each user sees only their own."""
 
-    def __init__(self, keep: int = 20):
+    def __init__(self, keep: int = KEEP_RUNS):
         self.keep = keep
         self._runs: OrderedDict[str, Run] = OrderedDict()
         self._lock = threading.Lock()
+        self._loaded_from: Path | None = None
+
+    def _load(self) -> None:
+        """(Re)load the runs of the current data directory (once per directory)."""
+        d = Path(settings.data_dir) / "datacompare"
+        if self._loaded_from == d:
+            return
+        self._runs.clear()
+        self._loaded_from = d
+        if not d.is_dir():
+            return
+        loaded = []
+        for sub in d.iterdir():
+            if (sub / "run.json").is_file():
+                try:
+                    loaded.append(Run.load(sub))
+                except Exception:  # noqa: BLE001 - a damaged run is skipped, not fatal
+                    log_.warning("could not load the data comparison in %s", sub, exc_info=True)
+        for r in sorted(loaded, key=lambda r: r.created):
+            self._runs[r.id] = r
+
+    def _visible(self, r: Run) -> bool:
+        return r.owner == _owner()
 
     def add(self, run_id: str, run: Run) -> None:
         with self._lock:
+            self._load()
+            run.id = run_id
             self._runs[run_id] = run
-            old = [k for k, r in self._runs.items() if r.finished and not r.applying]
-            for k in old[: max(0, len(self._runs) - self.keep)]:
+            mine = [k for k, r in self._runs.items() if r.owner == run.owner and r.finished and not r.applying]
+            for k in mine[: max(0, len([r for r in self._runs.values() if r.owner == run.owner]) - self.keep)]:
                 self._runs.pop(k).cleanup()
+        run.save()
 
     def get(self, run_id: str) -> Run:
         with self._lock:
-            try:
-                return self._runs[run_id]
-            except KeyError:
-                raise KeyError(f"Unknown data comparison {run_id!r} (it may have expired)") from None
+            self._load()
+            r = self._runs.get(run_id)
+            if r is None or not self._visible(r):
+                raise KeyError(f"Unknown data comparison {run_id!r} (it may have expired)")
+            return r
+
+    def list(self) -> list[Run]:
+        with self._lock:
+            self._load()
+            return [r for r in reversed(self._runs.values()) if self._visible(r)]
+
+    def delete(self, run_id: str) -> None:
+        r = self.get(run_id)
+        if not r.finished or r.applying:
+            raise ValueError("The comparison is still running")
+        with self._lock:
+            self._runs.pop(run_id, None)
+        r.cleanup()
 
 
 runs = Runs()
@@ -456,9 +669,10 @@ def preview(v: Any) -> Any:
     return to_json(v)
 
 
-def _checked(rows: Iterator[tuple[tuple, list]], side: str) -> Iterator[tuple[tuple, list]]:
+def _checked(rows: Iterator[tuple[tuple, list]], side: str, nk: int = 0,
+             normalized: bool = False) -> Iterator[tuple[tuple, list]]:
     """Pass rows through, verifying that keys strictly increase."""
-    prev = None
+    prev = prev_vals = None
     for key, vals in rows:
         if prev is not None:
             try:
@@ -466,16 +680,21 @@ def _checked(rows: Iterator[tuple[tuple, list]], side: str) -> Iterator[tuple[tu
                 dup = not ok and prev == key
             except TypeError:
                 raise TableError(f"Key values in the {side} database cannot be ordered") from None
+            if dup and normalized and prev_vals is not None and prev_vals[:nk] != vals[:nk]:
+                raise TableError(
+                    f"The keys {to_json(prev_vals[:nk])} and {to_json(vals[:nk])} are different in the {side} "
+                    "database but equal in the target, whose collation ignores case, accents or trailing "
+                    "spaces: these rows cannot be synchronized")
             if dup:
                 raise TableError(f"Duplicate key {to_json(list(key))} in the {side} database")
             if not ok:
                 raise OutOfOrder(side)
-        prev = key
+        prev, prev_vals = key, vals
         yield key, vals
 
 
 def _spill(rows: list) -> Any:
-    f = tempfile.TemporaryFile(dir=_base())  # noqa: SIM115 - closed by _read_spilled
+    f = tempfile.TemporaryFile(dir=_spill_base())  # noqa: SIM115 - closed by _read_spilled
     p = pickle.Pickler(f, protocol=pickle.HIGHEST_PROTOCOL)
     for r in rows:
         p.dump(r)
@@ -515,6 +734,53 @@ def external_sort(rows: Iterator[tuple[tuple, list]], run_rows: int = SORT_RUN_R
     yield from heapq.merge(*(_read_spilled(f) for f in files), key=key)
 
 
+def parents_first(rows: list[tuple]) -> tuple[list[int] | None, int]:
+    """Order rows so that a row comes after the rows it references; rows are ``_refs`` tuples
+    ((own key, parent key) per foreign key). Returns (order, rows in cycles), or (None, 0) when no
+    row references another row of the list. Otherwise rows keep their order where possible."""
+    owners: list[dict[tuple, int]] = [{} for _ in (rows[0] if rows else ())]
+    for i, r in enumerate(rows):
+        for f, (own, _parent) in enumerate(r):
+            owners[f].setdefault(own, i)
+    parents: list[list[int]] = []
+    any_edge = False
+    for i, r in enumerate(rows):
+        ps = []
+        for f, (_own, parent) in enumerate(r):
+            if any(v is None for v in parent):
+                continue
+            j = owners[f].get(parent)
+            if j is not None and j != i:
+                ps.append(j)
+        parents.append(ps)
+        any_edge = any_edge or bool(ps)
+    if not any_edge:
+        return None, 0
+    state = [0] * len(rows)  # 0 new, 1 on the stack, 2 placed
+    order: list[int] = []
+    cycles = 0
+    for start in range(len(rows)):
+        if state[start]:
+            continue
+        stack = [(start, 0)]
+        state[start] = 1
+        while stack:
+            node, k = stack[-1]
+            if k < len(parents[node]):
+                stack[-1] = (node, k + 1)
+                p = parents[node][k]
+                if state[p] == 0:
+                    state[p] = 1
+                    stack.append((p, 0))
+                elif state[p] == 1:
+                    cycles += 1  # p is an ancestor of node: a cycle (placed in visiting order)
+                continue
+            stack.pop()
+            state[node] = 2
+            order.append(node)
+    return order, cycles
+
+
 class TableCompare:
     """Compare one planned table and write its statements."""
 
@@ -535,6 +801,12 @@ class TableCompare:
                          + (" OVERRIDING SYSTEM VALUE" if overriding else "") + " VALUES (")
         self.no_update = {i for i, c in enumerate(plan["_tcols"]) if i >= self.nk and c.identity == "ALWAYS"}
         self.qnames = [quote_ident(n) for n in self.names]
+        self.norms = plan.get("_norm") or [None] * self.nk
+        self.normalized = any(self.norms)
+        self.self_fks: list[tuple[list[int], list[int]]] = plan.get("_self_fks") or []
+        # self-referencing rows: (statement position, row) of INSERTs and DELETEs, ordered at the end
+        self.ins_rows: list[tuple[int, tuple]] = []
+        self.del_rows: list[tuple[int, tuple]] = []
 
     # --- reading
     def _sql(self, cols: list[Column], ordered: bool) -> str:
@@ -552,7 +824,9 @@ class TableCompare:
             convs = [(i, c.conv) for i, c in enumerate(cols) if c.conv]
             nk = self.nk
             counter = f"rows_{side}"
+            norms = list(enumerate(self.norms)) if self.normalized else []
             while True:
+                jobs.check()
                 rows = cur.fetchmany(FETCH)
                 if not rows:
                     break
@@ -562,6 +836,8 @@ class TableCompare:
                         if r[i] is not None:
                             r[i] = f(r[i])
                     key = tuple(r[:nk])
+                    if norms:
+                        key = tuple(f(key[i]) if f is not None and key[i] is not None else key[i] for i, f in norms)
                     self.stats[counter] += 1
                     n = self.stats[counter]
                     if n % PROGRESS_EVERY == 0:
@@ -596,20 +872,30 @@ class TableCompare:
                            "target": [preview(v) for v in t] if t is not None else None,
                            "changed": changed or []})
 
+    def _refs(self, row: list) -> tuple:
+        """What ordering by the self-references needs of a row: (own key, parent key) per foreign key."""
+        return tuple((tuple(row[i] for i in refs), tuple(row[i] for i in cols)) for cols, refs in self.self_fks)
+
     def on_insert(self, s: list) -> None:
         self.stats["only_source"] += 1
         self._keep("insert", s, None)
         if "insert" in self.directions:
-            self.files["INSERT"].add(self.ins_head, *self._values(s, list(range(len(s)))), ")")
+            pos = self.files["INSERT"].add(self.ins_head, *self._values(s, list(range(len(s)))), ")")
+            if self.self_fks:
+                self.ins_rows.append((pos, self._refs(s)))
 
     def on_delete(self, t: list) -> None:
         self.stats["only_target"] += 1
         self._keep("delete", None, t)
         if "delete" in self.directions:
-            self.files["DELETE"].add(f"DELETE FROM {self.qt} WHERE {self._where(t)}")
+            pos = self.files["DELETE"].add(f"DELETE FROM {self.qt} WHERE {self._where(t)}")
+            if self.self_fks:
+                self.del_rows.append((pos, self._refs(t)))
 
     def on_both(self, s: list, t: list) -> None:
-        changed = [i for i in range(self.nk, len(s)) if not same(s[i], t[i])]
+        # with collation-aware keys, the key itself may differ (e.g. only in case): update it too
+        first = 0 if self.normalized else self.nk
+        changed = [i for i in range(first, len(s)) if not same(s[i], t[i])]
         if not changed:
             self.stats["identical"] += 1
             return
@@ -650,11 +936,13 @@ class TableCompare:
         scols, tcols = self.p["_scols"], self.p["_tcols"]
         sgen = self._stream(self.src, scols, "source", ordered)
         tgen = self._stream(self.dst, tcols, "target", ordered)
+        nk, nz = self.nk, self.normalized
         try:
             if ordered:
-                self._merge(_checked(sgen, "source"), _checked(tgen, "target"))
+                self._merge(_checked(sgen, "source", nk, nz), _checked(tgen, "target", nk, nz))
             else:
-                self._merge(_checked(external_sort(sgen), "source"), _checked(external_sort(tgen), "target"))
+                self._merge(_checked(external_sort(sgen), "source", nk, nz),
+                            _checked(external_sort(tgen), "target", nk, nz))
         finally:
             sgen.close()  # closes the cursors of an abandoned attempt
             tgen.close()
@@ -670,8 +958,29 @@ class TableCompare:
             self._reset()
             self._attempt(ordered=False)
             self.stats["ordering"] = "python"
+        self._order_self_references()
+
+    def _order_self_references(self) -> None:
+        """Rows of a table that references itself: INSERT parents before their children, DELETE
+        children before their parents (a cascading delete would otherwise remove a child first
+        and its own DELETE would change no row)."""
+        for kind, rows, reverse in (("INSERT", self.ins_rows, False), ("DELETE", self.del_rows, True)):
+            if len(rows) < 2:
+                continue
+            order, cycles = parents_first([r for _, r in rows])
+            if order is None:
+                continue  # no row references another one in this set
+            if reverse:
+                order.reverse()
+            self.files[kind].reorder([rows[i][0] for i in order])
+            if cycles:
+                self.stats["warnings"].append(
+                    f"{cycles} row(s) to {kind.lower()} reference each other in a cycle: their {kind} statements "
+                    "cannot be ordered and may fail")
 
     def _reset(self) -> None:
+        self.ins_rows.clear()
+        self.del_rows.clear()
         for f in self.files.values():
             f.reset()
         for k in ("rows_source", "rows_target", "only_source", "only_target", "different", "identical", "null_keys"):
@@ -724,6 +1033,11 @@ def compare_tables(src, dst, log: Callable[[str], None], run: Run, *, tables: li
     res["tables"] = [stats_by_name[n] for n in order]
     major = tcat.engine_major
     for name in order:
+        if jobs.cancelling():
+            for s in res["tables"]:
+                if s["status"] in ("pending", "running"):
+                    s["status"] = "cancelled"
+            raise jobs.Cancelled()
         p, stats = plans[name], stats_by_name[name]
         stats["status"] = "running"
         log(f"{name}: comparing by {p['key_type'].lower()} ({', '.join(p['key'])}), "
@@ -743,6 +1057,13 @@ def compare_tables(src, dst, log: Callable[[str], None], run: Run, *, tables: li
             log(f"{name}: {e}")
             continue
         except Exception as e:
+            if jobs.cancelling():  # a cancelled statement, or the check in the read loop
+                for s in res["tables"]:
+                    if s["status"] in ("pending", "running"):
+                        s["status"] = "cancelled"
+                for f in files[name].values():
+                    f.reset()
+                raise jobs.Cancelled() from None
             stats["status"], stats["error"] = "error", str(e).strip()
             for f in files[name].values():
                 f.reset()
@@ -788,6 +1109,7 @@ def apply_script(run: Run, conn, log: Callable[[str], None]) -> int:
     log(f"Applying {total} statement(s) to the target in one transaction")
     try:
         for table, kind, st in run.statements():
+            jobs.check()
             sql = st.param_sql
             try:
                 cur.execute(sql, st.params)

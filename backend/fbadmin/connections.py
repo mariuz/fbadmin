@@ -18,7 +18,7 @@ import os
 import threading
 import time
 import uuid
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 
 import firebirdsql
@@ -248,6 +248,25 @@ class ConnectionManager:
             except Exception:
                 pass
 
+    @contextmanager
+    def detach_on_cancel(self, server_id: str, db_path: str) -> Iterator[None]:
+        """Inside a cancellable job: when it is cancelled, detach the attachments that this job's
+        service actions (gbak, gfix) hold on ``db_path`` (found by ``jobs.service_tag()``)."""
+        from . import jobs
+
+        tag = jobs.service_tag()
+        if tag is None:
+            yield
+            return
+        srv = self.store.get(server_id)
+        password = "" if srv.embedded else self._password(server_id)
+
+        def hook() -> str | None:
+            return detach_tagged(connect(srv, db_path, password), tag)
+
+        with jobs.on_cancel(hook):
+            yield
+
     # --- query tool sessions -------------------------------------------
     def open_session(self, server_id: str, db_id: str) -> tuple[str, QuerySession]:
         fbc = self._open(server_id, db_id)
@@ -360,6 +379,52 @@ class ConnectionManager:
                 _close_quietly(v.conn)
             self._meta.clear()
             self._sessions.clear()
+
+
+def detach_tagged(conn, tag: str) -> str | None:
+    """Detach the attachments whose process name is ``tag`` (a job's service actions); closes ``conn``."""
+    try:
+        cur = conn.cursor()
+        cur.execute("DELETE FROM MON$ATTACHMENTS WHERE MON$REMOTE_PROCESS = ? "
+                    "AND MON$ATTACHMENT_ID <> CURRENT_CONNECTION", [tag])
+        n = cur.rowcount
+        conn.commit()
+        return f"Stopped the server operation ({n} attachment(s) detached)" if n else None
+    finally:
+        _close_quietly(conn)
+
+
+@contextmanager
+def statements_on_cancel(conn, opener: Callable[[], object]) -> Iterator[None]:
+    """Inside a cancellable job: when it is cancelled, cancel the statement ``conn`` is running
+    (from a second attachment made by ``opener``, like the Query Tool's Cancel button).
+
+    Reads the attachment id first and commits, so the connection's next transaction starts
+    fresh (with whatever transaction parameters are set afterwards)."""
+    from . import jobs
+
+    job = jobs.current()
+    if job is None or not job.cancellable:
+        yield
+        return
+    cur = conn.cursor()
+    cur.execute("SELECT CURRENT_CONNECTION FROM RDB$DATABASE")
+    att = cur.fetchone()[0]
+    conn.commit()
+
+    def hook() -> str | None:
+        other = opener()
+        try:
+            c = other.cursor()
+            c.execute("DELETE FROM MON$STATEMENTS WHERE MON$ATTACHMENT_ID = ? AND MON$STATE <> 0", [att])
+            n = c.rowcount
+            other.commit()
+            return f"Cancelled {n} running statement(s)" if n else None
+        finally:
+            _close_quietly(other)
+
+    with jobs.on_cancel(hook):
+        yield
 
 
 def _supports_schemas(fbc) -> bool:

@@ -33,6 +33,10 @@ shows columns that exist on one side only, columns whose type differs (the value
 compared), and warnings such as a target column that is `NOT NULL` without a default (inserts
 into it would fail). Computed columns are never compared or written.
 
+The notes also say when keys are matched ignoring case or accents (see
+[Keys follow the target's collation](#keys-follow-the-targets-collation)) and when a table
+references itself.
+
 ## Options
 
 | Option | Effect |
@@ -45,7 +49,9 @@ into it would fail). Computed columns are never compared or written.
 
 ## The result
 
-The comparison runs as a background job (also listed in **Processes**). For every table you see:
+The comparison runs as a background job (also listed in **Processes**). **Cancel** next to its
+log stops it: the statement being read is cancelled on the server, the tables not compared yet
+are marked *cancelled*, and there is no sync script. For every table you see:
 
 - **Only in source** – rows that will be inserted,
 - **Different** – rows that will be updated (only the changed columns are set),
@@ -55,6 +61,16 @@ The comparison runs as a background job (also listed in **Processes**). For ever
 
 Click a table name to see its sample rows. For updates, the source (new) and target (old) values
 are shown on two lines with the changed cells highlighted.
+
+### Recent comparisons
+
+fbadmin keeps the last 20 comparisons (per user in server mode) with their sample rows, log and
+sync script in `<data dir>/datacompare`, so they survive a restart of fbadmin. **Recent
+comparisons** under the database pickers lists them; **Open** shows a result again (and selects
+its databases), and the trash button deletes one. A saved script can still be downloaded or
+applied; it shows when it was compared, since the target may have changed since then (applying
+stops and rolls back if a row to update or delete is gone). A comparison that was running when
+fbadmin stopped is shown as *failed*.
 
 ## The sync script
 
@@ -71,6 +87,10 @@ run it there.
   with child tables first. The order of tables comes from the foreign keys
   (`RDB$REF_CONSTRAINTS`) of both databases, so new child rows find their new parents, and old
   parents are deleted only after their children were deleted or moved.
+- Tables that reference themselves (a foreign key to their own key, such as a tree of
+  categories): their `INSERT`s are ordered so that a row comes after the row it references, and
+  their `DELETE`s so that children go first. Rows that reference each other in a cycle cannot be
+  ordered; the table's result warns about them.
 - Every value is a literal: `DATE '…'`, `TIME '…'`, `TIMESTAMP '…'`, `TRUE`/`FALSE`, exact
   decimals, `CAST('…' AS DECFLOAT(34))`, time zone values with their zone
   (`TIMESTAMP '2024-03-01 10:20:30.1234 Europe/Bucharest'`), binary values and binary BLOBs as
@@ -90,6 +110,7 @@ database's name to confirm.
 - Long BLOB values are sent as parameters instead of literals here, which is much faster.
 - An `UPDATE` or `DELETE` that finds no row means the target changed after the comparison; the
   apply stops and rolls back. Compare again and retry.
+- **Cancel** stops applying: the running statement is cancelled and everything is rolled back.
 - A script can be applied once; **Compare again** checks the result (it should show no
   differences).
 - Triggers on the target fire as usual. Disable them first if they must not run.
@@ -100,9 +121,8 @@ database's name to confirm.
 ## How the comparison works
 
 Both sides are read with `SELECT … ORDER BY <key>` and merge-joined row by row, so memory use
-does not depend on table size, and the statements are written to temporary files as they are
-produced (deleted when fbadmin exits or when the result is dropped; the last 20 comparisons are
-kept).
+does not depend on table size, and the statements are written to files as they are produced
+(kept with the comparison, see [Recent comparisons](#recent-comparisons)).
 
 The merge needs both streams in the same order as fbadmin compares keys. The server's `ORDER BY`
 follows the column's collation, which may differ from a plain binary ordering — for example
@@ -113,6 +133,20 @@ fbadmin itself (an external merge sort in temporary files), and the result shows
 **sorted in fbadmin**. Either way both sides are matched with one consistent ordering, so a
 collation difference never produces false differences.
 
+### Keys follow the target's collation
+
+The sync script runs on the target, and the target's unique index decides which keys are the same.
+So for every text key column fbadmin asks the target server how its collation compares
+(`CAST(… AS TYPE OF COLUMN …)` keeps the column's collation): whether it ignores case
+(`UNICODE_CI`, `PT_BR`, …), accents (`UNICODE_CI_AI`, …) and trailing spaces (all standard
+collations). Keys are matched the same way. `'abc'` in the source and `'ABC'` in a
+case-insensitive target are then one row, updated to `'abc'`, instead of an insert that the
+target's unique index would reject and a delete. Two source keys that differ but are equal for
+the target (`'abc'` and `'ABC'` in a binary source) cannot both exist in the target; that table
+fails with a message naming both keys.
+
+### Values
+
 Values are compared as Firebird returns them: `NULL` equals only `NULL`, numbers by value
 (`1.50` equals `1.5`), `CHAR` without trailing padding, BLOBs by content, time zone values
 including their zone (the time zone types are read as Firebird's text, so `10:00 Europe/Bucharest`
@@ -120,11 +154,12 @@ and `08:00 UTC` differ even though they are the same instant).
 
 ## Limitations
 
-- Keys are compared exactly (case and accents matter). With a case-insensitive key collation,
-  rows whose keys differ only in case appear as one delete and one insert, and the insert fails
-  with a unique-key violation because deletes run last.
-- Rows of a self-referencing table are inserted in key order; a child row with a lower key than
-  its new parent fails. Swapping values of a non-key unique column between rows also fails.
+- Key matching follows Python's Unicode case folding and accent removal, which agrees with
+  Firebird's case- and accent-insensitive collations for practically all text; special rules of
+  some ICU locales (with `SPECIFIC_ATTRIBUTES`) are not modelled.
+- Swapping values of a non-key unique column between rows fails (the first `UPDATE` violates the
+  unique constraint). Rows of a self-referencing table that reference each other in a cycle
+  cannot be ordered.
 - `FLOAT`/`DOUBLE PRECISION` NaN and infinity cannot be written as literals; such a table fails
   with a clear error.
 - Arrays are not supported.
@@ -138,7 +173,11 @@ and `08:00 UTC` differ even though they are the same instant).
 | --- | --- | --- |
 | POST | `/api/datacompare/tables` | `{source, target, ignore_columns}` → tables with key, columns, notes or reason |
 | POST | `/api/datacompare/compare` | `{source, target, tables: [{name, where, ignore_columns}], ignore_columns, inserts, updates, deletes, max_differences}` → job (202) |
-| GET | `/api/datacompare/jobs/{job_id}` | live result: per-table counts, statements, `applied` |
+| GET | `/api/datacompare/jobs/{job_id}` | live result: per-table counts, statements, `applied`, `status`, `created` |
+| GET | `/api/datacompare/jobs/{job_id}/log` | the comparison's log (kept with it) |
+| GET | `/api/datacompare/runs` | the kept comparisons, newest first |
+| DELETE | `/api/datacompare/runs/{job_id}` | delete a kept comparison and its script |
+| POST | `/api/jobs/{job_id}/cancel` | cancel a running comparison or apply job |
 | GET | `/api/datacompare/jobs/{job_id}/samples?table=T` | sample rows (`insert`, `update`, `delete`) |
 | GET | `/api/datacompare/jobs/{job_id}/script` | the SQL script (download) |
 | POST | `/api/servers/{sid}/databases/{db}/datacompare/{job_id}/apply` | `{confirm: true}` → apply job (202); 403 on read-only servers |
