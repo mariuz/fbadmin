@@ -213,28 +213,27 @@ def test_backup_download_and_restore_upload(web, tmp_path):
 
 
 @requires_server
-def test_ctrl_c_cancels_the_job_on_the_server(web, tmp_path):
-    """Interrupting a remote restore cancels its job (a restore streamed from fbadmin can be cancelled)."""
-    big = tmp_path / "big.fbk"
+def test_ctrl_c_cancels_the_job_on_the_server(web):
+    """Interrupting a remote backup to a server file cancels its job, and gbak stops on the server."""
     ok(rfb(web, "sql", "@Firebird/app", "-c", (
         "CREATE TABLE FILLER (ID INTEGER NOT NULL PRIMARY KEY, S VARCHAR(200));"
-        "EXECUTE BLOCK AS DECLARE I INT = 0; BEGIN WHILE (I < 60000) DO BEGIN "
+        "EXECUTE BLOCK AS DECLARE I INT = 0; BEGIN WHILE (I < 300000) DO BEGIN "
         "INSERT INTO FILLER VALUES (:I, UUID_TO_CHAR(GEN_UUID()) || UUID_TO_CHAR(GEN_UUID()) || "
         "UUID_TO_CHAR(GEN_UUID()) || UUID_TO_CHAR(GEN_UUID()) || UUID_TO_CHAR(GEN_UUID())); I = I + 1; END END")))
-    ok(rfb(web, "backup", "@Firebird/app", "-o", str(big), "-q"))
-    target = f"{DB_DIR}/fbadmin_remote_cxl_{uuid.uuid4().hex[:8]}.fdb"
+    fbk = f"{DB_DIR}/fbadmin_remote_cxl_{uuid.uuid4().hex[:8]}.fbk"
     e = {**os.environ, "PYTHONPATH": str(BACKEND), "FBADMIN_URL": web["url"], "FBADMIN_TOKEN": web["token"]}
-    p = subprocess.Popen([sys.executable, "-m", "fbadmin", "restore", str(big), f"@Firebird:{target}"], cwd=BACKEND,
-                         env=e, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    p = subprocess.Popen([sys.executable, "-m", "fbadmin", "backup", "@Firebird/app", "--server-file", fbk],
+                         cwd=BACKEND, env=e, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     seen = b""
     end = time.time() + 120
-    while b"via stdin" not in seen and time.time() < end:  # the restore job has started
-        seen += p.stderr.read1(4096)
+    while b"(on the server)" not in seen and time.time() < end:  # the server's job log: the job has started
+        chunk = p.stderr.read1(4096)
+        if not chunk:
+            break
+        seen += chunk
     p.send_signal(signal.SIGINT)
     _, err = p.communicate(timeout=120)
-    err = seen + err
-    try:
-        assert b"Cancelling the job on the server" in err, err.decode()[-2000:]
-        assert p.returncode == 130, err.decode()[-2000:]
-    finally:
-        drop(target)
+    err = (seen + err).decode()
+    assert "Cancelling the job on the server" in err, err[-2000:]
+    assert p.returncode == 130, err[-2000:]
+    assert "was cancelled" in err

@@ -15339,6 +15339,7 @@ export interface operations {
                 page_size?: number | null;
                 buffers?: number | null;
                 deactivate_indexes?: boolean;
+                no_shadow?: boolean;
                 no_validity?: boolean;
                 one_at_a_time?: boolean;
                 use_all_space?: boolean;
