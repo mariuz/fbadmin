@@ -12,7 +12,7 @@ scope.
 
 **Status:** milestones 0.1 to 2.0, the engineering backlog and the phone and tablet layout are
 implemented and verified in CI against real services. Firebird 6.0 final support waits for the
-6.0 release. The current release is **2.0.0** ([release notes](docs/release-notes/v2.0.0.md)): on
+6.0 release; milestones 2.1, 2.2 and 3.0 below are planned. The current release is **2.0.0** ([release notes](docs/release-notes/v2.0.0.md)): on
 [PyPI](https://pypi.org/project/firebird-admin/) (`pip install firebird-admin`), on
 [GitHub Releases](https://github.com/mariuz/fbadmin/releases) with desktop installers for Windows,
 macOS and Linux, as a Docker image, and documented at https://mariuz.github.io/fbadmin/.
@@ -220,6 +220,36 @@ exact DDL before it runs, like pgAdmin.
 Also fixed in this milestone:
 - The `firebirdsql` driver decoded INT128, NUMERIC(>18), DECFLOAT and time zone values wrongly and truncated large parameters; fbadmin now patches these (see [docs/upstream-firebirdsql-fb4-types.md](docs/upstream-firebirdsql-fb4-types.md)).
 - In server mode, scheduled jobs, history sampling and alert condition checks run as the user who set them up (they previously failed for lack of a signed-in user), and server-wide monitoring and update settings are admin-only.
+
+## Milestone 2.1 — Polish and hardening ⬜
+
+- ⬜ **Upstream the driver fixes:** report the `firebirdsql` INT128 / DECFLOAT / time zone bugs with the minimal reproduction in [docs/upstream-firebirdsql-fb4-types.md](docs/upstream-firebirdsql-fb4-types.md), contribute the fix, and drop fbadmin's local patches once a fixed driver is released
+- ⬜ **Cancel long-running jobs:** data compare, backups and restores, test restores, debugger runs and trial restores
+- ⬜ **Data compare:** keep results across restarts; handle keys that differ only by case (collation-aware matching) and rows that reference rows of the same table (insert order for self-referencing foreign keys)
+- ⬜ **Command-line remote mode:** `fbadmin --url … --token …` runs commands through a running fbadmin server with an API token
+- ⬜ **Real cloud tests:** run the storage tests against real AWS S3, Azure Blob Storage and Google Cloud Storage accounts in CI (short-lived credentials via OIDC), not only emulators
+- ⬜ **Native driver in CI:** test the `firebird-driver` / libfbclient path (used by local databases) in CI, including the time zone and INT128 handling
+- ⬜ **Server-mode startup race:** investigate the intermittent `UNIQUE constraint failed: users.username` seen once when a server-mode instance starts
+- ⬜ **Tablet comfort:** make the ERD, query builder canvas and table designer comfortable on tablets (touch dragging, pinch zoom)
+- ⬜ **Large schemas:** keep the Object Explorer, search and autocompletion fast with tens of thousands of objects (virtualized tree, load tests)
+- ⬜ **Supply-chain hardening:** an SBOM for each package, signed container images and build provenance (attestations), dependency scanning in CI, and a security policy (`SECURITY.md` for reporting vulnerabilities)
+
+## Milestone 2.2 — Operations ⬜
+
+- ⬜ **Schema drift detection:** on a schedule, compare a production database with its git schema history or with another database, and alert when they differ
+- ⬜ **Versioned migrations:** numbered SQL scripts in git applied in order, a per-database record of what was applied, dry run first (Flyway-style), from the UI and the command-line tool
+- ⬜ **Replication setup wizard:** configure primary and replica end to end (publication, `replication.conf`, replica creation from a backup) and verify that changes arrive
+- ⬜ **Backup encryption and restore drills:** optional encryption of backups kept by fbadmin and uploaded to the cloud; periodic restore drills with a report
+- ⬜ **Query regression tracking:** keep slow statements and their plans over time and flag statements whose plan or duration got worse
+- ⬜ **Audit log forwarding:** send the audit log to a central logging system (syslog, webhook)
+- ⬜ **Kubernetes operator integration:** manage Firebird clusters of the cloudnative-firebird operator from the UI
+
+## Milestone 3.0 — Teams and distribution ⬜
+
+- ⬜ **SAML sign-in** and **SCIM** user provisioning from a company directory
+- ⬜ **More install channels:** apt and yum repositories, Homebrew, winget, Flatpak on Flathub
+- ⬜ **Independent security review** of server mode
+- ⬜ **Screen reader testing** with NVDA and VoiceOver, beyond the automated axe checks
 
 ## Ongoing ⬜
 
