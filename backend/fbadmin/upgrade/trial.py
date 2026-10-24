@@ -138,7 +138,7 @@ def run_trial(*, source_service: Callable[[], AbstractContextManager], source_pa
             log(f"Backing up {source_path} with the source server (Firebird {smajor})"
                 + (" - metadata only" if metadata_only else ""))
             size = ops.backup_to_local_file(svc, source_path, fbk, ops.BackupOptions(metadata_only=metadata_only),
-                                            smajor, log)
+                                            ops.option_major(svc), log)
         result["backup_bytes"] = size
         with target_service() as svc:
             tmajor = ops.engine_major(svc)
@@ -154,7 +154,7 @@ def run_trial(*, source_service: Callable[[], AbstractContextManager], source_pa
                 if re.search(r"error|warning|failed|cannot", line, re.I):
                     log(line)
 
-            ops.restore_from_local_file(svc, fbk, scratch, opts, tmajor, rlog)
+            ops.restore_from_local_file(svc, fbk, scratch, opts, ops.option_major(svc), rlog)
         result["restore_seconds"] = round(time.time() - t0, 1)
         log(f"Restore finished in {result['restore_seconds']} s")
     except Exception:

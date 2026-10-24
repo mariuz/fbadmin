@@ -53,13 +53,13 @@ jobs:
       - name: Wait for the newer Firebird (upgrade trial restore)
         if: matrix.next
         run: for _ in $(seq 1 60); do (echo > /dev/tcp/127.0.0.1/3057) 2>/dev/null && break; sleep 1; done
-      # firebird-driver is installed (a regular dependency) but the runner has no Firebird client
-      # library, so the default driver setting (auto) resolves to firebirdsql: asserted by
-      # test_driver_auto.py through FBADMIN_TEST_EXPECT_DRIVER
+      # the pure Python driver, forced: the ubuntu-26.04 runner image ships libfbclient2 (a Firebird 4
+      # client), so the default setting (auto) would pick the native driver here
       - run: pytest -q backend/tests
         env:
           FBADMIN_TEST_DIR: /var/lib/firebird/data
           FBADMIN_TEST_UPGRADE_PORT: ${{ matrix.next && '3057' || '' }}
+          FBADMIN_DRIVER: firebirdsql
           FBADMIN_TEST_EXPECT_DRIVER: firebirdsql
       - name: Local databases (Firebird 5 embedded engine, no server)
         if: matrix.firebird == '5'
@@ -74,12 +74,18 @@ jobs:
     # handle INT128/DECFLOAT/time zones). test_driver_equivalence.py compares both drivers result by
     # result; test_driver_auto.py checks that the default setting (auto, FBADMIN_DRIVER unset in
     # that test) resolves to native with this client and that it negotiates ChaCha wire encryption.
-    name: Backend tests (native driver, Firebird ${{ matrix.firebird }})
+    # One more run uses the system client (Ubuntu's libfbclient2, a Firebird 4 client) against a
+    # Firebird 5 server, as on Ubuntu 25.04+/Debian 13 hosts: service options newer than the client
+    # (e.g. parallel workers) must be refused cleanly, not sent (maintenance/ops.py engine_major).
+    name: Backend tests (native driver, Firebird ${{ matrix.firebird }}${{ matrix.client == 'system' && ', system Firebird 4 client' || '' }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         firebird: ["3", "4", "5", "6-snapshot"]
+        client: ["bundled"]
+        include:
+          - { firebird: "5", client: "system" }
     continue-on-error: ${{ matrix.firebird == '6-snapshot' }}
     services:
       firebird:
@@ -100,7 +106,13 @@ jobs:
           path: /tmp/fbadmin-embedded-cache
           key: firebird-embedded-linux-x64-${{ hashFiles('packaging/embedded/fetch-embedded.py') }}
       - name: Firebird 5 client library (embedded file set)
+        if: matrix.client == 'bundled'
         run: PYTHON=python scripts/embedded-test-setup.sh "$RUNNER_TEMP/firebird-embedded"
+      - name: System client library (Ubuntu's libfbclient2)
+        if: matrix.client == 'system'
+        run: |
+          sudo apt-get update -q && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends libfbclient2
+          dpkg -s libfbclient2 | grep "^Version"
       - name: Wait for Firebird
         run: for _ in $(seq 1 30); do (echo > /dev/tcp/127.0.0.1/3050) 2>/dev/null && break; sleep 1; done
       - name: Firebird with a fixed RemoteAuxPort (event monitor tests)
@@ -112,7 +124,7 @@ jobs:
         env:
           FBADMIN_TEST_DIR: /var/lib/firebird/data
           FBADMIN_DRIVER: native
-          FBADMIN_FBCLIENT: ${{ runner.temp }}/firebird-embedded/lib/libfbclient.so.2
+          FBADMIN_FBCLIENT: ${{ matrix.client == 'bundled' && format('{0}/firebird-embedded/lib/libfbclient.so.2', runner.temp) || '' }}
           FBADMIN_TEST_EXPECT_DRIVER: native
 
   integrations:

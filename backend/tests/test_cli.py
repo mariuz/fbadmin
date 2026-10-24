@@ -97,6 +97,19 @@ def engine_major() -> int:
         svc.close()
 
 
+def service_major() -> int:
+    """The Firebird version whose service options the CLI may use (ops.engine_major): the server's,
+    capped at the client library's when the native driver is in use."""
+    from fbadmin import drivers
+
+    major = engine_major()
+    if drivers.effective()[0] == "native":
+        from .drivers_util import client_major
+
+        major = min(major, client_major() or major)
+    return major
+
+
 def counts(path: str):
     return query(path, "SELECT COUNT(*), SUM(ID), (SELECT COUNT(*) FROM PARENT) FROM ITEMS")[0]
 
@@ -206,7 +219,9 @@ def test_backup_options(srcdb, paths, tmp_path):
     ok(fb("restore", str(out2), dsn(target2), "-q"))
     assert counts(target2)[0] == 0 and counts(target2)[2] == 2
     r = fb("backup", dsn(srcdb), "-o", str(tmp_path / "p.fbk"), "--parallel", "2")
-    if engine_major() >= 5:
+    # parallel workers need Firebird 5 on the server and, with the native driver, in the client
+    # library too (an older libfbclient refuses the option): fbadmin says so instead of failing
+    if service_major() >= 5:
         ok(r)
     else:
         assert r.returncode == 4 and b"Firebird 5" in r.stderr

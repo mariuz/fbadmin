@@ -166,7 +166,7 @@ def cmd_backup(args: argparse.Namespace, out: Out) -> int:
     started = time.time()
     res: dict[str, Any] = {"database": t.label, "compress": kind}
     with t.service() as svc:
-        major = ops.engine_major(svc)
+        major = ops.option_major(svc)
         res["engine_major"] = major
         if args.server_file:
             out.log(f"Backing up {t.label} to {args.server_file} (on the server)")
@@ -340,7 +340,7 @@ def cmd_restore(args: argparse.Namespace, out: Out) -> int:
     started = time.time()
     res: dict[str, Any] = {"database": t.label, "replace": o.replace}
     with t.service() as svc:
-        major = ops.engine_major(svc)
+        major = ops.option_major(svc)
         res["engine_major"] = major
         try:
             if args.server_file:

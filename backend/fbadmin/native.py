@@ -607,6 +607,13 @@ class NativeServices(Services):
     users, trace and the server log run unchanged.
     """
 
+    @property
+    def client_major(self) -> int:
+        """Major version of the client library; service options newer than it are refused by
+        libfbclient itself, whatever the server supports (see ``maintenance.ops.engine_major``)."""
+        return client_major()
+
+
     def __init__(self, server, errors: tuple[type[Exception], ...]):  # noqa: D107 - no socket
         self._server = server
         self._svc = server._svc

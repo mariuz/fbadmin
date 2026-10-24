@@ -68,7 +68,10 @@ def count(client, sid, dbid, table="ITEMS"):
 
 
 def major(client, sid):
-    return client.get(f"/api/servers/{sid}/maintenance/capabilities").json()["engine_major"]
+    """The Firebird version whose service options work: the server's, or lower when the native
+    driver uses an older client library (capabilities' option_major, see ops.option_major)."""
+    caps = client.get(f"/api/servers/{sid}/maintenance/capabilities").json()
+    return caps.get("option_major", caps["engine_major"])
 
 
 def new_path(tag):
@@ -93,8 +96,10 @@ def register(client, sid, path, name="r"):
 def test_capabilities(client, server):
     caps = client.get(f"/api/servers/{server['id']}/maintenance/capabilities").json()
     assert caps["engine_major"] >= 3
-    assert caps["features"]["parallel_workers"] == (caps["engine_major"] >= 5)
-    assert caps["features"]["rdb_config"] == (caps["engine_major"] >= 4)
+    # option_major: the server's version, or the client library's when it is older (native driver)
+    assert caps["option_major"] <= caps["engine_major"]
+    assert caps["features"]["parallel_workers"] == (caps["option_major"] >= 5)
+    assert caps["features"]["rdb_config"] == (caps["option_major"] >= 4)
 
 
 def test_backup_download_and_upload_restore_roundtrip(client, database):

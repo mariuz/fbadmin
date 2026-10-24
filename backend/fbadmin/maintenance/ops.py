@@ -20,8 +20,19 @@ def _nolog(_line: str) -> None:
 
 # ------------------------------------------------------------------ versions
 def engine_major(svc) -> int:
+    """The server's major Firebird version."""
     m = re.search(r"-[VTB](\d+)\.", svc.getServerVersion())  # V = release, T = test (snapshot), B = beta
     return int(m.group(1)) if m else 3
+
+
+def option_major(svc) -> int:
+    """The Firebird version whose service options (backup, restore, sweep, ...) may be used: the
+    server's, capped at the client library's for the native driver. A Firebird 4 libfbclient (e.g.
+    Ubuntu 26.04's libfbclient2) rejects Firebird 5 options such as parallel workers ("Invalid
+    clumplet buffer structure: unknown parameter for backup/restore") even with a Firebird 5 server."""
+    major = engine_major(svc)
+    client = getattr(svc, "client_major", None)
+    return min(major, client) if client else major
 
 
 def capabilities(major: int) -> dict[str, bool]:
@@ -40,8 +51,11 @@ def capabilities(major: int) -> dict[str, bool]:
 
 
 def require(major: int, minimum: int, what: str) -> None:
+    """``major`` comes from engine_major(): the server's version, or the client library's when the
+    native driver uses an older libfbclient than the server."""
     if major < minimum:
-        raise ValueError(f"{what} requires Firebird {minimum} or later (server is Firebird {major})")
+        raise ValueError(f"{what} requires Firebird {minimum} or later (the server, or the client library of "
+                         f"the native driver, is Firebird {major})")
 
 
 # ------------------------------------------------------------ backup / restore

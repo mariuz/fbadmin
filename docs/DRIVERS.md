@@ -114,6 +114,10 @@ Automatic uses the native driver with it. Where to get one:
   13 "trixie" (4.0.5) and newer, and in Ubuntu 25.04 (4.0.5), 25.10 and 26.04 (4.0.6). Debian
   12 "bookworm" and Ubuntu 24.04 LTS and older ship a **Firebird 3** client (3.0.11), with
   which Automatic keeps the pure-Python driver.
+  A Firebird 4 client works with Firebird 5 servers, but it cannot send service options that are
+  new in Firebird 5, such as **parallel workers** for backup, restore and sweep: fbadmin then
+  offers only the options both the client library and the server understand, and says why. Use
+  a Firebird 5 client (or the pure-Python driver) to get those options.
 - **Elsewhere:** extract the client from the official release archive, e.g.
   `python packaging/embedded/fetch-embedded.py --client-only --dest /opt/firebird` (Linux;
   needs `libtommath1` and ICU from the system) and point `FBADMIN_FBCLIENT` at

@@ -204,7 +204,7 @@ class Scheduler:
             try:
                 snap = s.kind == "schema_snapshot"  # no service connection needed
                 with nullcontext() if snap else st.manager.service(s.server_id) as svc:
-                    major = 0 if snap else ops.engine_major(svc)
+                    major = 0 if snap else ops.option_major(svc)
                     if snap:
                         extra, failure = self._schema_snapshot(s, log)
                     elif s.kind == "backup":
@@ -309,7 +309,7 @@ class Scheduler:
             target = verify.scratch_path(db.path, s.id, s.verify_path)
             with st.manager.service(s.server_id) as svc:
                 verify.verify_backup(svc, srv, st.store.password_for(s.server_id) or "", src, target,
-                                     ops.engine_major(svc), log, [d.path for d in srv.databases])
+                                     ops.option_major(svc), log, [d.path for d in srv.databases])
 
         return st.jobs.start("verify-backup", f"Test restore: {src.name}", s.server_id, fn).summary()
 

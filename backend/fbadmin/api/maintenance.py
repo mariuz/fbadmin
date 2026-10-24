@@ -35,8 +35,9 @@ def _db(server_id: str, db_id: str) -> DatabaseEntry:
 
 
 def _major(server_id: str) -> int:
+    """The version whose service options may be used (see ops.option_major)."""
     with get_state().manager.service(server_id) as svc:
-        return ops.engine_major(svc)
+        return ops.option_major(svc)
 
 
 def _job(kind: str, description: str, server_id: str, fn) -> dict:
@@ -54,7 +55,9 @@ def capabilities(server_id: str):
     with get_state().manager.service(server_id) as svc:
         version = svc.getServerVersion()
         major = ops.engine_major(svc)
-    return {"server_version": version, "engine_major": major, "features": ops.capabilities(major)}
+        usable = ops.option_major(svc)  # lower with an older client library (native driver)
+    return {"server_version": version, "engine_major": major, "option_major": usable,
+            "features": ops.capabilities(usable)}
 
 
 # ===================================================================== backup
@@ -104,7 +107,7 @@ def prepare_backup_download(server_id: str, db_id: str, body: ops.BackupOptions)
     ctx = get_state().manager.service(server_id)
     svc = ctx.__enter__()
     try:
-        major = ops.engine_major(svc)
+        major = ops.option_major(svc)
         chunks = ops.backup_stream(svc, db.path, body, major)
     except BaseException:
         ctx.__exit__(None, None, None)
@@ -147,7 +150,7 @@ def backup_job(server_id: str, db_id: str, body: BackupIn):
 
     def run(log):
         with st.manager.service(server_id) as svc:
-            major = ops.engine_major(svc)
+            major = ops.option_major(svc)
             if body.target == "server":
                 log(f"Backing up {db.path} to {body.backup_file} (on the server)")
                 ops.backup_server_file(svc, db.path, body.backup_file, body.options, major, log)
@@ -176,7 +179,7 @@ def _restore_job(server_id: str, description: str, local: Path | None, server_fi
     def run(log):
         try:
             with st.manager.service(server_id) as svc:
-                major = ops.engine_major(svc)
+                major = ops.option_major(svc)
                 if local is not None:
                     log(f"Restoring {local.name} ({local.stat().st_size} bytes) to {database_path} via stdin")
                     ops.restore_from_local_file(svc, local, database_path, o, major, log)
@@ -345,7 +348,7 @@ def nbackup_fixup(server_id: str, db_id: str, body: PathIn):
     get_state().manager.disconnect(server_id, db_id)
     lines: list[str] = []
     with get_state().manager.service(server_id) as svc:
-        ops.nfix(svc, path, ops.engine_major(svc), lines.append)
+        ops.nfix(svc, path, ops.option_major(svc), lines.append)
     return {"ok": True, "output": lines}
 
 
@@ -409,7 +412,7 @@ def sweep(server_id: str, db_id: str, body: RepairIn | None = None):
     def run(log):
         log(f"Sweeping {db.path}")
         with get_state().manager.service(server_id) as svc:
-            ops.repair(svc, db.path, "sweep", parallel_workers=workers, major=ops.engine_major(svc), log=log)
+            ops.repair(svc, db.path, "sweep", parallel_workers=workers, major=ops.option_major(svc), log=log)
         log("Sweep completed")
 
     return _job("sweep", f"Sweep {db.name}", server_id, run)

@@ -14,7 +14,12 @@ from fbadmin.upgrade import keywords as K
 from fbadmin.upgrade import plan
 
 from .conftest import DB_DIR, HOST, PASSWORD, PORT, USER, requires_server
-from .test_maintenance import base, execute, major, wait_job
+from .test_maintenance import base, execute, wait_job
+
+
+def major(client, sid):
+    """The server's Firebird version (the upgrade assistant compares server versions)."""
+    return client.get(f"/api/servers/{sid}/maintenance/capabilities").json()["engine_major"]
 
 # ------------------------------------------------------------------ unit tests
 
