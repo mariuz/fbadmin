@@ -10,12 +10,16 @@ Supported Firebird versions: **3.0, 4.0, 5.0** (tested in CI) and the **6.0 snap
 (SQL schemas; a CI job that is allowed to fail). Firebird 2.5 is end-of-life and out of
 scope.
 
-**Status:** every milestone up to 1.0 and the engineering backlog is implemented, verified in CI against real services, and
-released: 1.0.1 is on [PyPI](https://pypi.org/project/firebird-admin/) (`pip install firebird-admin`),
-on [GitHub Releases](https://github.com/mariuz/fbadmin/releases) with desktop installers for
-Windows, macOS and Linux, as a Docker image, and documented at https://mariuz.github.io/fbadmin/.
-Code signing is deferred by decision of the project owner: the 1.x desktop builds ship unsigned. The signing steps (macOS Developer ID with notarization, Windows Authenticode) are already in the desktop workflow and turn on as soon as the certificates are added as repository secrets; see [docs/PACKAGING.md](docs/PACKAGING.md#desktop-app).
-Milestones 1.1 (except Firebird 6.0 final support, which waits for the release), 1.2 and 2.0 are implemented.
+**Status:** milestones 0.1 to 2.0, the engineering backlog and the phone and tablet layout are
+implemented and verified in CI against real services. Firebird 6.0 final support waits for the
+6.0 release. The current release is **2.0.0** ([release notes](docs/release-notes/v2.0.0.md)): on
+[PyPI](https://pypi.org/project/firebird-admin/) (`pip install firebird-admin`), on
+[GitHub Releases](https://github.com/mariuz/fbadmin/releases) with desktop installers for Windows,
+macOS and Linux, as a Docker image, and documented at https://mariuz.github.io/fbadmin/.
+Code signing is deferred by decision of the project owner, so the desktop builds ship unsigned. The
+signing steps (macOS Developer ID with notarization, Windows Authenticode) are already in the
+desktop workflow and turn on as soon as the certificates are added as repository secrets; see
+[docs/PACKAGING.md](docs/PACKAGING.md#desktop-app).
 
 ---
 
