@@ -228,7 +228,7 @@ Also fixed in this milestone:
 - ⬜ **Data compare:** keep results across restarts; handle keys that differ only by case (collation-aware matching) and rows that reference rows of the same table (insert order for self-referencing foreign keys)
 - ⬜ **Command-line remote mode:** `fbadmin --url … --token …` runs commands through a running fbadmin server with an API token
 - ⬜ **Real cloud tests:** run the storage tests against real AWS S3, Azure Blob Storage and Google Cloud Storage accounts in CI (short-lived credentials via OIDC), not only emulators
-- ⬜ **Native driver in CI:** test the `firebird-driver` / libfbclient path (used by local databases) in CI, including the time zone and INT128 handling
+- ✅ **Native driver in CI and as an app setting:** choose the pure-Python `firebirdsql` or the native `firebird-driver` + libfbclient driver in the app (or with `FBADMIN_DRIVER`); native now covers the Query Tool, create/drop database and the Services API too; the full backend suite and the e2e suite run under both drivers in CI, with a cross-driver equivalence test; correctness and benchmark comparison in [docs/DRIVERS.md](docs/DRIVERS.md)
 - ⬜ **Server-mode startup race:** investigate the intermittent `UNIQUE constraint failed: users.username` seen once when a server-mode instance starts
 - ⬜ **Tablet comfort:** make the ERD, query builder canvas and table designer comfortable on tablets (touch dragging, pinch zoom)
 - ⬜ **Large schemas:** keep the Object Explorer, search and autocompletion fast with tens of thousands of objects (virtualized tree, load tests)

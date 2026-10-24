@@ -163,12 +163,20 @@ class Catalog(CatalogExtras):
         if params and self.inline_params:
             sql, params = inline_params(sql, list(params)), []
         cur = self.conn.cursor()
-        cur.execute(sql, list(params))
-        if cur.description is None:
-            return []
-        names = [d[0].lower() for d in cur.description]
-        data = cur.fetchall() or []
-        return [dict(zip(names, r, strict=True)) for r in data]
+        try:
+            cur.execute(sql, list(params))
+            if cur.description is None:
+                return []
+            names = [d[0].lower() for d in cur.description]
+            data = cur.fetchall() or []
+            return [dict(zip(names, r, strict=True)) for r in data]
+        finally:
+            # an unclosed cursor keeps its statement allocated: on Firebird 5 a connection that runs the
+            # same query more than 1000 times then fails with "Too many concurrent executions"
+            try:
+                cur.close()
+            except Exception:  # noqa: BLE001 - the connection may already be gone
+                pass
 
     def one(self, sql: str, params: tuple | list = (), scoped: bool = True) -> dict[str, Any] | None:
         r = self.rows(sql, params, scoped=scoped)

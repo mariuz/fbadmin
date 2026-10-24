@@ -209,3 +209,17 @@ def test_blob_upload(client, database):
     assert row[1] == "0x" + png.hex().upper() and row[2] == "héllo\nworld"
     client.post(b + "/tables/FILES/data", json={"updates": [{"key": {"ID": 1}, "values": {"DATA": {"$hex": "00ff"}}}]})
     assert client.get(b + "/tables/FILES/data").json()["rows"][0][1] == "0x00FF"
+
+
+@requires_server
+def test_catalog_closes_its_cursors(client, database):
+    """Catalog.rows() closes each cursor: before, a metadata connection running the same query more than
+    1000 times failed on Firebird 5 with "Too many concurrent executions of the same request"."""
+    from fbadmin.api.deps import get_state
+    from fbadmin.metadata.catalog import Catalog
+
+    sid, dbid = database
+    with get_state().manager.meta(sid, dbid) as conn:
+        cat = Catalog(conn)
+        for _ in range(1100):
+            assert cat.one("SELECT 1 AS n FROM RDB$DATABASE")["n"] == 1
