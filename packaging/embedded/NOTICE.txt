@@ -4,7 +4,10 @@ Firebird embedded engine bundled with fbadmin
 This directory contains unmodified binaries of the Firebird relational database
 (https://firebirdsql.org), release 5.0.4 (build 5.0.4.1812), taken from the official
 release archives published by the Firebird Project. fbadmin uses them as an embedded
-engine to open local database files without a Firebird server.
+engine to open local database files without a Firebird server. The Docker image contains
+only the client part (libfbclient, the ChaCha wire encryption plugin and libtomcrypt, with
+libtommath from the distribution), which fbadmin's native driver uses to reach Firebird
+servers.
 
 Firebird is distributed under the InterBase Public License v1.0 (IPLicense.txt) and the
 Initial Developer's Public License v1.0 (IDPLicense.txt). As required by section 3.6 of

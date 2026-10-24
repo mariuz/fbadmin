@@ -1,9 +1,9 @@
 """Optional native driver adapter (``firebird-driver`` on top of ``libfbclient``).
 
 Selected with the server-wide "Database driver" setting (:mod:`fbadmin.drivers`, stored in the
-data directory and edited in the UI) or ``FBADMIN_DRIVER=native``; the default is the
-pure-Python ``firebirdsql`` wire-protocol driver. The adapter exposes the DB-API subset fbadmin
-uses (``cursor``, ``execute``, ``fetchone/fetchall/fetchmany``, ``description``, ``rowcount``,
+data directory and edited in the UI) or ``FBADMIN_DRIVER``; the default ``auto`` uses it when a
+Firebird 4+ client library is available, else the pure-Python ``firebirdsql`` driver. The
+adapter exposes the DB-API subset fbadmin uses (``cursor``, ``execute``, ``fetchone/fetchall/fetchmany``, ``description``, ``rowcount``,
 ``commit``, ``rollback``, ``close``) and translates errors into ``firebirdsql`` exceptions, so the
 rest of the app and its error handling are unchanged.
 
@@ -20,7 +20,7 @@ Scope (see docs/DRIVERS.md for the per-feature table):
 * Features built on ``firebirdsql``'s wire internals stay on it whatever is selected: the event
   monitor (its own auxiliary-port implementation, :mod:`fbadmin.events.wire`).
 * **Local (embedded) databases** (:mod:`fbadmin.embedded`) always use this adapter.
-* Needs ``pip install firebird-driver`` (or ``pip install firebird-admin[native]``) and a
+* Needs ``firebird-driver`` (a dependency of fbadmin on Python 3.11+) and a
   ``libfbclient`` (Firebird 3+; a Firebird 5 client for INT128/DECFLOAT/time zones with every
   server). The library comes from the embedded file set when present, else the configured path
   (``FBADMIN_FBCLIENT`` or the setting), else the system search path.
@@ -45,22 +45,92 @@ warnings.filterwarnings("ignore", message="Secondary attachment - config data fr
 
 
 def driver_name() -> str:
-    """The driver selected for registered servers: ``firebirdsql`` or ``native``."""
-    from .drivers import selected
+    """The driver new connections to registered servers use: ``firebirdsql`` or ``native``
+    (``auto`` resolved, see :func:`fbadmin.drivers.effective`)."""
+    from .drivers import effective
 
-    return selected()[0]
+    return effective()[0]
 
 
 def native_enabled() -> bool:
     return driver_name() == "native"
 
 
+class NativeClientError(firebirdsql.InterfaceError):
+    """The native driver could not be used for a reason that is not a Firebird error: the
+    package or the client library cannot be loaded, the library raised an ``OSError``/ctypes error,
+    or it cannot load one of its plugins. With the ``auto`` driver setting the connection is then
+    made with firebirdsql instead (:func:`with_fallback`). ``load_failure``: the library itself
+    did not load (every further attempt would fail the same way)."""
+
+    def __init__(self, msg: str, *, load_failure: bool = False) -> None:
+        super().__init__(msg)
+        self.load_failure = load_failure
+
+
+# Status codes the client library raises about its own environment (plugin manager, providers,
+# ICU, libtomcrypt), never about a server or a database: e.g. "Error loading plugin ChaCha",
+# "No providers loaded"
+_CLIENT_GDS = {
+    335544720,  # Unable to load required library
+    335545004,  # Error loading plugin
+    335545005,  # Loadable module not found
+    335545006,  # Standard plugin entrypoint does not exist in module
+    335545007,  # Module exists but can not be loaded
+    335545008,  # Module does not contain plugin
+    335545044,  # No providers loaded
+    335545166,  # Missing entrypoint in ICU library
+    335545167,  # Could not find acceptable ICU library
+    335545218,  # Error registering ... probably bad tomcrypt library
+}
+
+
+def _client_failure(exc: BaseException) -> bool:
+    """Is ``exc`` (raised while connecting) a failure of the client library or its plugins
+    rather than a Firebird error from a server or database?"""
+    if isinstance(exc, (OSError, ctypes.ArgumentError)):
+        return True
+    gds = set(getattr(exc, "gds_codes", ()) or ())
+    return bool(gds & _CLIENT_GDS)
+
+
+def _client_error(exc: BaseException, what: str = "connect") -> NativeClientError:
+    return NativeClientError(f"Firebird client library error ({what}): {str(exc).strip() or type(exc).__name__}")
+
+
+def _load_api():
+    """firebird.driver with libfbclient loaded; a :class:`NativeClientError` when that fails."""
+    try:
+        driver = _load()
+        driver.load_api()
+    except NativeClientError:
+        raise
+    except Exception as exc:  # noqa: BLE001 - firebird-driver raises plain Exception, OSError, ...
+        raise NativeClientError(f"Cannot load the Firebird client library (libfbclient): {exc}",
+                                load_failure=True) from exc
+    return driver
+
+
+def with_fallback(native_call, pure_call, *, forced: str | None = None):
+    """``native_call()``; when it raises :class:`NativeClientError` and the driver setting is
+    ``auto`` (and nothing ``forced`` the native driver), note it and return ``pure_call()``."""
+    from . import drivers
+
+    try:
+        return native_call()
+    except NativeClientError as exc:
+        if forced or not drivers.may_fall_back():
+            raise
+        drivers.note_native_failure(exc, sticky=exc.load_failure)
+        return pure_call()
+
+
 def _load():
     try:
         from firebird import driver
-    except ImportError as exc:  # pragma: no cover - depends on optional package
-        raise RuntimeError("The native driver needs the 'firebird-driver' package "
-                           "(pip install 'firebird-admin[native]')") from exc
+    except ImportError as exc:
+        raise NativeClientError("The native driver needs the 'firebird-driver' package "
+                                "(pip install firebird-driver)", load_failure=True) from exc
     from .drivers import fbclient_setting
     from .embedded import prepare_client
 
@@ -448,8 +518,10 @@ def connect_native(*, host: str, port: int, database: str, user: str, password: 
     """Attach (or with ``create`` create) a database. ``embedded``: a local file opened in-process.
 
     The keyword arguments match :func:`firebirdsql.connect` / ``create_database``; the wire
-    options become the connection's client configuration (see :func:`client_config`)."""
-    driver = _load()
+    options become the connection's client configuration (see :func:`client_config`).
+    Failures of the client library itself raise :class:`NativeClientError`, Firebird errors the
+    matching ``firebirdsql`` exception."""
+    driver = _load_api()
     errors = (driver.Error,)
     if embedded:
         dsn = _embedded_config(driver, database, page_size, charset) if create else _embedded_config(driver, database)
@@ -471,7 +543,11 @@ def connect_native(*, host: str, port: int, database: str, user: str, password: 
         if not embedded and client_major() < 4:
             _legacy_bind(con)
     except errors as exc:
+        if _client_failure(exc):
+            raise _client_error(exc) from exc
         raise _translate(exc) from exc
+    except (OSError, ctypes.ArgumentError) as exc:  # from the library through ctypes, not a Firebird status
+        raise _client_error(exc) from exc
     return NativeConnection(con, errors)
 
 
@@ -598,12 +674,16 @@ def connect_services(*, host: str, port: int | None, user: str, password: str,
                      auth_plugin_name: str | None = None, timeout: int | None = None,
                      **_ignored) -> NativeServices:
     """Attach to a remote server's service manager (same keywords as ``firebirdsql.services.connect``)."""
-    driver = _load()
+    driver = _load_api()
     conf = client_config(wire_crypt=wire_crypt, wire_compress=wire_compress,
                          auth_plugin_name=auth_plugin_name, timeout=timeout)
     name = _server_config(driver, host, port, conf, auth_plugin_name)
     try:
         srv = driver.connect_server(name, user=user, password=password or None)
     except driver.Error as exc:
+        if _client_failure(exc):
+            raise _client_error(exc, "service manager") from exc
         raise _translate(exc) from exc
+    except (OSError, ctypes.ArgumentError) as exc:
+        raise _client_error(exc, "service manager") from exc
     return NativeServices(srv, (driver.Error,))

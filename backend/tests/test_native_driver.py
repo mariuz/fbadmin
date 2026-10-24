@@ -41,7 +41,7 @@ def test_driver_switch(monkeypatch, tmp_path):
     from fbadmin import config, native
 
     monkeypatch.setattr(config.settings, "data_dir", tmp_path)
-    monkeypatch.delenv("FBADMIN_DRIVER", raising=False)
+    monkeypatch.setenv("FBADMIN_DRIVER", "firebirdsql")
     assert not native.native_enabled()
     monkeypatch.setenv("FBADMIN_DRIVER", "native")
     assert native.native_enabled()
@@ -53,7 +53,7 @@ def test_stored_setting_and_environment_override(monkeypatch, tmp_path):
     monkeypatch.setattr(config.settings, "data_dir", tmp_path)
     monkeypatch.delenv("FBADMIN_DRIVER", raising=False)
     monkeypatch.delenv("FBADMIN_FBCLIENT", raising=False)
-    assert drivers.selected() == ("firebirdsql", "default")
+    assert drivers.selected() == ("auto", "default")  # see test_driver_auto.py
     drivers.save(driver="native", fbclient="/opt/fb/lib/libfbclient.so")
     assert (tmp_path / "driver.json").is_file()
     assert drivers.selected() == ("native", "settings")
@@ -71,7 +71,8 @@ def test_stored_setting_and_environment_override(monkeypatch, tmp_path):
 def test_driver_api(client, monkeypatch):
     monkeypatch.delenv("FBADMIN_DRIVER", raising=False)
     st = client.get("/api/driver").json()
-    assert st["driver"] in ("firebirdsql", "native") and set(st["drivers"]) == {"firebirdsql", "native"}
+    assert st["driver"] == "auto" and set(st["drivers"]) == {"auto", "firebirdsql", "native"}
+    assert st["effective"] in ("firebirdsql", "native") and st["reason"]
     assert {"available", "reason", "library", "client_version", "package"} <= set(st["native"])
     # an unknown driver, and a client library that does not exist, are refused
     assert client.put("/api/driver", json={"driver": "odbc"}).status_code == 400

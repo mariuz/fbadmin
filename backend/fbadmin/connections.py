@@ -24,7 +24,7 @@ from contextlib import contextmanager
 import firebirdsql
 from firebirdsql import services
 
-from .native import connect_native, connect_services, driver_name
+from .native import connect_native, connect_services, driver_name, with_fallback
 from .metadata.types import quote_ident
 from .query import QuerySession, TxOptions, apply_tpb, end_transaction
 from .schema_ctx import current_schema
@@ -87,13 +87,20 @@ def connect(
         timeout=30,
         **wire_options(srv),
     )
-    if (driver or driver_name()) == "native":
-        conn = connect_native(create=create, page_size=page_size if create else None, **kwargs)
-    elif create:
-        return firebirdsql.create_database(page_size=page_size, **kwargs)
+
+    def pure():
+        if create:
+            return firebirdsql.create_database(page_size=page_size, **kwargs)
+        return firebirdsql.connect(**kwargs)
+
+    if (driver or driver_name()) == "native":  # auto falls back to firebirdsql if the client library fails
+        conn = with_fallback(lambda: connect_native(create=create, page_size=page_size if create else None, **kwargs),
+                             pure, forced=driver)
     else:
-        conn = firebirdsql.connect(**kwargs)
-    if srv.read_only and not create:  # production safety: every transaction of this server is read-only
+        conn = pure()
+    if create:
+        return conn
+    if srv.read_only:  # production safety: every transaction of this server is read-only
         apply_tpb(conn, TxOptions(read_only=True).tpb())
     return conn
 
@@ -220,8 +227,7 @@ class ConnectionManager:
             with embedded_services() as svc:
                 yield svc
             return
-        svc_connect = connect_services if driver_name() == "native" else services.connect
-        svc = svc_connect(
+        kw = dict(
             host=srv.host,
             port=srv.port,
             user=srv.user,
@@ -230,6 +236,10 @@ class ConnectionManager:
             timeout=60,
             **wire_options(srv),
         )
+        if driver_name() == "native":
+            svc = with_fallback(lambda: connect_services(**kw), lambda: services.connect(**kw))
+        else:
+            svc = services.connect(**kw)
         try:
             yield svc
         finally:

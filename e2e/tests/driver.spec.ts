@@ -3,9 +3,10 @@ import { expect, test, type Page } from "@playwright/test";
 import { expand, FB } from "./fixtures";
 
 /**
- * The server-wide "Database driver" setting (user menu → Database driver…): availability of the
- * native driver, switching drivers (pooled connections are closed), environment override, and an
- * axe audit of the panel. See docs/DRIVERS.md.
+ * The server-wide "Database driver" setting (user menu → Database driver…): automatic (the default),
+ * native or pure Python; the driver in use and why, availability of the native driver, switching
+ * drivers (pooled connections are closed when the driver in use changes), environment override, and
+ * an axe audit of the panel. See docs/DRIVERS.md.
  */
 test.describe.configure({ mode: "serial" });
 
@@ -14,10 +15,16 @@ let serverId = "";
 let dbId = "";
 
 interface DriverStatus {
-  driver: string;
+  driver: "auto" | "native" | "firebirdsql";
   source: string;
+  effective: "native" | "firebirdsql";
+  reason: string;
+  fallback: string | null;
   native: { available: boolean; reason: string; client_version: string | null };
 }
+
+const status = async (request: import("@playwright/test").APIRequestContext): Promise<DriverStatus> =>
+  (await request.get("/api/driver")).json();
 
 test.beforeAll(async ({ request }) => {
   serverId = (await (await request.post("/api/servers", {
@@ -31,8 +38,8 @@ test.beforeAll(async ({ request }) => {
 });
 
 test.afterAll(async ({ request }) => {
-  const st: DriverStatus = await (await request.get("/api/driver")).json();
-  if (st.source !== "environment") await request.put("/api/driver", { data: { driver: "firebirdsql" } });
+  const st = await status(request);
+  if (st.source !== "environment") await request.put("/api/driver", { data: { driver: "auto" } });
   if (!serverId) return;
   await request.post(`/api/servers/${serverId}/databases/${dbId}/drop`);
   await request.delete(`/api/servers/${serverId}`);
@@ -52,23 +59,35 @@ async function openPanel(page: Page) {
   return panel;
 }
 
-test("driver panel shows availability and passes axe", async ({ browser, request }) => {
+const radios = (panel: import("@playwright/test").Locator) => ({
+  auto: panel.getByRole("radio", { name: /^Automatic \(recommended\)/ }),
+  native: panel.getByRole("radio", { name: /^Native \(firebird-driver\)/ }),
+  firebirdsql: panel.getByRole("radio", { name: /^Pure Python \(firebirdsql\)/ }),
+});
+const LABEL = { native: "Native (firebird-driver)", firebirdsql: "Pure Python (firebirdsql)" };
+
+test("driver panel shows the setting, the driver in use and why, and passes axe", async ({ browser, request }) => {
   const page = await (await browser.newContext()).newPage();
   await page.goto("/");
-  const st: DriverStatus = await (await request.get("/api/driver")).json();
+  const st = await status(request);
   const panel = await openPanel(page);
   await expect(panel.getByRole("heading", { name: "Database driver" })).toBeVisible();
-  const pure = panel.getByRole("radio", { name: /firebirdsql/ });
-  const native = panel.getByRole("radio", { name: /^native/ });
-  await expect(st.driver === "native" ? native : pure).toBeChecked();
+  const r = radios(panel);
+  await expect(r[st.driver]).toBeChecked();
+  if (st.source === "default") expect(st.driver).toBe("auto"); // the default setting
+  const inUse = panel.locator("table.driver-effective");
+  await expect(inUse).toContainText(LABEL[st.effective]);
+  await expect(inUse).toContainText(st.reason);
   if (st.native.available) {
-    await expect(panel.locator("table.kv")).toContainText(st.native.client_version ?? "");
+    await expect(panel.locator("table.kv").last()).toContainText(st.native.client_version ?? "");
   } else {
-    await expect(native).toBeDisabled();
+    await expect(r.native).toBeDisabled();
     await expect(panel).toContainText("Not available:");
+    expect(st.effective).toBe("firebirdsql");
   }
   if (st.source === "environment") {
-    await expect(pure).toBeDisabled();
+    await expect(r.firebirdsql).toBeDisabled();
+    await expect(r.auto).toBeDisabled();
     await expect(panel).toContainText("FBADMIN_DRIVER");
   }
   await audit(page, "driver panel");
@@ -77,8 +96,8 @@ test("driver panel shows availability and passes axe", async ({ browser, request
   await page.context().close();
 });
 
-test("switching to the native driver closes pooled connections", async ({ browser, request }) => {
-  const st: DriverStatus = await (await request.get("/api/driver")).json();
+test("switching drivers closes pooled connections; automatic comes back", async ({ browser, request }) => {
+  const st = await status(request);
   test.skip(!st.native.available, `native driver unavailable: ${st.native.reason}`);
   test.skip(st.source === "environment", "driver set by FBADMIN_DRIVER");
   const page = await (await browser.newContext()).newPage();
@@ -86,16 +105,31 @@ test("switching to the native driver closes pooled connections", async ({ browse
   await expand(page, SERVER);
   await expand(page, "drv"); // opens a pooled metadata connection
   const panel = await openPanel(page);
-  await panel.getByRole("radio", { name: /^native/ }).check();
-  await panel.getByRole("button", { name: "Save" }).click();
+  const r = radios(panel);
+  const saveBtn = panel.getByRole("button", { name: "Save" });
+  const exec = async () => {
+    const res = await request.post(`/api/servers/${serverId}/databases/${dbId}/execute`, { data: { sql: "SELECT 1 FROM RDB$DATABASE" } });
+    expect((await res.json()).error).toBeNull();
+  };
+
+  await r.firebirdsql.check();
+  await saveBtn.click();
+  await expect.poll(async () => (await status(request)).effective).toBe("firebirdsql");
+  await exec(); // a pooled firebirdsql connection
+
+  await r.native.check();
+  await saveBtn.click();
   await expect(panel.getByRole("status").filter({ hasText: "pooled connection(s) closed" })).toBeVisible();
-  await expect(panel.locator("table.kv")).toContainText("native");
-  expect((await (await request.get("/api/driver")).json()).driver).toBe("native");
-  // new connections use the native driver
-  const r = await request.post(`/api/servers/${serverId}/databases/${dbId}/execute`, { data: { sql: "SELECT 1 FROM RDB$DATABASE" } });
-  expect((await r.json()).error).toBeNull();
-  await panel.getByRole("radio", { name: /firebirdsql/ }).check();
-  await panel.getByRole("button", { name: "Save" }).click();
-  await expect.poll(async () => (await (await request.get("/api/driver")).json()).driver).toBe("firebirdsql");
+  await expect(panel.locator("table.driver-effective")).toContainText(LABEL.native);
+  expect(await status(request)).toMatchObject({ driver: "native", effective: "native" });
+  await exec(); // new connections use the native driver
+
+  await r.auto.check();
+  await saveBtn.click();
+  await expect.poll(async () => (await status(request)).driver).toBe("auto");
+  const after = await status(request);
+  if (st.driver === "auto") expect(after.effective).toBe(st.effective); // resolves the same way again
+  await expect(panel.locator("table.driver-effective")).toContainText(after.reason);
+  await exec();
   await page.context().close();
 });

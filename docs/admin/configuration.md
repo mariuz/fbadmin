@@ -25,8 +25,8 @@ fbadmin-desktop [--port PORT] [--browser] [--log-level LEVEL]
 | `FBADMIN_RATE_LIMIT_TRUST_PROXY` | `0` | `1`: identify clients by `X-Forwarded-For` (only behind a trusted proxy) |
 | `FBADMIN_MAX_REQUEST_BYTES` | `33554432` (32 MiB) | Maximum request body; larger requests get HTTP 413. `0` = unlimited |
 | `FBADMIN_META_POOL_SIZE` | `3` | Metadata connections per database (see below) |
-| `FBADMIN_DRIVER` | `firebirdsql` | `native`: use `firebird-driver` + libfbclient for every server connection. Overrides the setting in the UI (see [Drivers](../DRIVERS.md)) |
-| `FBADMIN_FBCLIENT` | | Path of `libfbclient` for the native driver. Overrides the setting in the UI |
+| `FBADMIN_DRIVER` | `auto` | Database driver for server connections: `auto` (native `firebird-driver` when a Firebird 4+ client library is available, else pure-Python `firebirdsql`), `native` or `firebirdsql`. Overrides the setting in the UI (see [Drivers](../DRIVERS.md)) |
+| `FBADMIN_FBCLIENT` | | Path of `libfbclient` for the native driver (default: the embedded engine's, else the system library path). Overrides the setting in the UI |
 | `FBADMIN_UPDATE_CHECK` | `ask` | `off` forbids the opt-in update check (see [Privacy](../PRIVACY.md)) |
 | `FBADMIN_SERVERS_FILE` | unset | YAML/JSON file of Firebird servers to register at startup; see [Deployment](deployment.md#preconfigured-servers) |
 | `FBADMIN_PLUGINS` | on | `off` loads no plugins: a safe mode for troubleshooting, also used when generating the API types |
@@ -61,19 +61,28 @@ whenever it is free; extra ones open only while it is busy (a slow DDL extractio
 `MON$` query) and close again after two idle minutes. Every Query Tool tab has its own
 connection, separate from the pool.
 
-## Native driver (optional)
+## Database driver
 
 The **Database driver** setting (user menu → *Database driver…*, administrators only in
-server mode) switches every server connection between the pure-Python `firebirdsql`
-(default) and [`firebird-driver`](https://pypi.org/project/firebird-driver/) on top of the
-Firebird client library: object explorer, Query Tool, create/drop database and the Services
-API. It is stored in `driver.json` in the data directory. `FBADMIN_DRIVER` and
-`FBADMIN_FBCLIENT` override it:
+server mode) chooses the driver for every server connection (object explorer, Query Tool,
+create/drop database and the Services API):
+
+- **Automatic** (default): [`firebird-driver`](https://pypi.org/project/firebird-driver/) on
+  top of the Firebird client library when a **Firebird 4 or newer** client is available,
+  otherwise the pure-Python `firebirdsql`. The panel and the startup log say which one is in
+  use and why;
+- **Native**: always `firebird-driver` (refused when it cannot be used);
+- **Pure Python**: always `firebirdsql`, no native library.
+
+`firebird-driver` is installed with fbadmin (Python 3.11+); the client library comes with the
+desktop app and the Docker image, or from a Firebird installation or your distribution's
+`libfbclient2` (Firebird 4 from Debian 13 and Ubuntu 25.04 on). The setting is stored in
+`driver.json` in the data directory. `FBADMIN_DRIVER` and `FBADMIN_FBCLIENT` override it:
 
 ```bash
-pip install "firebird-admin[native]"      # plus a libfbclient, ideally Firebird 4 or newer
-FBADMIN_DRIVER=native FBADMIN_FBCLIENT=/opt/firebird/lib/libfbclient.so fbadmin
+FBADMIN_FBCLIENT=/opt/firebird/lib/libfbclient.so fbadmin   # Automatic with this client library
+FBADMIN_DRIVER=firebirdsql fbadmin                          # always the pure-Python driver
 ```
 
-The event monitor stays on `firebirdsql`. The official Docker image contains no libfbclient.
-See [Drivers](../DRIVERS.md) for the per-feature table, how to choose, and the benchmarks.
+The event monitor stays on `firebirdsql`. See [Drivers](../DRIVERS.md) for the selection
+rules, the fallback, the per-feature table and the benchmarks.

@@ -12,7 +12,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import __version__
+from . import __version__, drivers
 from .api import ROUTERS
 from .api.deps import get_state
 from .config import settings
@@ -42,6 +42,7 @@ def _reaper(stop: threading.Event) -> None:
 async def lifespan(app: FastAPI):
     stop = threading.Event()
     threading.Thread(target=_reaper, args=(stop,), daemon=True).start()
+    drivers.log_startup()  # the database driver in use (auto: native or firebirdsql) and why
     scheduler.startup()
     alert_engine.startup()
     sampler = start_sampler()

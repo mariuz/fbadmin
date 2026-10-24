@@ -100,8 +100,9 @@ config:
   trustProxy: true
   # Opt-in update check from the UI: "ask" (users may opt in) or "off".
   updateCheck: "off"
-  # firebirdsql (pure Python, default) or native (needs libfbclient in the image).
-  driver: firebirdsql
+  # auto (default): native firebird-driver with the image's Firebird 5 client, else pure Python;
+  # native; or firebirdsql (pure Python). See docs/DRIVERS.md.
+  driver: auto
 
 # Firebird servers registered at startup (FBADMIN_SERVERS_FILE), e.g. the Service of a
 # Firebird StatefulSet or of an instance managed by a Firebird operator. Passwords are read

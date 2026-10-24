@@ -30,8 +30,12 @@ def client_major() -> int | None:
 
 
 def native_suite() -> bool:
-    """The whole suite runs with FBADMIN_DRIVER=native."""
-    return os.environ.get("FBADMIN_DRIVER", "").strip().lower() in ("native", "firebird-driver", "fbclient")
+    """The whole suite runs with the native driver: FBADMIN_DRIVER=native, or the default (auto)
+    with a Firebird 4+ client library."""
+    env = os.environ.get("FBADMIN_DRIVER", "").strip().lower()
+    if env:
+        return env in ("native", "firebird-driver", "fbclient") or (env == "auto" and (client_major() or 0) >= 4)
+    return (client_major() or 0) >= 4
 
 
 def use_driver(monkeypatch, name: str) -> None:

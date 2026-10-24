@@ -35,7 +35,8 @@ Optional extras:
 
 ```bash
 pip install "firebird-admin[desktop]"   # native window for fbadmin-desktop (pywebview)
-pip install "firebird-admin[native]"    # optional libfbclient driver, see Administration → Configuration
+# firebird-driver (the native driver) is installed with fbadmin; it is used automatically when a
+# Firebird 4+ client library is present, see Administration → Configuration
 ```
 
 ## Desktop app

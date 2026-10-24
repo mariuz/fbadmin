@@ -71,20 +71,28 @@ It runs weekly in `.github/workflows/compat.yml`. It already found three splitte
 ### Native driver tests
 
 The native driver (`firebird-driver` + libfbclient, see [DRIVERS.md](DRIVERS.md)) needs a
-client library. Use the Firebird 5 one from the embedded file set: it is pinned and
-checksummed, and unlike a Firebird 3 client (Ubuntu's `libfbclient2`) it handles INT128,
-DECFLOAT and the time zone types of Firebird 4+ servers.
+client library. `firebird-driver` is a regular dependency, but without a client library the
+default setting (*Automatic*) uses the pure-Python driver, so a plain checkout runs the suite
+with `firebirdsql`. Use the Firebird 5 client from the embedded file set: it is pinned and
+checksummed, includes the ChaCha wire-encryption plugin, and unlike a Firebird 3 client
+(Ubuntu 24.04's `libfbclient2`) it handles INT128, DECFLOAT and the time zone types of
+Firebird 4+ servers.
 
 ```bash
-pip install -e "backend[native]"
 scripts/embedded-test-setup.sh                       # → build/firebird-embedded
 export FBADMIN_FBCLIENT=$PWD/build/firebird-embedded/lib/libfbclient.so.2
 cd backend
-python -m pytest -q tests/test_native_driver.py tests/test_driver_equivalence.py   # both drivers
-FBADMIN_DRIVER=native python -m pytest -q             # the whole suite through the native driver
-FBADMIN_DRIVER=native FBADMIN_TEST_PORT=3053 python -m pytest -q   # ... against Firebird 3
+python -m pytest -q tests/test_driver_auto.py tests/test_native_driver.py tests/test_driver_equivalence.py
+python -m pytest -q                                   # the whole suite; Automatic → native
+FBADMIN_TEST_PORT=3053 python -m pytest -q            # ... against Firebird 3
+FBADMIN_DRIVER=firebirdsql python -m pytest -q        # the whole suite through the pure-Python driver
 ```
 
+`FBADMIN_TEST_EXPECT_DRIVER=native` (or `firebirdsql`) makes `test_driver_auto.py` assert what
+*Automatic* resolves to on your machine, as CI does.
+
+- `tests/test_driver_auto.py`: the *Automatic* rules and the run-time fallback (a client
+  library failure falls back to firebirdsql, a Firebird error does not), ChaCha negotiation.
 - `tests/test_native_driver.py`: the driver setting and its API, Query Tool sessions,
   services, wire options, error classes, BLOBs, and switching drivers at run time.
 - `tests/test_driver_equivalence.py` runs the same queries and API calls through both drivers
@@ -93,8 +101,10 @@ FBADMIN_DRIVER=native FBADMIN_TEST_PORT=3053 python -m pytest -q   # ... against
   fails it prints the path of every differing value.
 - Without a loadable libfbclient these tests skip; with `FBADMIN_DRIVER=native` and no
   library every connection fails with the reason.
-- The `backend-native` CI job runs the whole suite this way against Firebird 3, 4, 5 and 6,
-  and the `e2e` job runs the Playwright suite once per driver.
+- The `backend-native` CI job runs the whole suite with `FBADMIN_DRIVER=native` against
+  Firebird 3, 4, 5 and 6; the plain `backend` jobs have no client library, so *Automatic*
+  uses firebirdsql there. The `e2e` job runs the Playwright suite with *Automatic* (native
+  through the embedded file set's client) and with `FBADMIN_DRIVER=firebirdsql`.
 
 `scripts/driver-compare.py` benchmarks both drivers (see [DRIVERS.md](DRIVERS.md#benchmarks)).
 
@@ -133,9 +143,9 @@ Playwright starts `python -m fbadmin` from `backend/` on port `E2E_PORT` (defaul
 with a temporary data directory. Variables: `FB_HOST`, `FB_PORT` (3050), `FB_PASSWORD`,
 `FB_DB_DIR` (a directory on the Firebird server), `E2E_BASE_URL` (test an already running
 instance), `PW_CHROMIUM_PATH` (use a specific Chromium binary). The fbadmin server inherits
-the environment, so `FBADMIN_DRIVER=native FBADMIN_FBCLIENT=…` (or `FBADMIN_EMBEDDED_DIR`)
-runs the suite through the native driver. The `e2e` CI job runs them against a Firebird 5
-service container, once with each driver.
+the environment, so `FBADMIN_FBCLIENT=…` (or `FBADMIN_EMBEDDED_DIR`) runs the suite through
+the native driver (*Automatic*) and `FBADMIN_DRIVER=firebirdsql` through the pure-Python one.
+The `e2e` CI job runs them against a Firebird 5 service container, once each way.
 
 ## API types
 

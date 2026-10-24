@@ -107,13 +107,15 @@ class Target:
         from firebirdsql import services
 
         from ..connections import wire_options
-        from ..native import connect_services, driver_name
+        from ..native import connect_services, driver_name, with_fallback
 
-        svc_connect = connect_services if driver_name() == "native" else services.connect
+        kw = dict(host=self.srv.host, port=self.srv.port, user=self.srv.user, password=self.password,
+                  wire_crypt=self.srv.wire_crypt, timeout=60, **wire_options(self.srv))
         try:
-            svc = svc_connect(host=self.srv.host, port=self.srv.port, user=self.srv.user,
-                                   password=self.password, wire_crypt=self.srv.wire_crypt, timeout=60,
-                                   **wire_options(self.srv))
+            if driver_name() == "native":
+                svc = with_fallback(lambda: connect_services(**kw), lambda: services.connect(**kw))
+            else:
+                svc = services.connect(**kw)
         except Exception as exc:  # noqa: BLE001
             raise CliError(f"Cannot connect to the service manager of {self.srv.host}/{self.srv.port}: "
                            f"{clean_error(exc)}", CONNECT) from exc

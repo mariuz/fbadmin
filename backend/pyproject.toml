@@ -27,6 +27,10 @@ dependencies = [
   "uvicorn[standard]>=0.27",
   "pydantic>=2.5",
   "firebirdsql>=1.4.5",
+  # the native driver, used by default (driver setting "auto") when a Firebird 4+ client library
+  # (libfbclient, not on PyPI) is installed; pure Python on top of ctypes. Tested with 2.0.3 and
+  # 2.1.0. It needs Python 3.11+: on 3.10 fbadmin uses the pure Python driver. docs/DRIVERS.md.
+  "firebird-driver>=2.0,<3; python_version >= '3.11'",
   "openpyxl>=3.1",
   "cryptography>=42",
   "argon2-cffi>=23.1",
@@ -38,8 +42,8 @@ dev = ["pytest>=8", "httpx>=0.27", "ruff>=0.5", "hypothesis>=6.100", "ldap3>=2.9
 ai = ["anthropic>=1.0"]
 ldap = ["ldap3>=2.9"]
 legacy-auth = ["passlib>=1.7"]
-# Optional native driver (firebird-driver + libfbclient): the app setting or FBADMIN_DRIVER=native; docs/DRIVERS.md.
-native = ["firebird-driver>=2.0,<3"]  # tested with 2.0.3 and 2.1.0 (get_client_version changed type in 2.1)
+# Kept so that `pip install firebird-admin[native]` keeps working: firebird-driver is now a regular dependency.
+native = []
 # Native desktop window for fbadmin-desktop (falls back to the web browser without it).
 desktop = ["pywebview>=5.0"]
 

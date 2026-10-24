@@ -53,22 +53,27 @@ jobs:
       - name: Wait for the newer Firebird (upgrade trial restore)
         if: matrix.next
         run: for _ in $(seq 1 60); do (echo > /dev/tcp/127.0.0.1/3057) 2>/dev/null && break; sleep 1; done
+      # firebird-driver is installed (a regular dependency) but the runner has no Firebird client
+      # library, so the default driver setting (auto) resolves to firebirdsql: asserted by
+      # test_driver_auto.py through FBADMIN_TEST_EXPECT_DRIVER
       - run: pytest -q backend/tests
         env:
           FBADMIN_TEST_DIR: /var/lib/firebird/data
           FBADMIN_TEST_UPGRADE_PORT: ${{ matrix.next && '3057' || '' }}
+          FBADMIN_TEST_EXPECT_DRIVER: firebirdsql
       - name: Local databases (Firebird 5 embedded engine, no server)
         if: matrix.firebird == '5'
         run: |
-          pip install -e "backend[native]"
           PYTHON=python scripts/embedded-test-setup.sh "$RUNNER_TEMP/firebird-embedded"
           FBADMIN_TEST_EMBEDDED_DIR="$RUNNER_TEMP/firebird-embedded" pytest -q backend/tests/test_embedded.py -rs
 
   backend-native:
     # The whole backend suite again with the native driver (firebird-driver + libfbclient), which
     # local databases rely on. The client library is the Firebird 5 one from the pinned, SHA-256
-    # checked embedded file set (a Firebird 3 client, e.g. Ubuntu's libfbclient2, cannot handle
-    # INT128/DECFLOAT/time zones). test_driver_equivalence.py compares both drivers result by result.
+    # checked embedded file set (a Firebird 3 client, e.g. Ubuntu 24.04's libfbclient2, cannot
+    # handle INT128/DECFLOAT/time zones). test_driver_equivalence.py compares both drivers result by
+    # result; test_driver_auto.py checks that the default setting (auto, FBADMIN_DRIVER unset in
+    # that test) resolves to native with this client and that it negotiates ChaCha wire encryption.
     name: Backend tests (native driver, Firebird ${{ matrix.firebird }})
     runs-on: ubuntu-latest
     strategy:
@@ -88,7 +93,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install -e "backend[dev,native]"
+      - run: pip install -e "backend[dev,native]"  # [native]: the compatibility alias (now empty)
       - name: Cache the Firebird release archive (SHA-256 pinned in fetch-embedded.py)
         uses: actions/cache@v4
         with:
@@ -108,6 +113,7 @@ jobs:
           FBADMIN_TEST_DIR: /var/lib/firebird/data
           FBADMIN_DRIVER: native
           FBADMIN_FBCLIENT: ${{ runner.temp }}/firebird-embedded/lib/libfbclient.so.2
+          FBADMIN_TEST_EXPECT_DRIVER: native
 
   integrations:
     name: Real services (crypt plugin, OpenLDAP, Dex OIDC)
@@ -251,8 +257,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # the native run uses the embedded file set's Firebird 5 client (FBADMIN_EMBEDDED_DIR below)
-        driver: [firebirdsql, native]
+        # auto: the default setting, which resolves to native with the embedded file set's Firebird 5
+        # client (FBADMIN_EMBEDDED_DIR below), as for desktop and Docker users; firebirdsql: the pure
+        # Python driver forced. driver.spec.ts also switches to native explicitly and back.
+        driver: [auto, firebirdsql]
     services:
       firebird:
         image: firebirdsql/firebird:5
@@ -272,7 +280,7 @@ jobs:
           cache-dependency-path: |
             frontend/package-lock.json
             e2e/package-lock.json
-      - run: pip install -e "backend[native]"
+      - run: pip install -e backend
       - name: Build the UI
         working-directory: frontend
         run: npm ci && npm run build
@@ -292,7 +300,7 @@ jobs:
           FBADMIN_PYTHON: python
           FB_DB_DIR: /var/lib/firebird/data
           FB_EVENTS_PORT: "3060"
-          FBADMIN_DRIVER: ${{ matrix.driver == 'native' && 'native' || '' }}
+          FBADMIN_DRIVER: ${{ matrix.driver == 'firebirdsql' && 'firebirdsql' || '' }}
       - uses: actions/upload-artifact@v4
         if: failure()
         with:

@@ -88,7 +88,8 @@ jobs:
         # a prebuilt cryptography wheel (OpenSSL linked in statically): newer releases have no Intel
         # macOS wheel, and a source build links Homebrew's libssl while PyInstaller bundles another
         # one -> "Symbol not found: _SSL_get0_group_name" when the app starts
-        # [native]: firebird-driver, which local (embedded) databases use
+        # firebird-driver (a dependency) runs local (embedded) databases and, with the bundled
+        # Firebird 5 client, remote servers too (driver setting auto); [native] is a compat alias
         run: pip install --only-binary cryptography "./backend[desktop,native]" pyinstaller pillow
       - name: Firebird embedded engine (local databases)
         # pinned release, SHA-256 checked; Linux takes libtommath.so.1 from the runner (libtommath1);

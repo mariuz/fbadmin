@@ -35,10 +35,11 @@ The library finds its configuration, messages and plugins in its *root directory
 `tzdata/*.res` files. The embedded engine does no authentication: the user name in the
 connection request becomes `CURRENT_USER`, and SYSDBA has all rights.
 
-fbadmin uses the default pure-Python driver `firebirdsql` for servers. It speaks the wire
-protocol, so it can never open a file in-process. Local databases therefore go through
-`firebird-driver` (the native adapter in `backend/fbadmin/native.py`) on top of the bundled
-libfbclient.
+The pure-Python driver `firebirdsql` speaks the wire protocol, so it can never open a file
+in-process. Local databases therefore always go through `firebird-driver` (the native adapter
+in `backend/fbadmin/native.py`) on top of the bundled libfbclient. With the file set present,
+the default driver setting (*Automatic*) uses the same native driver and library for servers
+too (see [DRIVERS.md](DRIVERS.md)).
 
 ## The file set (Firebird 5.0.4)
 
@@ -50,14 +51,21 @@ archives and nothing else (no server binaries, tools, examples or security datab
 | client | `lib/libfbclient.so.2` | `fbclient.dll` | `lib/libfbclient.dylib` |
 | engine | `plugins/libEngine13.so` | `plugins/engine13.dll` | `plugins/libEngine13.dylib` |
 | profiler plugin (RDB$PROFILER) | `plugins/libDefault_Profiler.so` | `plugins/default_profiler.dll` | `plugins/libDefault_Profiler.dylib` |
+| wire encryption plugin (ChaCha64/ChaCha, for remote servers) | `plugins/libChaCha.so` | `plugins/chacha.dll` | `plugins/libChaCha.dylib` |
 | character sets | `intl/fbintl`, `intl/fbintl.conf` | `intl/fbintl.dll`, `.conf` | `intl/libfbintl.dylib`, `.conf` |
 | crypto / bignum | `lib/libtomcrypt.so.1`, `lib/libtommath.so.1` (from the build machine) | linked statically | `lib/libtomcrypt.dylib`, `lib/libtommath.dylib` |
 | ICU | the system's (any version 3.8 to 79) | `icuuc63.dll`, `icuin63.dll`, `icudt63.dll`, `icudt63l.dat` | `lib/libicuuc.71.1.dylib`, `lib/libicui18n.71.1.dylib`, `lib/libicudata.71.dylib` |
 | runtime | glibc ≥ 2.17 class | `msvcp140*.dll`, `vcruntime140*.dll`, `zlib1.dll` | system |
 | common | `firebird.conf`, `plugins.conf`, `firebird.msg`, `tzdata/*.res` (+ `ids.dat` on Windows/macOS), licences | | |
-| **size** (raw / gzip) | **17.9 / 6.8 MB** | **45.5 / 17.6 MB** | **53.1 / 19.5 MB** |
+| **size** (raw / gzip) | **19.0 / 7.3 MB** | **45.9 / 17.9 MB** | **53.9 / 19.9 MB** (arm64) |
 
 Most of the size is the engine (~10 MB) and, on Windows and macOS, ICU's data (27–30 MB).
+The ChaCha plugin (about 1 MB) is there for the native driver's connections to servers: without
+it the client negotiates only Arc4 with Firebird 4+ servers. `--client-only` (Linux, used by
+the Docker image) extracts just the client part: `libfbclient`, libtomcrypt, the ChaCha
+plugin, `firebird.msg`, `plugins.conf` and the licences (4.7 MB); `--platform linux-arm64`
+takes the arm64 release archive (SHA-256 pinned like the others, and equal to the value
+SourceForge publishes for its copy).
 The Linux frozen app (`dist/fbadmin`) is 122 MB on disk with the engine, about 18 MB more
 than without it.
 
@@ -211,7 +219,7 @@ before the library loads.
 
 ```bash
 scripts/embedded-test-setup.sh                 # -> build/firebird-embedded (Linux x64, macOS)
-.venv/bin/pip install firebird-driver          # or: pip install -e "backend[native]"
+# firebird-driver is a dependency of fbadmin (Python 3.11+)
 FBADMIN_TEST_EMBEDDED_DIR=$PWD/build/firebird-embedded \
   .venv/bin/python -m pytest -q backend/tests/test_embedded.py
 FBADMIN_EMBEDDED_DIR=$PWD/build/firebird-embedded .venv/bin/python -m fbadmin   # try it in the UI

@@ -57,8 +57,11 @@ docker compose up --build
 
 ### From source
 
-Requirements: Python 3.10+ and Node 18+. You do **not** need a Firebird client library:
-fbadmin uses the pure-Python [`firebirdsql`](https://github.com/nakagami/pyfirebirdsql) driver.
+Requirements: Python 3.10+ and Node 18+. You do **not** need a Firebird client library: the
+pure-Python [`firebirdsql`](https://github.com/nakagami/pyfirebirdsql) driver needs none. If a
+Firebird 4 or newer client library is installed, fbadmin automatically uses the faster native
+[`firebird-driver`](https://pypi.org/project/firebird-driver/) instead (see
+[Drivers](docs/DRIVERS.md)); the desktop app and the Docker image include one.
 
 ```bash
 git clone https://github.com/mariuz/fbadmin && cd fbadmin

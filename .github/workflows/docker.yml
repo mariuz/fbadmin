@@ -12,6 +12,7 @@ on:
     paths:
       - Dockerfile
       - .dockerignore
+      - packaging/embedded/**  # the image's Firebird client library (fetch-embedded.py --client-only)
       - .github/workflows/docker.yml
   workflow_dispatch:
 

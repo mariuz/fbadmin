@@ -7,7 +7,7 @@
 #     .venv/bin/python -m pytest backend/tests/test_embedded.py
 #   FBADMIN_EMBEDDED_DIR=build/firebird-embedded .venv/bin/python -m fbadmin   # "Local database" button
 #
-# Needs the firebird-driver package (pip install 'firebird-admin[native]'). On Linux the
+# Needs the firebird-driver package (a dependency of fbadmin on Python 3.11+). On Linux the
 # engine also needs libtommath.so.1 and the system ICU: libtommath is copied into the file
 # set from the system (apt install libtommath1), or fetched with `apt-get download` when it
 # is not installed. The same directory is what the PyInstaller spec bundles into the

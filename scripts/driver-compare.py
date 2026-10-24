@@ -22,7 +22,7 @@ gives the median and the spread (min-max). Output: JSON (``--json``) and a Markd
         --fbclient build/firebird-embedded/lib/libfbclient.so.2 --json out.json --md out.md
 
 Needs Firebird servers (SYSDBA/masterkey by default, see --help) and the native driver
-(``pip install 'firebird-admin[native]'`` plus a libfbclient; ``scripts/embedded-test-setup.sh``
+(``firebird-driver``, a dependency of fbadmin, plus a libfbclient; ``scripts/embedded-test-setup.sh``
 provides a Firebird 5 one). See docs/DRIVERS.md for results and caveats.
 """
 

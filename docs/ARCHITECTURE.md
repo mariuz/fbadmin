@@ -26,12 +26,14 @@
 
 ## Key decisions
 
-**Pure-Python driver.** [`firebirdsql`](https://github.com/nakagami/pyfirebirdsql) speaks
-the wire protocol directly: Srp authentication, wire encryption, and Services API calls
-for backup, restore, sweep, gstat and the log. There is no `libfbclient` to install,
-which makes Docker images and the pip install trivial. The trade-off is that a few
-client-library-only features (for example the detailed plan) need driver work. These
-are tracked in the roadmap.
+**Two drivers, chosen automatically.** [`firebirdsql`](https://github.com/nakagami/pyfirebirdsql)
+speaks the wire protocol directly: Srp authentication, wire encryption, and Services API
+calls for backup, restore, sweep, gstat and the log, with no `libfbclient` to install, so
+fbadmin works everywhere Python does. When a Firebird 4+ client library is available (the
+desktop app and the Docker image include one) the default setting uses the much faster
+native [`firebird-driver`](https://pypi.org/project/firebird-driver/) instead, through an
+adapter (`native.py`) that gives the rest of the app the same DB-API surface and error
+classes. See [DRIVERS.md](DRIVERS.md).
 
 **Connections.**
 - *Metadata connection*: one per registered database, used by the object explorer,

@@ -1,50 +1,99 @@
-# Database drivers: firebirdsql and native
+# Database drivers: native and firebirdsql
 
-fbadmin talks to Firebird servers through one of two Python drivers. You choose one for the
-whole fbadmin instance.
+fbadmin talks to Firebird servers through one of two Python drivers. By default it picks one
+itself (**Automatic**): the faster native driver when it can be used with a Firebird 4 or newer
+client library, otherwise the pure-Python one. You can also choose one for the whole fbadmin
+instance.
 
-| | **firebirdsql** (default) | **native** |
+| | **native** (used by *Automatic* when possible) | **firebirdsql** (pure Python) |
 |---|---|---|
-| What it is | [`firebirdsql`](https://pypi.org/project/firebirdsql/), a pure-Python implementation of the Firebird wire protocol, plus fbadmin's fixes for Firebird 4+ types (`driver_patches.py`, `fb4types.py`) | [`firebird-driver`](https://pypi.org/project/firebird-driver/), the official Python driver, a ctypes binding over the Firebird client library (`libfbclient.so` / `fbclient.dll` / `libfbclient.dylib`) |
-| Install | Nothing: it is a dependency of fbadmin | `pip install "firebird-admin[native]"` plus a client library, ideally Firebird 4 or newer |
-| Runs on | Anything that runs Python | Platforms with a Firebird client build (Linux x64/arm64, Windows, macOS) |
-| Strengths | No native code; same behaviour everywhere; no library to deploy | Much faster for anything that moves data (see [Benchmarks](#benchmarks)), above all with wire encryption, which `firebirdsql` does in Python; the client Firebird itself ships, so new protocol features arrive with the library |
-| Weaknesses | Slow at bulk data with wire encryption on (the Firebird default) | One more native dependency; a process can load only one libfbclient; a Firebird 3 client cannot decode Firebird 4+ types |
+| What it is | [`firebird-driver`](https://pypi.org/project/firebird-driver/), the official Python driver, a ctypes binding over the Firebird client library (`libfbclient.so` / `fbclient.dll` / `libfbclient.dylib`) | [`firebirdsql`](https://pypi.org/project/firebirdsql/), a pure-Python implementation of the Firebird wire protocol, plus fbadmin's fixes for Firebird 4+ types (`driver_patches.py`, `fb4types.py`) |
+| Install | `firebird-driver` is a dependency of fbadmin (Python 3.11+). The client library is not on PyPI: it comes with the desktop app and the Docker image, or from a Firebird installation / your distribution (see [Which client library](#which-client-library)) | Nothing: it is a dependency of fbadmin |
+| Runs on | Platforms with a Firebird client build (Linux x64/arm64, Windows, macOS) | Anything that runs Python |
+| Strengths | Much faster for anything that moves data (see [Benchmarks](#benchmarks)), above all with wire encryption, which `firebirdsql` does in Python; the client Firebird itself ships, so new protocol features arrive with the library | No native code; same behaviour everywhere; no library to deploy |
+| Weaknesses | One more native dependency; a process can load only one libfbclient; a Firebird 3 client cannot decode Firebird 4+ types | Slow at bulk data with wire encryption on (the Firebird default) |
 
 **Local (embedded) databases** of the desktop app always use the native driver with the
 bundled Firebird 5 engine, whatever is selected here (see [EMBEDDED.md](EMBEDDED.md)). The
 setting on this page is about connections to Firebird **servers**.
 
+## Automatic selection (the default)
+
+With the setting **Automatic** (`auto`, the default when nothing is saved and `FBADMIN_DRIVER`
+is not set), fbadmin uses the **native** driver when all of these hold, and **firebirdsql**
+otherwise:
+
+1. the `firebird-driver` package can be imported (it is a dependency on Python 3.11+; on
+   Python 3.10 it is not installed: "firebird-driver is not installed");
+2. a client library loads ("No Firebird client library found ..." or the load error);
+3. it is a **Firebird 4 or newer** client. A Firebird 3 client would get INT128, DECFLOAT and
+   the time zone types only as legacy types, which the pure driver reads exactly ("The client
+   library is Firebird 3: ...");
+4. that client can load **ICU**, which it needs for time zone names. Without ICU a Firebird
+   client reads `TIMESTAMP '... Europe/Prague'` without its zone and cannot send one at all
+   ("... cannot load ICU ..."). Linux distributions and Firebird's own packages install ICU;
+   minimal containers may not.
+
+The client library is looked for in this order: the embedded engine's file set when present
+(the desktop app, or `FBADMIN_EMBEDDED_DIR`; one process can load only one libfbclient, and
+local databases need that one), then the configured path (`FBADMIN_FBCLIENT` or the setting
+in the panel; if it does not exist, Automatic uses firebirdsql and says so), then the system
+library search path (firebird-driver's default lookup: `libfbclient.so` via `ldconfig`,
+`fbclient.dll` on the `PATH`, the Firebird framework on macOS).
+
+The decision is made once, when it is first needed, and again when the setting changes; the
+log says which driver is in use and why at startup (INFO, logger `fbadmin.drivers`):
+
+```text
+INFO    fbadmin.drivers: Database driver: native (setting auto, default). Firebird 5.0 (LI-V6.3.4.1812) client library: libfbclient.so.2
+```
+
+**Safety net at run time.** If a native connection attempt fails for a reason that is not a
+Firebird error, Automatic makes that connection with firebirdsql instead, logs a warning
+once, and the panel shows "Native driver failed, using firebirdsql: ...". Such failures are:
+the client library or `firebird-driver` cannot be loaded, the library raises an `OSError` or a
+ctypes error, or it reports a problem with its own installation (a plugin, provider, ICU or
+libtomcrypt it cannot load). When the library itself does not load, Automatic stops trying it
+until the setting changes. **Firebird errors are never a reason to fall back**: a wrong
+password, an unknown database, a refused connection or a server-side error are reported as
+they are, whichever driver is in use. An explicitly selected driver never falls back either.
+
 ## Choosing and configuring
 
 **In the UI:** open the user menu (in desktop mode the *Security* button in the top bar) →
-**Database driver…**. In server mode only administrators see it. The panel shows:
+**Database driver…**. In server mode only administrators see it. The panel offers:
 
-- the selected driver and where the choice comes from (environment, saved setting or default);
-- whether `firebird-driver` is installed and which version;
-- which libfbclient is loaded (or would be), its version, and why the native driver cannot be
-  used when it cannot: the package is missing, the library is not found or does not load, or it
-  is older than Firebird 3. Selecting *native* is then disabled, and the API refuses it;
-- the client library path (empty: the embedded engine's library when present, else the
-  system search path).
+- **Automatic (recommended): native when available, otherwise pure Python**;
+- **Native (firebird-driver)**: always the native driver. It is disabled, and the API refuses
+  it, when the native driver cannot be used: the package is missing, the library is not found
+  or does not load, or it is older than Firebird 3;
+- **Pure Python (firebirdsql)**: always the pure-Python driver.
+
+It shows the selected setting and where it comes from (environment, saved setting or
+default), **the driver in use and the reason** (for Automatic: which rule decided), a
+run-time fallback if one happened, whether `firebird-driver` is installed and which version,
+which libfbclient is loaded (or would be), its version, whether it can load ICU, and the
+client library path (empty: the embedded engine's library when present, else the system
+search path).
 
 The choice is saved in `driver.json` in the data directory (`{"driver": "native", "fbclient":
 "/opt/firebird/lib/libfbclient.so"}`). The API is `GET /api/driver` and `PUT /api/driver`
-(`{"driver": "firebirdsql" | "native", "fbclient": "<path>"}`), for administrators only in
-server mode.
+(`{"driver": "auto" | "native" | "firebirdsql", "fbclient": "<path>"}`), for administrators
+only in server mode. `GET` also returns `effective` (`native` or `firebirdsql`), `reason` and
+`fallback`.
 
 **Environment variables win** over the saved setting, and the panel then shows "set by
 environment" and keeps those fields read-only:
 
 ```bash
-FBADMIN_DRIVER=native                                  # or firebirdsql
+FBADMIN_DRIVER=auto                                    # or native, firebirdsql
 FBADMIN_FBCLIENT=/opt/firebird/lib/libfbclient.so      # the client library
 ```
 
 **What happens when you switch:**
 
-- The pooled metadata connections (object explorer, data grid, dashboards) are closed, so new
-  ones use the selected driver. The panel says how many were closed.
+- When the driver in use changes, the pooled metadata connections (object explorer, data
+  grid, dashboards) are closed, so new ones use it. The panel says how many were closed.
 - **Open Query Tool tabs keep their connection, and therefore their driver, until they are
   closed.** Closing them would throw away uncommitted transactions; a session that keeps
   running on the old driver is harmless. New Query Tool tabs use the new driver.
@@ -55,41 +104,56 @@ FBADMIN_FBCLIENT=/opt/firebird/lib/libfbclient.so      # the client library
 
 ### Which client library
 
-Use a **Firebird 4 or 5 client** library; it works with Firebird 3, 4, 5 and 6 servers. A
-Firebird 3 client (for example Debian/Ubuntu's `libfbclient2` 3.0.11) cannot decode INT128,
-DECFLOAT or the time zone types. A query that returns them fails with "Data type unknown". To
-avoid that, fbadmin binds them to legacy types on Firebird 4+ servers when the client is a
-Firebird 3 one (`SET BIND OF INT128 / DECFLOAT / TIME ZONE TO LEGACY`). Values then arrive as
-BIGINT, DOUBLE PRECISION and timestamps without a time zone, and the panel shows a warning.
+Use a **Firebird 4 or 5 client** library; it works with Firebird 3, 4, 5 and 6 servers, and
+Automatic uses the native driver with it. Where to get one:
 
-### Desktop app and Docker
+- **Desktop app and Docker image:** included (Firebird 5.0.4), nothing to install.
+- **A Firebird 4 or 5 server installation** on the same machine (the official installers and
+  tarballs install the client library too).
+- **Linux distributions:** the `libfbclient2` package. It is a **Firebird 4** client in Debian
+  13 "trixie" (4.0.5) and newer, and in Ubuntu 25.04 (4.0.5), 25.10 and 26.04 (4.0.6). Debian
+  12 "bookworm" and Ubuntu 24.04 LTS and older ship a **Firebird 3** client (3.0.11), with
+  which Automatic keeps the pure-Python driver.
+- **Elsewhere:** extract the client from the official release archive, e.g.
+  `python packaging/embedded/fetch-embedded.py --client-only --dest /opt/firebird` (Linux;
+  needs `libtommath1` and ICU from the system) and point `FBADMIN_FBCLIENT` at
+  `/opt/firebird/lib/libfbclient.so.2`.
 
-- **Desktop app:** it bundles the Firebird 5 client with the embedded engine, so the native
-  driver is always available there. Selecting it needs no installation.
-- **Docker image:** it does not contain a client library, so only `firebirdsql` is available.
-  Adding one is cheap only as the distribution's Firebird 3 client. `libfbclient2` 3.0.11 is
-  a 550 kB download and about 1.7 MB installed (measured on Ubuntu 24.04), plus `libtommath1`
-  and `firebird3.0-common`. With a Firebird 3 client the Firebird 4+ types come back as legacy
-  types (see above).
+With **no** client library, or a Firebird 3 one, fbadmin works exactly as before with the
+pure-Python driver.
 
-  A Firebird 5 client means taking `lib/libfbclient.so.2` (3.0 MB), `libtomcrypt`/`libtommath`
-  (0.5 MB), `firebird.msg` and `tzdata/` from the official release tarball of each
-  architecture (amd64, arm64). That is a few MB per image but a per-architecture, checksummed
-  download step in the build, so the image does not do it today. A derived image with the
-  distribution's client looks like this (an example, not built in CI):
+If you select *Native* explicitly with a Firebird 3 client, fbadmin binds the Firebird 4+ types
+to legacy types on Firebird 4+ servers (`SET BIND OF INT128 / DECFLOAT / TIME ZONE TO LEGACY`):
+values arrive as BIGINT, DOUBLE PRECISION and timestamps without a time zone, and the panel
+shows a warning.
 
-  ```dockerfile
-  FROM ghcr.io/mariuz/fbadmin:latest
-  USER root
-  RUN apt-get update && apt-get install -y --no-install-recommends libfbclient2 \
-   && rm -rf /var/lib/apt/lists/* && pip install --no-cache-dir "firebird-driver>=1.10"
-  USER fbadmin
-  ENV FBADMIN_DRIVER=native
-  ```
+**Wire encryption:** the client file sets fbadmin ships (desktop, Docker, `fetch-embedded.py`)
+include Firebird's ChaCha plugin, so the native driver negotiates **ChaCha64** with Firebird 4+
+servers, like a normal Firebird client (checked with
+`RDB$GET_CONTEXT('SYSTEM', 'WIRE_CRYPT_PLUGIN')` against Firebird 4, 5 and the 6 snapshot).
+Before 2.1 the file set had no ChaCha plugin and the native driver used Arc4. Firebird 3
+servers only offer Arc4.
+
+### pip, desktop app and Docker
+
+- **pip (`pip install firebird-admin`):** installs `firebird-driver` on Python 3.11+. If a
+  Firebird 4+ client library is installed (see above), Automatic uses the native driver;
+  otherwise the pure-Python one, with nothing else to do. `pip install
+  "firebird-admin[native]"` still works; the extra is now empty.
+- **Desktop app:** it bundles the Firebird 5 client with the embedded engine, so Automatic
+  uses the native driver for remote servers too, through the same library local databases
+  use (one libfbclient per process).
+- **Docker image:** it contains the Firebird 5.0.4 client for its architecture (amd64 and
+  arm64): `libfbclient`, the ChaCha plugin and libtomcrypt from the pinned, SHA-256-checked
+  official release (`fetch-embedded.py --client-only`, about 4.7 MB), plus Debian's
+  `libtommath1` and ICU (`libicu76`, about 37 MB, needed for time zone names). The library is
+  on the system library path, so Automatic finds it and uses the native driver.
+  `FBADMIN_DRIVER=firebirdsql` selects the pure-Python driver. Compared with 2.0 the image is
+  about 49 MB larger uncompressed (19 MB compressed), most of it ICU.
 
 ## What each feature uses
 
-With **native** selected, every connection to a registered server goes through
+With the **native** driver in use, every connection to a registered server goes through
 `firebird-driver`. `backend/fbadmin/native.py` adapts it to the small DB-API subset fbadmin
 uses. Errors become the same `firebirdsql` exception classes with the same message format.
 Values are made to match (CHAR without trailing blanks, INT128 without a scale as `int`). The
@@ -111,9 +175,9 @@ only exception is the event monitor.
 | Wire compression (per server) | ✅ | ✅ | `WireCompression = true`. The client needs zlib, which Linux systems have |
 | Authentication plugin (per server) | ✅ | ✅ | `AuthClient`. *Srp256* means "Srp256, then Srp", because firebirdsql also falls back to Srp when the server lacks Srp256 (a Firebird 3 default) |
 | Connect timeout | ✅ | ✅ | `ConnectionTimeout = 30` |
-| INT128, DECFLOAT, NUMERIC(38), TIME/TIMESTAMP WITH TIME ZONE | ✅ | ✅ | With a Firebird 4+ client; a Firebird 3 client gets legacy types (see above) |
+| INT128, DECFLOAT, NUMERIC(38), TIME/TIMESTAMP WITH TIME ZONE | ✅ | ✅ | With a Firebird 4+ client that can load ICU; a Firebird 3 client gets legacy types (see above) |
 | **Event monitor** (POST_EVENT listener) | ✅ | firebirdsql | It speaks the auxiliary-port protocol itself (`events/wire.py`) on top of firebirdsql's socket, so `api/events.py` opens its connection with `driver="firebirdsql"` |
-| `fbadmin` command line (backup, restore, sql, ...) | ✅ | ✅ | Follows `FBADMIN_DRIVER` / the saved setting |
+| `fbadmin` command line (backup, restore, sql, ...) | ✅ | ✅ | Follows `FBADMIN_DRIVER` / the saved setting (Automatic by default) |
 | Local (embedded) databases | — | always | The embedded engine runs in-process, which only libfbclient can do |
 
 ## Correctness: the two drivers compared
@@ -219,11 +283,12 @@ scripts/embedded-test-setup.sh       # Firebird 5 client library → build/fireb
 - **ChaCha is the costlier cipher.** On Firebird 4+ firebirdsql negotiates ChaCha64, and the
   gap is largest there. On Firebird 3 both drivers use Arc4, and firebirdsql is "only" 26 to
   160 times slower for BLOBs.
-- **The two drivers did not use the same cipher on Firebird 4+.** The native driver used
-  Arc4 there too, because the embedded file set fbadmin ships has no ChaCha plugin
-  (`plugins/libChaCha`). A full Firebird client installation would negotiate ChaCha, which
-  costs a little more in C. Arc4 is the weaker cipher; adding the ChaCha plugin to the file
-  set is a packaging follow-up.
+- **The two drivers did not use the same cipher on Firebird 4+ in these runs.** The native
+  driver used Arc4 there too, because the embedded file set had no ChaCha plugin at the time.
+  The file sets now include it (see [Which client library](#which-client-library)), so the
+  native driver negotiates ChaCha64 like firebirdsql. In C that costs about the same: writing
+  and reading a 10 MB BLOB on Firebird 5 took 443 / 116 ms with ChaCha64 against 436 / 139 ms
+  with Arc4 (median of 5, same machine, within the run-to-run spread).
 - **Row fetches are 3 to 5 times faster natively.** Both drivers are CPU-bound in Python
   here, the native one in firebird-driver's ctypes value conversion. fbadmin's adapter costs
   little: the "without fbadmin's adapter" rows are within the run-to-run spread on Firebird
@@ -341,14 +406,26 @@ Correctness: 12 of 12 type groups serialize identically.
 ## Tests and CI
 
 - **Locally:** see [DEVELOPMENT.md](DEVELOPMENT.md#native-driver-tests). In short:
-  `FBADMIN_DRIVER=native FBADMIN_FBCLIENT=build/firebird-embedded/lib/libfbclient.so.2
-  python -m pytest -q` runs the whole backend suite through the native driver.
-- **CI:** the `backend-native` job of `.github/workflows/ci.yml` runs the full suite with
-  `FBADMIN_DRIVER=native` against Firebird 3, 4, 5 and the 6 snapshot. Firebird 6 is
+  `FBADMIN_FBCLIENT=build/firebird-embedded/lib/libfbclient.so.2 python -m pytest -q` runs the
+  whole backend suite with the default setting, which then resolves to the native driver;
+  `FBADMIN_DRIVER=firebirdsql` forces the pure-Python one.
+- **CI:** the plain `backend` jobs install `firebird-driver` (a regular dependency) but have no
+  client library, so Automatic resolves to firebirdsql there; `test_driver_auto.py` asserts it
+  (`FBADMIN_TEST_EXPECT_DRIVER=firebirdsql`). The `backend-native` job of
+  `.github/workflows/ci.yml` runs the full suite with `FBADMIN_DRIVER=native` against
+  Firebird 3, 4, 5 and the 6 snapshot, and checks that Automatic resolves to native with that
+  client (`FBADMIN_TEST_EXPECT_DRIVER=native`) and negotiates ChaCha64. Firebird 6 is
   reported but does not fail the build. The client library is the Firebird 5 one from the
   pinned, SHA-256-checked embedded file set (`scripts/embedded-test-setup.sh`); the release
-  archive is cached between runs. The `e2e` job runs the Playwright suite once with each
-  driver. `e2e/tests/driver.spec.ts` covers the settings panel, including an axe audit.
+  archive is cached between runs. The `e2e` job runs the Playwright suite with the default
+  setting (Automatic, which resolves to native with the embedded file set's client) and with
+  `FBADMIN_DRIVER=firebirdsql`. `e2e/tests/driver.spec.ts` covers the settings panel,
+  switching to each driver and back, and an axe audit.
+- **Automatic selection:** `backend/tests/test_driver_auto.py` covers the resolution rules
+  (package missing, no library, Firebird 3 client, Firebird 4+ client, no ICU, environment
+  and saved settings, explicit native refused when unavailable) and the run-time fallback (a
+  client-library failure falls back, a Firebird error such as a wrong password does not), also
+  against a real server with a simulated `OSError` from the client library.
 - **Driver-specific tests:** `backend/tests/test_native_driver.py` covers the setting and its
   API, the environment override, switching at run time (pools closed, open Query Tool
   sessions kept), Query Tool sessions, services, wire options, error classes, 1 and 10 MB

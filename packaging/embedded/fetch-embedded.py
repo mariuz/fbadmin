@@ -2,6 +2,8 @@
 """Download a pinned Firebird release and extract the minimal *embedded* engine file set.
 
     python packaging/embedded/fetch-embedded.py --platform linux-x64 --dest build/firebird-embedded
+    python packaging/embedded/fetch-embedded.py --platform linux-arm64 --client-only --system-libtommath \
+        --dest /opt/firebird          # just the client library, for the Docker image
 
 The result is a directory fbadmin uses as its local-database engine: point
 ``FBADMIN_EMBEDDED_DIR`` at it (development, tests) or let the PyInstaller spec bundle it
@@ -10,8 +12,13 @@ The result is a directory fbadmin uses as its local-database engine: point
 * The release archive is checked against the SHA-256 pinned below before anything is
   extracted (``--archive`` uses a local copy, still checked).
 * Only what the embedded engine needs is copied: the client library, the Engine13 and
-  profiler plugins, character sets (``intl/``), time-zone data, messages, configuration,
-  ICU / runtime libraries where the release ships them, and the licence files.
+  profiler plugins, the ChaCha wire encryption plugin (without it the client negotiates only
+  Arc4 with Firebird 4+ servers), character sets (``intl/``), time-zone data, messages,
+  configuration, ICU / runtime libraries where the release ships them, and the licence files.
+* ``--client-only`` (Linux): just what a *client* needs to reach servers with the native driver:
+  ``libfbclient``, libtomcrypt and the ChaCha plugin, messages, ``plugins.conf`` and the
+  licences (the Docker image uses it). ``--system-libtommath`` leaves libtommath out (install the
+  distribution's ``libtommath1`` instead, e.g. when fetching another architecture's files).
 * Linux: the official tarball does not ship ``libtommath.so.1`` (the installer takes it from
   the distribution); it is copied from the build machine (``--libtommath`` or the usual
   library directories, e.g. ``apt install libtommath1``). ICU comes from the system.
@@ -52,6 +59,8 @@ MIRROR_URL = f"https://downloads.sourceforge.net/project/firebird/v{VERSION}/"
 ARCHIVES = {
     "linux-x64": (f"Firebird-{BUILD}-0-linux-x64.tar.gz",
                   "ab6a15a0258f38b022be496bb5e038c14e8628ce9acd0f9a06288a3baedd917b"),
+    "linux-arm64": (f"Firebird-{BUILD}-0-linux-arm64.tar.gz",
+                    "1a3eb3d46b82e96c784800aeec37287d4c47acec4d8caed6c7897beb4ff6cee0"),
     "windows-x64": (f"Firebird-{BUILD}-0-windows-x64.zip",
                     "01e844fce4d5f53272a76205dbc3a1ba4b782ab8e8eadcd808cdbccd9ce13b72"),
     "macos-arm64": (f"Firebird-{BUILD}-0-macos-arm64.pkg",
@@ -71,21 +80,30 @@ COMMON = {
     "tzdata/windowsZones.res": "tzdata/windowsZones.res",
     "tzdata/zoneinfo64.res": "tzdata/zoneinfo64.res",
 }
+# Linux: real files under their sonames (no symlinks: they do not survive every packager)
+LINUX_CLIENT = {
+    "lib/libfbclient.so.2": "lib/libfbclient.so.5.0.4",
+    "lib/libtomcrypt.so.1": "lib/libtomcrypt.so.1.0.1",  # needed by the ChaCha plugin
+    "plugins/libChaCha.so": "plugins/libChaCha.so",
+    "firebird.msg": "firebird.msg",
+    "plugins.conf": "plugins.conf",  # declares ChaCha64 (first in the default WireCryptPlugin list)
+    "licenses/IDPLicense.txt": "IDPLicense.txt",
+    "licenses/IPLicense.txt": "IPLicense.txt",
+}
+LINUX = {
+    **LINUX_CLIENT,
+    "plugins/libEngine13.so": "plugins/libEngine13.so",
+    "plugins/libDefault_Profiler.so": "plugins/libDefault_Profiler.so",
+    "intl/fbintl": "intl/fbintl",
+}
 FILES = {
-    # Linux: real files under their sonames (no symlinks: they do not survive every packager)
-    "linux-x64": {
-        "lib/libfbclient.so.2": "lib/libfbclient.so.5.0.4",
-        "lib/libtomcrypt.so.1": "lib/libtomcrypt.so.1.0.1",
-        "plugins/libEngine13.so": "plugins/libEngine13.so",
-        "plugins/libDefault_Profiler.so": "plugins/libDefault_Profiler.so",
-        "intl/fbintl": "intl/fbintl",
-        "licenses/IDPLicense.txt": "IDPLicense.txt",
-        "licenses/IPLicense.txt": "IPLicense.txt",
-    },
+    "linux-x64": LINUX,
+    "linux-arm64": LINUX,
     "windows-x64": {
         "fbclient.dll": "fbclient.dll",
         "plugins/engine13.dll": "plugins/engine13.dll",
         "plugins/default_profiler.dll": "plugins/default_profiler.dll",
+        "plugins/chacha.dll": "plugins/chacha.dll",
         "intl/fbintl.dll": "intl/fbintl.dll",
         "icudt63.dll": "icudt63.dll",
         "icudt63l.dat": "icudt63l.dat",
@@ -114,6 +132,7 @@ FILES = {
         "tzdata/ids.dat": "tzdata/ids.dat",
         "plugins/libEngine13.dylib": "plugins/libEngine13.dylib",
         "plugins/libDefault_Profiler.dylib": "plugins/libDefault_Profiler.dylib",
+        "plugins/libChaCha.dylib": "plugins/libChaCha.dylib",
         "intl/libfbintl.dylib": "intl/libfbintl.dylib",
         "licenses/IPLicense.txt": "License.txt",
     },
@@ -121,6 +140,7 @@ FILES = {
 # licences of bundled third-party libraries (vendored next to this script)
 EXTRA_LICENSES = {
     "linux-x64": ["libtommath.txt", "libtomcrypt.txt"],
+    "linux-arm64": ["libtommath.txt", "libtomcrypt.txt"],
     "windows-x64": ["ICU-63.txt", "zlib.txt"],
     "macos": ["ICU-71.txt", "libtommath.txt", "libtomcrypt.txt", "IDPLicense.txt"],
 }
@@ -257,22 +277,26 @@ def read_macos(archive: Path, wanted: set[str]) -> dict[str, bytes]:
 
 
 # --- extraction ------------------------------------------------------------------------
-def find_libtommath(explicit: str | None) -> Path:
-    candidates = [explicit] if explicit else [
-        "/usr/lib/x86_64-linux-gnu/libtommath.so.1", "/usr/lib64/libtommath.so.1", "/usr/lib/libtommath.so.1",
-        "/lib/x86_64-linux-gnu/libtommath.so.1",
-    ]
+def find_libtommath(explicit: str | None, platform: str = "linux-x64") -> Path:
+    if explicit:
+        candidates = [explicit]
+    elif platform == "linux-arm64":  # only the matching architecture's directories
+        candidates = ["/usr/lib/aarch64-linux-gnu/libtommath.so.1", "/lib/aarch64-linux-gnu/libtommath.so.1"]
+    else:
+        candidates = ["/usr/lib/x86_64-linux-gnu/libtommath.so.1", "/usr/lib64/libtommath.so.1",
+                      "/usr/lib/libtommath.so.1", "/lib/x86_64-linux-gnu/libtommath.so.1"]
     for c in candidates:
         if c and Path(c).is_file():
             return Path(c).resolve()
-    raise SystemExit("libtommath.so.1 not found: install it (Debian/Ubuntu: apt install libtommath1, "
-                     "Fedora: dnf install libtommath) or pass --libtommath PATH")
+    raise SystemExit(f"libtommath.so.1 ({platform}) not found: install it (Debian/Ubuntu: apt install libtommath1, "
+                     "Fedora: dnf install libtommath), pass --libtommath PATH, or --system-libtommath to leave it "
+                     "out and install it on the target system")
 
 
 def macos_fixups(dest: Path) -> None:
     """Make the dylibs find @rpath/lib/... without Firebird's executables, then re-sign."""
     for rel in ("lib/libfbclient.dylib", "plugins/libEngine13.dylib", "plugins/libDefault_Profiler.dylib",
-                "intl/libfbintl.dylib", "lib/libtomcrypt.dylib"):
+                "plugins/libChaCha.dylib", "intl/libfbintl.dylib", "lib/libtomcrypt.dylib"):
         f = dest / rel
         if f.is_file():
             subprocess.run(["install_name_tool", "-add_rpath", "@loader_path/..", str(f)], check=False)
@@ -282,10 +306,19 @@ def macos_fixups(dest: Path) -> None:
         subprocess.run(["codesign", "--force", "--sign", "-", str(f)], check=True)
 
 
-def extract(platform: str, archive: Path, dest: Path, *, libtommath: str | None, macos_fix: bool) -> dict:
-    files = FILES["macos" if platform.startswith("macos") else platform] | COMMON
+def extract(platform: str, archive: Path, dest: Path, *, libtommath: str | None, macos_fix: bool,
+            client_only: bool = False, system_libtommath: bool = False) -> dict:
+    if client_only:
+        if not platform.startswith("linux"):
+            raise SystemExit("--client-only is for the Linux platforms")
+        files = dict(LINUX_CLIENT)
+    else:
+        files = FILES["macos" if platform.startswith("macos") else platform] | COMMON
     wanted = set(files.values())
-    reader = {"linux-x64": read_linux, "windows-x64": read_windows}.get(platform, read_macos)
+    if platform.startswith("linux"):
+        reader = read_linux
+    else:
+        reader = read_windows if platform.startswith("windows") else read_macos
     found = reader(archive, wanted)
     missing = sorted(wanted - set(found))
     if missing:
@@ -299,13 +332,17 @@ def extract(platform: str, archive: Path, dest: Path, *, libtommath: str | None,
         if not platform.startswith("windows") and (d_rel.startswith(("lib/", "plugins/")) or d_rel == "intl/fbintl"
                                                   or d_rel.endswith(".dylib")):
             target.chmod(0o755)
-    if platform == "linux-x64":
-        src = find_libtommath(libtommath)
+    if platform.startswith("linux") and not system_libtommath:
+        src = find_libtommath(libtommath, platform)
         shutil.copyfile(src, dest / "lib" / "libtommath.so.1")
         (dest / "lib" / "libtommath.so.1").chmod(0o755)
         log(f"libtommath.so.1 from {src}")
+    elif platform.startswith("linux"):
+        log("libtommath.so.1 left out: install the system package (Debian/Ubuntu: libtommath1)")
     licdir = dest / "licenses"
     for name in EXTRA_LICENSES["macos" if platform.startswith("macos") else platform]:
+        if name == "libtommath.txt" and system_libtommath:
+            continue
         shutil.copyfile(HERE / "licenses" / name, licdir / name)
     shutil.copyfile(HERE / "NOTICE.txt", licdir / "NOTICE.txt")
     if platform.startswith("macos") and macos_fix:
@@ -314,7 +351,8 @@ def extract(platform: str, archive: Path, dest: Path, *, libtommath: str | None,
         else:
             log("WARNING: not on macOS - rpaths not added, the dylibs will not load (see --help)")
     size = sum(f.stat().st_size for f in dest.rglob("*") if f.is_file())
-    info = {"version": VERSION, "build": BUILD, "platform": platform, "archive": archive.name,
+    info = {"version": VERSION, "build": BUILD, "platform": platform, "kind": "client" if client_only else "embedded",
+            "archive": archive.name,
             "sha256": sha256(archive), "size": size,
             "files": sorted(str(f.relative_to(dest)).replace(os.sep, "/") for f in dest.rglob("*") if f.is_file())}
     (dest / "fbadmin-embedded.json").write_text(json.dumps(info, indent=2) + "\n", "utf-8")
@@ -330,7 +368,7 @@ def host_platform() -> str:
         return "windows-x64"
     if sys.platform == "darwin":
         return "macos-arm64" if machine in ("arm64", "aarch64") else "macos-x64"
-    return "linux-x64"
+    return "linux-arm64" if machine in ("arm64", "aarch64") else "linux-x64"
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -342,6 +380,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--archive", help="use this local release archive instead of downloading it")
     ap.add_argument("--libtommath", help="Linux: path of libtommath.so.1 to bundle")
     ap.add_argument("--no-macos-fixups", action="store_true", help="macOS: skip install_name_tool/codesign")
+    ap.add_argument("--client-only", action="store_true",
+                    help="Linux: only the client library and what it needs (no engine), e.g. for the Docker image")
+    ap.add_argument("--system-libtommath", action="store_true",
+                    help="Linux: do not bundle libtommath.so.1 (install the distribution package instead)")
     args = ap.parse_args(argv)
     name, expected = ARCHIVES[args.platform]
     if args.archive:
@@ -352,7 +394,8 @@ def main(argv: list[str] | None = None) -> int:
     else:
         archive = download(name, expected, Path(args.cache))
     extract(args.platform, archive, Path(args.dest), libtommath=args.libtommath,
-            macos_fix=not args.no_macos_fixups)
+            macos_fix=not args.no_macos_fixups, client_only=args.client_only,
+            system_libtommath=args.system_libtommath)
     return 0
 
 

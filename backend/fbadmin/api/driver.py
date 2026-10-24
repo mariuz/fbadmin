@@ -1,7 +1,9 @@
-"""Server-wide "Database driver" setting: pure-Python ``firebirdsql`` or native ``firebird-driver``.
+"""Server-wide "Database driver" setting: ``auto`` (default), native ``firebird-driver`` or
+pure-Python ``firebirdsql``.
 
 ``GET /api/driver`` reports the selection, where it comes from (environment, saved setting or
-default) and whether the native driver can be used (package, client library and its version).
+default), the driver actually used and why (``effective``, ``reason``, ``fallback``) and whether
+the native driver can be used (package, client library and its version).
 ``PUT /api/driver`` saves a new selection. Both are for administrators only in server mode (in
 desktop mode the local user is the administrator). See fbadmin/drivers.py and docs/DRIVERS.md.
 """
@@ -19,7 +21,7 @@ router = APIRouter(prefix="/api/driver", tags=["driver"])
 
 
 class DriverIn(BaseModel):
-    driver: str | None = None  # "firebirdsql" or "native"; None keeps the current one
+    driver: str | None = None  # "auto", "native" or "firebirdsql"; None keeps the current one
     fbclient: str | None = None  # client library path; "" clears it; None keeps it
 
 
@@ -35,6 +37,7 @@ def put_driver(body: DriverIn):
     driver; open Query Tool sessions keep their connection (and driver) until they are closed."""
     require_admin()
     before_driver = drivers.selected()[0]
+    before_effective = drivers.effective()[0]
     before = dict(drivers.stored())
     if body.driver is not None:
         new = drivers.normalize(body.driver)
@@ -52,6 +55,6 @@ def put_driver(body: DriverIn):
             drivers.restore(before)
             raise ValueError(f"The native driver cannot be used: {nat['reason']}")
     closed = 0
-    if drivers.selected()[0] != before_driver:
+    if drivers.effective()[0] != before_effective:
         closed = get_state().manager.close_pools()
     return {**drivers.status(), "closed_connections": closed}
