@@ -4,6 +4,10 @@ Draft bug report for [nakagami/pyfirebirdsql](https://github.com/nakagami/pyfire
 with firebirdsql 1.4.7 against Firebird 4.0.7, 5.0.4 and a 6.0 snapshot. fbadmin works around
 all of it in `backend/fbadmin/driver_patches.py` / `backend/fbadmin/fb4types.py`. Not filed yet.
 
+Status with firebirdsql 1.5.0 (checked 2026-10-25 against Firebird 5.0.4, without fbadmin's patches):
+#1 (INT128 decoding) is fixed; #2 (offset time zones), #4 (DECFLOAT) and #5 (INT128 parameters)
+still return the wrong values shown below.
+
 ## Summary
 
 | # | Where | Problem |

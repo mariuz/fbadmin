@@ -279,32 +279,83 @@ scripts/embedded-test-setup.sh       # Firebird 5 client library → build/fireb
 
 - **Wire encryption dominates for firebirdsql.** Firebird encrypts the wire by default
   (`WireCrypt = Required` in the Docker images used here), and firebirdsql encrypts and
-  decrypts in pure Python. Profiling a 1 MB BLOB read and write showed nearly all client time
-  in `firebirdsql/chacha.py`. The firebirdsql CPU column is almost equal to its wall time in
-  the bulk tests, so the client CPU is the bottleneck, not the server or the loopback network.
-  That explains the extremes for anything that moves bytes: BLOBs are 25 to 380 times faster
-  with the native driver, and backup streaming 13 to 52 times.
+  decrypts in pure Python. Profiling firebirdsql 1.5.0 reading a 1 MB BLOB and 20,000 rows on
+  Firebird 5 put about 95% of the client time in `firebirdsql/chacha.py`, nearly all of it
+  computing the ChaCha20 key stream (the quarter rounds), not XOR-ing it with the data. The
+  firebirdsql CPU column is almost equal to its wall time in the bulk tests, so the client CPU
+  is the bottleneck, not the server or the loopback network. That explains the extremes for
+  anything that moves bytes: BLOBs are 36 to 390 times faster with the native driver, and
+  backup streaming 12 to 49 times.
 - **ChaCha is the costlier cipher.** On Firebird 4+ firebirdsql negotiates ChaCha64, and the
-  gap is largest there. On Firebird 3 both drivers use Arc4, and firebirdsql is "only" 26 to
-  160 times slower for BLOBs.
+  gap is largest there. On Firebird 3 both drivers use Arc4, and firebirdsql is "only" 36 to
+  140 times slower for BLOBs.
 - **The two drivers did not use the same cipher on Firebird 4+ in these runs.** The native
-  driver used Arc4 there too, because the embedded file set had no ChaCha plugin at the time.
-  The file sets now include it (see [Which client library](#which-client-library)), so the
-  native driver negotiates ChaCha64 like firebirdsql. In C that costs about the same: writing
-  and reading a 10 MB BLOB on Firebird 5 took 443 / 116 ms with ChaCha64 against 436 / 139 ms
-  with Arc4 (median of 5, same machine, within the run-to-run spread).
-- **Row fetches are 3 to 5 times faster natively.** Both drivers are CPU-bound in Python
-  here, the native one in firebird-driver's ctypes value conversion. fbadmin's adapter costs
-  little: the "without fbadmin's adapter" rows are within the run-to-run spread on Firebird
-  4 to 6 and about 12% faster on Firebird 3.
-- **Small round trips are 6 to 14 times faster natively.** About 0.2 to 0.3 ms instead of 1.4
-  to 3.3 ms per query.
-- **Connects cost the same** (20 to 25 ms, 50 ms on the Firebird 6 snapshot), dominated by
+  driver used Arc4 there too, because the client library used for the runs has no ChaCha
+  plugin. The file sets fbadmin ships include it (see [Which client library](#which-client-library)),
+  so there the native driver negotiates ChaCha64 like firebirdsql. In C that costs about the
+  same: writing and reading a 10 MB BLOB on Firebird 5 took 443 / 116 ms with ChaCha64 against
+  436 / 139 ms with Arc4 (median of 5, same machine, within the run-to-run spread).
+- **Row fetches are 2.3 to 4 times faster natively** (3 to 5 times with firebirdsql 1.4).
+  Both drivers are CPU-bound in Python here, the native one in firebird-driver's ctypes value
+  conversion. fbadmin's adapter costs little: the "without fbadmin's adapter" rows are 2 to 8%
+  faster.
+- **Small round trips are 7 to 13 times faster natively.** About 0.23 to 0.31 ms instead of
+  1.7 to 3.2 ms per query.
+- **Connects cost the same** (20 to 32 ms, 52 ms on the Firebird 6 snapshot), dominated by
   the server's authentication (SRP).
-- **Parameterized inserts gain least** (1 to 2 times). Each execute is a server round trip
-  either way; firebird-driver's input conversion is not cheap.
-- **Metadata load is 1.6 to 3.3 times faster natively.** It is many small queries, so it
+- **Parameterized inserts gain least** (the same to 2 times). Each execute is a server round
+  trip either way; firebird-driver's input conversion is not cheap.
+- **Metadata load is 1.3 to 4.5 times faster natively.** It is many small queries, so it
   sits between round trips and fetches.
+
+### firebirdsql 1.5.0 compared with 1.4.7
+
+[firebirdsql 1.5.0](https://pypi.org/project/firebirdsql/1.5.0/) brought performance work
+([pyfirebirdsql#143](https://github.com/nakagami/pyfirebirdsql/pull/143)): rows are parsed from
+a read-ahead buffer without copying, the ChaCha20 XOR works in place, and `executemany` uses
+the Firebird 4+ batch API (fbadmin does not call `executemany`). The benchmark was run again
+with 1.5.0 the day after the 1.4.7 run, on the same machine and servers. Time saved by 1.5.0
+(positive = faster; bold = more than the ±15% run-to-run spread):
+
+| Test | Firebird 3 | Firebird 4 | Firebird 5 | Firebird 6 |
+|---|---:|---:|---:|---:|
+| connect + attach + detach | +1% | −7% | +9% | −2% |
+| round trip ×1000 | **−22%** | −9% | **−19%** | +5% |
+| fetch 10,000 rows | **+19%** | +5% | +9% | +11% |
+| fetch 100,000 rows | **+17%** | +8% | +14% | +5% |
+| insert 5,000 rows (params) | +14% | −12% | +14% | +6% |
+| BLOB write 1 MB | **−18%** | −1% | +9% | −1% |
+| BLOB read 1 MB | −1% | −12% | +6% | +1% |
+| BLOB write 10 MB | **−15%** | −1% | +5% | +7% |
+| BLOB read 10 MB | +3% | −5% | −7% | +1% |
+| metadata load (352 objects) | +14% | −1% | −7% | +5% |
+| backup stream to local file | −5% | **+21%** | +2% | **+20%** |
+
+- **Row fetches are 5 to 19% faster**, the clearest gain, and also the one a back-to-back A/B
+  run of both versions (plain driver, no fbadmin code) confirmed: 15 to 20% on Firebird 5.
+- **BLOBs, round trips and metadata did not change** beyond the noise: the A/B run showed no
+  consistent difference, so the larger swings above (round trips on Firebird 3 and 5, BLOB
+  writes on Firebird 3) are run-to-run variation. With encryption on, BLOB and backup speed
+  is set by the Python ChaCha20/Arc4 key stream, which 1.5.0 did not change.
+- **Backup streaming was about 20% faster** on Firebird 4 and 6, not on 3 and 5.
+- The gap to the native driver is therefore about the same as with 1.4.7, a little smaller
+  for row fetches.
+
+fbadmin works with both. 1.5.0 needed three adjustments in fbadmin, all guarded so 1.4.x
+keeps working:
+
+- `driver_patches.py`: the INT128 / time zone parameter patch recognises 1.5.0's new null
+  check (array support) in `params_to_blr`.
+- `driver_patches.py`: 1.5.0 asserts the wrong bytes when the description of a statement's
+  parameters continues in a second info request (`assert buf2[:2] == bytes([0x08, 0x07])`,
+  where the server sends `isc_info_sql_bind, isc_info_sql_describe_vars`, i.e. `[5, 7]`).
+  Any statement with about 19 or more parameters failed with `AssertionError`, for example
+  "Copy data" into a wide table. fbadmin corrects the assert until the driver does.
+- `security/wirecompat.py`: fbadmin's replacement of the driver's packet reader now reads
+  1.5.0's read-ahead buffer first (otherwise an error after a fetch, such as a cancelled
+  query, blocked), and the new fetch loop gets the same guard against waiting in `select()`
+  while decompressed bytes are already buffered (otherwise wire compression with a
+  connection timeout stalled).
 
 ### Caveats
 
@@ -317,28 +368,29 @@ scripts/embedded-test-setup.sh       # Firebird 5 client library → build/fireb
   on the server and encryption off in the registration, firebirdsql's bulk numbers would
   improve a lot. This was not measured: the test servers require encryption.
 - **The Firebird 6 numbers are from a pre-release snapshot.**
-- **The numbers are a single run of the script** on 2026-10-24, not a statistical study.
+- **The numbers are single runs of the script** (1.4.7 on 2026-10-24, 1.5.0 on 2026-10-25), not a
+  statistical study.
 
 ### Results
 
-Environment: Python 3.13.16, Linux-6.18.44-fc-v153-x86_64-with-glibc2.39, 4 CPUs; firebirdsql 1.4.7; firebird-driver 2.0.3 with libfbclient Firebird 5.0 (LI-V6.3.4.1812). Median of 5 runs after 1 warm-up (min–max in brackets); times in ms, lower is better. *ratio* = firebirdsql time / native time.
+Environment: Python 3.13.16, Linux-6.18.44-fc-v153-x86_64-with-glibc2.39, 4 CPUs; firebirdsql 1.5.0; firebird-driver 2.0.3 with libfbclient Firebird 5.0 (LI-V6.3.4.1812). Median of 5 runs after 1 warm-up (min–max in brackets); times in ms, lower is better. *ratio* = firebirdsql time / native time.
 
 #### Firebird 3.0.14 (port 3053)
 
 | Test | firebirdsql | native | ratio | firebirdsql CPU | native CPU |
 |---|---:|---:|---:|---:|---:|
-| connect + attach + detach | 25.3 (22.2–37.0) | 22.5 (21.4–23.8) | 1.12× | 4.6 | 4.4 |
-| round trip ×1000 | 1,424 (1,363–1,483) | 222 (185–263) | 6.43× | 635 | 88.5 |
-| fetch 10,000 rows | 971 (904–1,025) | 265 (249–298) | 3.67× | 935 | 259 |
-| fetch 100,000 rows | 9,304 (9,107–9,407) | 2,860 (2,700–3,124) | 3.25× | 8,965 | 2,824 |
-| fetch 100,000 rows, firebird-driver without fbadmin's adapter | | 2,515 (2,452–2,628) | | | 2,484 |
-| insert 5,000 rows (params) | 3,956 (3,811–4,318) | 3,865 (3,717–4,219) | 1.02× | 1,707 | 2,071 |
-| BLOB write 1 MB | 676 (652–717) | 25.9 (25.4–35.6) | 26.15× | 634 | 7.9 |
-| BLOB read 1 MB | 905 (841–953) | 12.0 (10.8–14.3) | 75.21× | 562 | 6.1 |
-| BLOB write 10 MB | 7,152 (7,064–7,385) | 210 (196–247) | 34.05× | 6,593 | 67.1 |
-| BLOB read 10 MB | 14,578 (14,432–15,419) | 91.2 (88.7–96.1) | 159.82× | 10,488 | 52.8 |
-| metadata load (352 objects) | 3,925 (3,836–4,053) | 2,445 (2,380–2,522) | 1.61× | 1,742 | 1,123 |
-| backup stream to local file | 9,189 (8,684–9,282) | 703 (665–753) | 13.08× | 8,360 | 84.9 |
+| connect + attach + detach | 25.0 (22.4–25.9) | 23.3 (21.4–29.1) | 1.07× | 5.0 | 4.7 |
+| round trip ×1000 | 1,738 (1,620–1,816) | 244 (217–287) | 7.12× | 850 | 102 |
+| fetch 10,000 rows | 786 (635–905) | 312 (292–329) | 2.52× | 763 | 309 |
+| fetch 100,000 rows | 7,711 (7,437–8,302) | 3,355 (3,321–3,612) | 2.30× | 7,463 | 3,329 |
+| fetch 100,000 rows, firebird-driver without fbadmin's adapter | | 3,243 (3,088–3,323) | | | 3,211 |
+| insert 5,000 rows (params) | 3,387 (3,244–3,892) | 4,007 (3,680–4,500) | 0.85× | 1,714 | 2,409 |
+| BLOB write 1 MB | 798 (762–952) | 22.2 (20.7–25.9) | 35.94× | 725 | 7.0 |
+| BLOB read 1 MB | 917 (860–987) | 13.0 (11.8–14.8) | 70.80× | 654 | 7.2 |
+| BLOB write 10 MB | 8,249 (8,078–8,401) | 188 (170–231) | 43.88× | 7,719 | 60.7 |
+| BLOB read 10 MB | 14,083 (14,047–14,370) | 99.2 (97.4–110) | 141.91× | 10,926 | 60.3 |
+| metadata load (352 objects) | 3,367 (3,257–3,598) | 2,615 (2,463–2,722) | 1.29× | 1,766 | 1,291 |
+| backup stream to local file | 9,640 (9,147–9,767) | 782 (757–870) | 12.33× | 8,816 | 78.6 |
 
 Backup size 9.2 MB. Wire: firebirdsql: encrypted=TRUE, compressed=FALSE; native: encrypted=TRUE, compressed=FALSE.
 
@@ -348,18 +400,18 @@ Correctness: 8 of 8 type groups serialize identically.
 
 | Test | firebirdsql | native | ratio | firebirdsql CPU | native CPU |
 |---|---:|---:|---:|---:|---:|
-| connect + attach + detach | 22.2 (20.2–35.4) | 24.7 (21.4–30.1) | 0.90× | 4.5 | 4.4 |
-| round trip ×1000 | 2,929 (2,605–3,062) | 298 (270–520) | 9.83× | 1,603 | 114 |
-| fetch 10,000 rows | 3,863 (3,614–3,949) | 713 (692–962) | 5.41× | 3,765 | 698 |
-| fetch 100,000 rows | 38,063 (36,345–39,475) | 7,585 (7,353–8,019) | 5.02× | 37,257 | 7,467 |
-| fetch 100,000 rows, firebird-driver without fbadmin's adapter | | 8,036 (7,645–8,146) | | | 7,217 |
-| insert 5,000 rows (params) | 6,542 (6,499–6,953) | 4,148 (3,796–4,315) | 1.58× | 3,704 | 2,123 |
-| BLOB write 1 MB | 2,274 (2,192–2,327) | 29.2 (27.0–30.0) | 77.92× | 2,198 | 9.1 |
-| BLOB read 1 MB | 2,698 (2,577–3,010) | 16.8 (14.1–17.9) | 160.73× | 2,243 | 8.3 |
-| BLOB write 10 MB | 22,835 (22,716–23,407) | 215 (185–239) | 106.28× | 22,121 | 66.4 |
-| BLOB read 10 MB | 34,498 (33,390–35,133) | 93.6 (85.3–103) | 368.67× | 28,930 | 58.2 |
-| metadata load (352 objects) | 7,863 (7,398–8,495) | 2,618 (2,475–2,687) | 3.00× | 5,023 | 1,205 |
-| backup stream to local file | 36,898 (36,545–37,094) | 957 (919–1,006) | 38.56× | 35,471 | 112 |
+| connect + attach + detach | 23.8 (23.1–29.5) | 31.6 (28.1–40.5) | 0.75× | 5.7 | 5.6 |
+| round trip ×1000 | 3,208 (2,750–3,339) | 308 (262–340) | 10.40× | 2,003 | 116 |
+| fetch 10,000 rows | 3,667 (3,283–3,715) | 1,163 (961–1,288) | 3.15× | 3,605 | 1,150 |
+| fetch 100,000 rows | 35,153 (34,061–35,559) | 9,556 (9,190–9,934) | 3.68× | 34,622 | 9,471 |
+| fetch 100,000 rows, firebird-driver without fbadmin's adapter | | 8,802 (8,389–9,263) | | | 8,535 |
+| insert 5,000 rows (params) | 7,330 (6,809–7,531) | 4,049 (3,766–4,269) | 1.81× | 4,722 | 2,389 |
+| BLOB write 1 MB | 2,295 (2,225–2,496) | 25.3 (23.3–26.1) | 90.58× | 2,217 | 7.5 |
+| BLOB read 1 MB | 3,022 (2,881–3,230) | 12.3 (11.8–13.9) | 246.21× | 2,630 | 6.2 |
+| BLOB write 10 MB | 23,003 (22,459–23,071) | 190 (185–254) | 120.85× | 22,292 | 63.7 |
+| BLOB read 10 MB | 36,342 (36,052–37,683) | 106 (98.3–108) | 342.37× | 31,921 | 64.7 |
+| metadata load (352 objects) | 7,948 (7,648–8,075) | 2,383 (2,208–2,607) | 3.34× | 5,870 | 1,190 |
+| backup stream to local file | 29,028 (28,767–30,487) | 997 (970–1,069) | 29.11× | 27,654 | 105 |
 
 Backup size 13.2 MB. Wire: firebirdsql: encrypted=TRUE (ChaCha64), compressed=FALSE; native: encrypted=TRUE (Arc4), compressed=FALSE.
 
@@ -369,18 +421,18 @@ Correctness: 12 of 12 type groups serialize identically.
 
 | Test | firebirdsql | native | ratio | firebirdsql CPU | native CPU |
 |---|---:|---:|---:|---:|---:|
-| connect + attach + detach | 22.0 (18.1–31.7) | 25.4 (22.0–36.4) | 0.87× | 4.6 | 4.6 |
-| round trip ×1000 | 2,451 (2,338–2,551) | 317 (256–365) | 7.72× | 1,432 | 115 |
-| fetch 10,000 rows | 3,685 (3,479–4,448) | 859 (770–1,117) | 4.29× | 3,614 | 826 |
-| fetch 100,000 rows | 40,368 (37,625–41,961) | 9,270 (8,758–11,243) | 4.35× | 39,566 | 9,086 |
-| fetch 100,000 rows, firebird-driver without fbadmin's adapter | | 9,452 (9,046–9,463) | | | 9,001 |
-| insert 5,000 rows (params) | 7,551 (7,335–8,065) | 4,949 (4,779–5,529) | 1.53× | 4,059 | 2,546 |
-| BLOB write 1 MB | 2,463 (2,398–2,621) | 30.5 (26.4–31.5) | 80.84× | 2,391 | 8.9 |
-| BLOB read 1 MB | 3,042 (2,845–3,286) | 13.9 (13.1–14.4) | 219.15× | 2,490 | 7.8 |
-| BLOB write 10 MB | 24,580 (23,885–24,735) | 268 (245–334) | 91.88× | 23,918 | 77.9 |
-| BLOB read 10 MB | 36,634 (36,555–37,248) | 124 (104–144) | 296.26× | 30,637 | 65.3 |
-| metadata load (352 objects) | 8,306 (8,290–8,420) | 2,505 (2,349–2,702) | 3.32× | 5,604 | 1,247 |
-| backup stream to local file | 39,478 (37,606–40,281) | 756 (724–782) | 52.21× | 38,120 | 123 |
+| connect + attach + detach | 20.1 (18.5–21.4) | 21.4 (18.9–24.2) | 0.94× | 4.7 | 4.0 |
+| round trip ×1000 | 2,917 (2,491–3,035) | 233 (220–371) | 12.52× | 1,919 | 94.4 |
+| fetch 10,000 rows | 3,352 (3,248–3,426) | 995 (933–1,349) | 3.37× | 3,292 | 974 |
+| fetch 100,000 rows | 34,691 (34,083–34,831) | 9,422 (9,366–9,498) | 3.68× | 34,130 | 9,260 |
+| fetch 100,000 rows, firebird-driver without fbadmin's adapter | | 9,224 (8,824–9,473) | | | 8,953 |
+| insert 5,000 rows (params) | 6,528 (6,351–6,767) | 3,803 (3,521–4,058) | 1.72× | 4,215 | 2,243 |
+| BLOB write 1 MB | 2,252 (2,085–2,360) | 22.7 (20.1–31.1) | 99.23× | 2,194 | 7.1 |
+| BLOB read 1 MB | 2,872 (2,796–3,013) | 12.4 (10.8–13.4) | 232.11× | 2,480 | 5.4 |
+| BLOB write 10 MB | 23,232 (23,141–25,345) | 188 (180–223) | 123.71× | 22,529 | 61.8 |
+| BLOB read 10 MB | 39,124 (38,679–39,323) | 99.4 (95.1–110) | 393.45× | 34,056 | 61.0 |
+| metadata load (352 objects) | 8,861 (8,718–9,045) | 1,969 (1,887–2,059) | 4.50× | 6,650 | 1,170 |
+| backup stream to local file | 38,857 (31,852–41,786) | 802 (786–837) | 48.47× | 37,304 | 115 |
 
 Backup size 13.1 MB. Wire: firebirdsql: encrypted=TRUE (ChaCha64), compressed=FALSE; native: encrypted=TRUE (Arc4), compressed=FALSE.
 
@@ -390,18 +442,18 @@ Correctness: 12 of 12 type groups serialize identically.
 
 | Test | firebirdsql | native | ratio | firebirdsql CPU | native CPU |
 |---|---:|---:|---:|---:|---:|
-| connect + attach + detach | 51.2 (46.3–69.5) | 49.8 (44.5–56.4) | 1.03× | 5.4 | 4.2 |
-| round trip ×1000 | 3,303 (3,169–3,398) | 231 (226–276) | 14.27× | 1,834 | 91.2 |
-| fetch 10,000 rows | 4,009 (3,936–4,137) | 757 (741–792) | 5.30× | 3,955 | 742 |
-| fetch 100,000 rows | 40,154 (40,077–41,287) | 7,568 (7,438–7,887) | 5.31× | 39,509 | 7,472 |
-| fetch 100,000 rows, firebird-driver without fbadmin's adapter | | 7,804 (7,571–7,831) | | | 7,511 |
-| insert 5,000 rows (params) | 7,919 (7,768–8,372) | 4,073 (3,898–4,146) | 1.94× | 4,340 | 2,101 |
-| BLOB write 1 MB | 2,457 (2,315–2,564) | 22.2 (20.6–26.5) | 110.63× | 2,381 | 7.2 |
-| BLOB read 1 MB | 3,040 (2,840–3,185) | 9.4 (8.9–9.7) | 323.77× | 2,465 | 5.2 |
-| BLOB write 10 MB | 24,470 (23,598–25,595) | 222 (213–317) | 110.17× | 23,609 | 64.7 |
-| BLOB read 10 MB | 35,889 (35,463–36,176) | 94.8 (83.5–108) | 378.73× | 29,775 | 56.7 |
-| metadata load (352 objects) | 8,474 (8,439–8,703) | 2,979 (2,803–3,029) | 2.84× | 5,300 | 1,255 |
-| backup stream to local file | 36,829 (35,960–36,926) | 798 (762–821) | 46.16× | 35,500 | 117 |
+| connect + attach + detach | 52.1 (46.8–65.3) | 52.2 (45.1–66.8) | 1.00× | 5.0 | 4.1 |
+| round trip ×1000 | 3,142 (2,934–3,279) | 241 (234–269) | 13.05× | 2,026 | 98.7 |
+| fetch 10,000 rows | 3,583 (3,288–3,959) | 970 (854–1,027) | 3.69× | 3,534 | 952 |
+| fetch 100,000 rows | 38,220 (38,157–39,719) | 9,431 (9,274–10,079) | 4.05× | 37,628 | 9,352 |
+| fetch 100,000 rows, firebird-driver without fbadmin's adapter | | 8,908 (8,857–9,789) | | | 8,818 |
+| insert 5,000 rows (params) | 7,435 (7,399–7,600) | 3,642 (3,443–4,212) | 2.04× | 4,671 | 2,239 |
+| BLOB write 1 MB | 2,490 (2,297–2,605) | 24.1 (21.0–25.5) | 103.23× | 2,398 | 7.5 |
+| BLOB read 1 MB | 2,999 (2,911–3,101) | 11.4 (9.9–13.8) | 263.18× | 2,598 | 6.3 |
+| BLOB write 10 MB | 22,846 (22,420–24,857) | 185 (155–283) | 123.26× | 22,101 | 61.0 |
+| BLOB read 10 MB | 35,699 (34,411–36,388) | 100 (92.8–102) | 356.04× | 31,501 | 62.8 |
+| metadata load (352 objects) | 8,069 (7,794–8,542) | 2,526 (2,439–2,632) | 3.19× | 5,648 | 1,168 |
+| backup stream to local file | 29,603 (27,847–31,560) | 717 (672–742) | 41.27× | 28,465 | 98.8 |
 
 Backup size 13.1 MB. Wire: firebirdsql: encrypted=TRUE (ChaCha64), compressed=FALSE; native: encrypted=TRUE (Arc4), compressed=FALSE.
 
