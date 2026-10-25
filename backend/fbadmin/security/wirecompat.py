@@ -16,18 +16,24 @@ waiting, decompressed, in the stream's buffer - ``select()`` then times out
 while buffered data is available. firebirdsql 1.5 reads rows ahead into the
 connection's ``_recv_buf``; the patched ``_recv_channel`` reads that first, as the
 driver's own does (otherwise an error after a fetch, such as a cancelled query,
-blocks forever).
+blocks forever). Its read-ahead fetch loop has the ``select()`` problem too and
+gets the same guard (``_patch_fetch_select``).
 
 Both patches are idempotent and only change behaviour for compressed connections.
 """
 
 from __future__ import annotations
 
+import inspect
+import logging
 import select
+import textwrap
 
 from firebirdsql import fbcore as _fbcore
 from firebirdsql import stream as _stream
 from firebirdsql.err import OperationalError
+
+log = logging.getLogger(__name__)
 
 _PATCHED = "_fbadmin_deferred_compression"
 
@@ -78,3 +84,29 @@ def apply() -> None:
         return bytes(r[:nbytes])
 
     _fbcore.ConnectionResponseMixin._recv_channel = _recv_channel
+    _patch_fetch_select()
+
+
+_FETCH_SELECT = "if self.timeout is not None and select.select([self.sock._sock], [], [], self.timeout)[0] == []:"
+
+
+def _patch_fetch_select() -> None:
+    """firebirdsql 1.5: skip ``select()`` in ``_op_fetch_response`` while decompressed bytes are buffered."""
+    try:
+        fn = _fbcore.ConnectionResponseMixin._op_fetch_response
+        if getattr(fn, "_fbadmin", False):
+            return
+        src = textwrap.dedent(inspect.getsource(fn))
+        if _FETCH_SELECT not in src:
+            return  # older driver (no read-ahead) or fixed upstream
+        src = src.replace(_FETCH_SELECT, (
+            "if (self.timeout is not None"
+            " and not (getattr(self.sock, '_decompressor', None) is not None and self.sock._recv_buf)"
+            " and select.select([self.sock._sock], [], [], self.timeout)[0] == []):"))
+        ns: dict = {}
+        exec(compile(src, "<fbadmin wirecompat patch>", "exec"), _fbcore.__dict__, ns)
+        patched = ns["_op_fetch_response"]
+        patched._fbadmin = True
+        _fbcore.ConnectionResponseMixin._op_fetch_response = patched
+    except Exception:  # noqa: BLE001
+        log.exception("could not patch firebirdsql _op_fetch_response for wire compression")
