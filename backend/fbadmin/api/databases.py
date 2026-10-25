@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 
 from fastapi import APIRouter, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from .. import schemahistory as schema_history
 from ..config import settings
@@ -88,20 +88,33 @@ def drop_object(server_id: str, db_id: str, otype: str, name: str):
     return {"sql": sql}
 
 
+COMPLETION_COLUMNS = 20_000  # above this many columns, completion sends table names only (columns on demand)
+_REL_COND = ("WHERE COALESCE(r.RDB$SYSTEM_FLAG, 0) = 0 OR r.RDB$RELATION_NAME STARTING WITH 'MON$' "
+             "OR r.RDB$RELATION_NAME STARTING WITH 'RDB$' OR r.RDB$RELATION_NAME STARTING WITH 'SEC$'")
+
+
 @router.get("/completion")
 def completion(server_id: str, db_id: str):
-    """Names for editor autocompletion: relations with columns, procedures, functions, packages."""
+    """Names for editor autocompletion: relations with columns, procedures, functions, packages.
+
+    With very large schemas (more than ``COMPLETION_COLUMNS`` columns) only the relation names are sent
+    (``lazy_columns: true``); the editor then asks ``/completion/columns`` for the tables a query uses."""
     with get_state().manager.meta(server_id, db_id) as conn:
         cat = Catalog(conn)
+        n = (cat.one("SELECT COUNT(*) AS n FROM RDB$RELATION_FIELDS rf JOIN RDB$RELATIONS r "
+                     "ON r.RDB$RELATION_NAME = rf.RDB$RELATION_NAME " + _REL_COND) or {}).get("n") or 0
+        lazy = n > COMPLETION_COLUMNS
         rels: dict[str, list[str]] = {}
-        for r in cat.rows(
-            "SELECT TRIM(rf.RDB$RELATION_NAME) AS rel, TRIM(rf.RDB$FIELD_NAME) AS col FROM RDB$RELATION_FIELDS rf "
-            "JOIN RDB$RELATIONS r ON r.RDB$RELATION_NAME = rf.RDB$RELATION_NAME "
-            "WHERE COALESCE(r.RDB$SYSTEM_FLAG, 0) = 0 OR r.RDB$RELATION_NAME STARTING WITH 'MON$' "
-            "OR r.RDB$RELATION_NAME STARTING WITH 'RDB$' OR r.RDB$RELATION_NAME STARTING WITH 'SEC$' "
-            "ORDER BY rf.RDB$RELATION_NAME, rf.RDB$FIELD_POSITION"
-        ):
-            rels.setdefault(r["rel"], []).append(r["col"])
+        if lazy:
+            for r in cat.rows("SELECT TRIM(r.RDB$RELATION_NAME) AS rel FROM RDB$RELATIONS r " + _REL_COND):
+                rels[r["rel"]] = []
+        else:
+            for r in cat.rows(
+                "SELECT TRIM(rf.RDB$RELATION_NAME) AS rel, TRIM(rf.RDB$FIELD_NAME) AS col FROM RDB$RELATION_FIELDS rf "
+                "JOIN RDB$RELATIONS r ON r.RDB$RELATION_NAME = rf.RDB$RELATION_NAME " + _REL_COND +
+                " ORDER BY rf.RDB$RELATION_NAME, rf.RDB$FIELD_POSITION"
+            ):
+                rels.setdefault(r["rel"], []).append(r["col"])
         procs = [r["name"] for r in cat.rows(
             "SELECT TRIM(RDB$PROCEDURE_NAME) AS name FROM RDB$PROCEDURES "
             "WHERE RDB$PACKAGE_NAME IS NULL AND COALESCE(RDB$SYSTEM_FLAG, 0) = 0")]
@@ -115,7 +128,31 @@ def completion(server_id: str, db_id: str):
             "FROM RDB$FUNCTIONS WHERE RDB$PACKAGE_NAME IS NOT NULL"
         ):
             pkgs.setdefault(r["pkg"], []).append(r["name"])
-        return {"relations": rels, "procedures": procs, "functions": funcs, "packages": pkgs}
+        return {"relations": rels, "procedures": procs, "functions": funcs, "packages": pkgs, "lazy_columns": lazy}
+
+
+class ColumnsIn(BaseModel):
+    relations: list[str] = Field(..., max_length=500)
+
+
+@router.post("/completion/columns")
+def completion_columns(server_id: str, db_id: str, body: ColumnsIn):
+    """Columns of some relations, for autocompletion in very large schemas (see ``completion``)."""
+    names = sorted({n for n in body.relations if n})
+    out: dict[str, list[str]] = {n: [] for n in names}
+    if not names:
+        return {"relations": out}
+    with get_state().manager.meta(server_id, db_id) as conn:
+        cat = Catalog(conn)
+        for i in range(0, len(names), 100):
+            chunk = names[i:i + 100]
+            for r in cat.rows(
+                "SELECT TRIM(rf.RDB$RELATION_NAME) AS rel, TRIM(rf.RDB$FIELD_NAME) AS col FROM RDB$RELATION_FIELDS rf "
+                f"WHERE rf.RDB$RELATION_NAME IN ({', '.join('?' * len(chunk))}) "
+                "ORDER BY rf.RDB$RELATION_NAME, rf.RDB$FIELD_POSITION", chunk
+            ):
+                out.setdefault(r["rel"], []).append(r["col"])
+    return {"relations": out}
 
 
 @router.post("/execute")

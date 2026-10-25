@@ -293,13 +293,15 @@ export function formatType(p: ParsedType): string {
 }
 
 /** Data type editor: base type + size/scale + character set, or free text. */
-export function TypePicker(props: { value: string | null | undefined; onChange: (v: string) => void; lk: Lookups | null; compact?: boolean }) {
+export function TypePicker(props: { value: string | null | undefined; onChange: (v: string) => void; lk: Lookups | null; compact?: boolean;
+  /** accessible name of the type select (grids have no visible label per field) */
+  label?: string }) {
   const p = parseType(props.value);
   const set = (q: Partial<ParsedType>) => props.onChange(formatType({ ...p, ...q }));
   const engine = props.lk?.engine_major ?? 5;
   return (
     <div className="type-picker">
-      <select className="text" value={p.custom ? "__custom" : p.base} onChange={(e) => {
+      <select className="text" aria-label={props.label ?? t("Data type")} value={p.custom ? "__custom" : p.base} onChange={(e) => {
         const v = e.target.value;
         if (v === "__custom") set({ custom: true, base: formatType(p) });
         else set({ base: v, custom: false, size: SIZED.has(v) ? (v === "VARCHAR" || v === "CHAR" ? p.size || "50" : p.size) : "" });

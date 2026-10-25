@@ -6,6 +6,7 @@ import { buildErdSvg, ErdExportDialog } from "./ErdExport";
 import { schemaApi, type ErdColumn, type ErdRelation } from "./api";
 import { quoteIdent } from "./common";
 import { t } from "../../i18n";
+import { useCoarsePointer } from "../mobile/responsive";
 
 // ------------------------------------------------------------------ model
 interface Col extends Partial<ErdColumn> { name: string; type: string; isNew?: boolean }
@@ -97,6 +98,10 @@ export function ErdTab({ tab, visible }: { tab: WorkTab; visible: boolean }) {
   const [link, setLink] = useState<{ table: string; col: string; x: number; y: number } | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const drag = useRef<{ kind: "pan" | "node"; sx: number; sy: number; ox: number; oy: number; name?: string } | null>(null);
+  // touch: the pointers on the canvas; two of them pinch-zoom around their midpoint
+  const pointers = useRef(new Map<number, { x: number; y: number }>());
+  const pinch = useRef<{ d: number; mx: number; my: number; view: { tx: number; ty: number; k: number } } | null>(null);
+  const coarse = useCoarsePointer();
   const newSeq = useRef(1);
 
   const load = async (relayout = false) => {
@@ -156,17 +161,46 @@ export function ErdTab({ tab, visible }: { tab: WorkTab; visible: boolean }) {
     const k = Math.min(3, Math.max(0.1, view.k * Math.exp(-e.deltaY * 0.0015)));
     setView({ k, tx: px - ((px - view.tx) * k) / view.k, ty: py - ((py - view.ty) * k) / view.k });
   };
-  const onBgDown = (e: React.MouseEvent) => {
-    if (e.button !== 0) return;
+  const pinchGeometry = () => {
+    const [a, b] = [...pointers.current.values()];
+    const r = svgRef.current!.getBoundingClientRect();
+    return { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, mx: (a.x + b.x) / 2 - r.left, my: (a.y + b.y) / 2 - r.top };
+  };
+  // every pointer is tracked (capture phase, before the node and handle handlers decide what to drag)
+  const onPointerDownCapture = (e: React.PointerEvent) => {
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    svgRef.current?.setPointerCapture?.(e.pointerId);
+    if (pointers.current.size === 2) { // a second finger: pinch instead of dragging
+      drag.current = null;
+      setLink(null);
+      pinch.current = { ...pinchGeometry(), view };
+    }
+  };
+  const endPointer = (e: React.PointerEvent) => {
+    pointers.current.delete(e.pointerId);
+    if (pointers.current.size < 2) pinch.current = null;
+  };
+  const onBgDown = (e: React.PointerEvent) => {
+    if (e.button !== 0 || pointers.current.size > 1) return;
     drag.current = { kind: "pan", sx: e.clientX, sy: e.clientY, ox: view.tx, oy: view.ty };
   };
-  const onNodeDown = (e: React.MouseEvent, n: Node) => {
+  const onNodeDown = (e: React.PointerEvent, n: Node) => {
     if (e.button !== 0) return;
     e.stopPropagation();
     setSelected(n.name);
+    if (pointers.current.size > 1) return;
     drag.current = { kind: "node", sx: e.clientX, sy: e.clientY, ox: n.x, oy: n.y, name: n.name };
   };
-  const onMove = (e: React.MouseEvent) => {
+  const onMove = (e: React.PointerEvent) => {
+    if (pointers.current.has(e.pointerId)) pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const p = pinch.current;
+    if (p && pointers.current.size >= 2) {
+      const g = pinchGeometry();
+      const k = Math.min(3, Math.max(0.1, p.view.k * (g.d / p.d)));
+      const wx = (p.mx - p.view.tx) / p.view.k, wy = (p.my - p.view.ty) / p.view.k; // world point under the start midpoint
+      setView({ k, tx: g.mx - wx * k, ty: g.my - wy * k });
+      return;
+    }
     const d = drag.current;
     if (link) {
       const w = toWorld(e.clientX, e.clientY);
@@ -178,10 +212,12 @@ export function ErdTab({ tab, visible }: { tab: WorkTab; visible: boolean }) {
     if (d.kind === "pan") setView((v) => ({ ...v, tx: d.ox + dx, ty: d.oy + dy }));
     else setNodes((cur) => cur.map((n) => (n.name === d.name ? { ...n, x: d.ox + dx / view.k, y: d.oy + dy / view.k } : n)));
   };
-  const onUp = (e: React.MouseEvent) => {
+  const onUp = (e: React.PointerEvent) => {
+    endPointer(e);
     drag.current = null;
     if (!link) return;
-    const el = (e.target as Element).closest("[data-table]");
+    // the canvas captures the pointer, so look up what is under it
+    const el = (document.elementFromPoint(e.clientX, e.clientY) ?? (e.target as Element)).closest("[data-table]");
     setLink(null);
     if (!el) return;
     const parent = el.getAttribute("data-table")!;
@@ -192,8 +228,9 @@ export function ErdTab({ tab, visible }: { tab: WorkTab; visible: boolean }) {
     if (!refCol || (parent === link.table && refCol === link.col)) return;
     addRelation(link.table, link.col, parent, refCol);
   };
-  const startLink = (e: React.MouseEvent, table: string, col: string) => {
+  const startLink = (e: React.PointerEvent, table: string, col: string) => {
     e.stopPropagation();
+    if (pointers.current.size > 1) return;
     const w = toWorld(e.clientX, e.clientY);
     setLink({ table, col, x: w.x, y: w.y });
   };
@@ -315,8 +352,9 @@ export function ErdTab({ tab, visible }: { tab: WorkTab; visible: boolean }) {
       </div>
       {error && <div className="pad err">{error}</div>}
       <div className="sch-erd">
-        <svg ref={svgRef} className="sch-erd-canvas" onWheel={onWheel} onMouseDown={onBgDown} onMouseMove={onMove} onMouseUp={onUp}
-          onMouseLeave={() => { drag.current = null; setLink(null); }}>
+        <svg ref={svgRef} className="sch-erd-canvas" onWheel={onWheel} onPointerDownCapture={onPointerDownCapture}
+          onPointerDown={onBgDown} onPointerMove={onMove} onPointerUp={onUp}
+          onPointerCancel={(e) => { endPointer(e); drag.current = null; setLink(null); }}>
           <g className="erd-root" transform={`translate(${view.tx},${view.ty}) scale(${view.k})`}>
             {rels.map((r) => {
               const p = relPath(r);
@@ -343,7 +381,7 @@ export function ErdTab({ tab, visible }: { tab: WorkTab; visible: boolean }) {
                   <rect width={w} height={h} rx={6} fill="var(--panel)" data-sel={isSel ? (n.isNew ? "var(--ok)" : "var(--border)") : undefined} stroke={isSel ? "var(--accent)" : n.isNew ? "var(--ok)" : "var(--border)"}
                     strokeWidth={isSel ? 2 : 1} strokeDasharray={n.isNew ? "5 3" : undefined} />
                   <path d={`M 0 6 a 6 6 0 0 1 6 -6 h ${w - 12} a 6 6 0 0 1 6 6 v ${HEAD_H - 6} h ${-w} z`}
-                    fill={n.isNew ? "var(--new)" : "var(--accent-soft)"} style={{ cursor: "move" }} onMouseDown={(e) => onNodeDown(e, n)} />
+                    fill={n.isNew ? "var(--new)" : "var(--accent-soft)"} style={{ cursor: "move" }} onPointerDown={(e) => onNodeDown(e, n)} />
                   <text x={PAD} y={18} fontWeight={700} fontSize={12.5} fill="var(--text)" fontFamily="var(--mono)" style={{ pointerEvents: "none" }}>
                     {n.name}{n.gtt ? "  (GTT)" : ""}
                   </text>
@@ -352,7 +390,7 @@ export function ErdTab({ tab, visible }: { tab: WorkTab; visible: boolean }) {
                     const y = HEAD_H + i * ROW_H;
                     return (
                       <g key={c.name} transform={`translate(0,${y})`} data-table={n.name} data-col={c.name} className="erd-row"
-                        onMouseDown={(e) => { e.stopPropagation(); setSelected(n.name); }}>
+                        onPointerDown={(e) => { e.stopPropagation(); setSelected(n.name); }}>
                         <rect x={1} y={0} width={w - 2} height={ROW_H} fill={c.isNew ? "var(--new)" : "transparent"} />
                         <text x={PAD} y={14} fontSize={11.5} fontFamily="var(--mono)" fill={c.pk ? "var(--warn)" : c.fk ? "var(--accent)" : "var(--text)"}
                           fontWeight={c.pk ? 700 : 400}>
@@ -360,9 +398,13 @@ export function ErdTab({ tab, visible }: { tab: WorkTab; visible: boolean }) {
                         </text>
                         <text x={w - PAD - 12} y={14} fontSize={10.5} fontFamily="var(--mono)" fill="var(--muted)" textAnchor="end">{c.type}</text>
                         <circle data-noexport cx={w - 7} cy={ROW_H / 2} r={4} className="erd-handle"
-                          onMouseDown={(e) => startLink(e, n.name, c.name)}>
+                          onPointerDown={(e) => startLink(e, n.name, c.name)}>
                           <title>{t("Drag onto the referenced column to create a foreign key")}</title>
                         </circle>
+                        {coarse && ( /* a finger-sized, invisible grip around the handle */
+                          <circle data-noexport cx={w - 7} cy={ROW_H / 2} r={13} fill="transparent" className="erd-grip"
+                            onPointerDown={(e) => startLink(e, n.name, c.name)} />
+                        )}
                       </g>
                     );
                   })}
@@ -379,7 +421,9 @@ export function ErdTab({ tab, visible }: { tab: WorkTab; visible: boolean }) {
         </svg>
         {loading && <div className="sch-erd-overlay muted">{t("Loading…")}</div>}
         {!loading && nodes.length === 0 && <div className="sch-erd-overlay muted">{t("No tables yet — use “Add table” to design one.")}</div>}
-        <div className="sch-erd-help muted">{t("Wheel: zoom · drag background: pan · drag a header: move · drag a column’s ● onto another column: foreign key")}</div>
+        <div className="sch-erd-help muted">{coarse
+          ? t("Pinch: zoom · drag background: pan · drag a header: move · drag a column’s ● onto another column: foreign key")
+          : t("Wheel: zoom · drag background: pan · drag a header: move · drag a column’s ● onto another column: foreign key")}</div>
         {sel && (
           <div className="sch-erd-panel">
             <div className="sch-erd-panel-head">

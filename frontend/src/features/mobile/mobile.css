@@ -39,6 +39,8 @@
 /* ---- touch: targets of at least 44 × 44 px for the things people tap most ------------------- */
 @media (pointer: coarse) {
   .tree-row { height: 44px; }
+  table.designer input[type="checkbox"] { width: 22px; height: 22px; }
+  table.designer .btn.icon.small { min-width: 36px; min-height: 36px; }
   .tree-row .twisty { width: 36px; height: 44px; margin-left: -8px; }
   .tree-row.pressing { background: var(--select); transition: background .45s ease-in; }
   .tree-row { -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
@@ -62,6 +64,11 @@
 
 /* ---- tablet and phone (as TABLET_QUERY in responsive.ts) ------------------------------------- */
 @media (max-width: 1023.98px), (max-width: 1366px) and (pointer: coarse) {
+  /* table designer grids (columns, constraints, indices, triggers): scroll sideways instead of
+     squeezing the fields; each field keeps a usable width */
+  table.designer { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  table.designer input.text, table.designer select.text { min-width: 130px; }
+  table.designer td.nowrap { white-space: nowrap; }
   .brand small { display: none; }
   .brand { margin-right: 6px; }
   .sidebar.collapsed { display: none; }

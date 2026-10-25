@@ -230,9 +230,17 @@ Also fixed in this milestone:
 - ⬜ **Real cloud tests:** run the storage tests against real AWS S3, Azure Blob Storage and Google Cloud Storage accounts in CI (short-lived credentials via OIDC), not only emulators
 - ✅ **Native driver in CI and as an app setting:** choose the pure-Python `firebirdsql` or the native `firebird-driver` + libfbclient driver in the app (or with `FBADMIN_DRIVER`); native now covers the Query Tool, create/drop database and the Services API too; the full backend suite and the e2e suite run under both drivers in CI, with a cross-driver equivalence test; correctness and benchmark comparison in [docs/DRIVERS.md](docs/DRIVERS.md)
 - ✅ **Native driver by default:** the default driver setting is *Automatic*: the native `firebird-driver` when a Firebird 4+ client library (with ICU) is available — the desktop app and Docker image bundle the Firebird 5 client, and Ubuntu 25.04+/Debian 13 ship a Firebird 4 one — otherwise, or if the client library fails, the pure-Python `firebirdsql`; both remain selectable. Service options newer than the client library (e.g. parallel workers with a Firebird 4 client) are offered only when both sides support them; the bundled client now negotiates ChaCha wire encryption
-- ⬜ **Server-mode startup race:** investigate the intermittent `UNIQUE constraint failed: users.username` seen once when a server-mode instance starts
-- ⬜ **Tablet comfort:** make the ERD, query builder canvas and table designer comfortable on tablets (touch dragging, pinch zoom)
-- ⬜ **Large schemas:** keep the Object Explorer, search and autocompletion fast with tens of thousands of objects (virtualized tree, load tests)
+- ✅ **Server-mode startup race:** several processes on one data directory (workers, replicas, an old instance still stopping) all created the first administrator from `FBADMIN_ADMIN_*`, and all but one crashed with `UNIQUE constraint failed: users.username` / "already exists"; two people finishing the setup page at once could even create two administrators. The first user is now created atomically (`BEGIN IMMEDIATE`, also across processes), and the schema upgrade tolerates a concurrent one; regression tests start six processes at once
+- ✅ **Tablet comfort:**
+  - ERD: pointer events, with finger pan, move and pinch zoom, and larger touch areas for the foreign-key handles.
+  - Query builder: touch dragging of tables, pinch and button zoom, and tap-to-join, since HTML drag and drop does not work with touch.
+  - Table designer: grids scroll sideways with usable field widths and finger-sized controls.
+  - Tested with real touch input on an emulated iPad ([docs/MOBILE.md](docs/MOBILE.md#on-a-tablet))
+- ✅ **Large schemas:** with 20,000 tables:
+  - Opening a database takes 0.25 s instead of 7.5 s (folder counts by `COUNT(*)`).
+  - Folders with more than 400 objects render only the visible rows; expanded state and screen-reader positions are kept.
+  - Autocompletion of very large schemas loads table names first (2.5 s instead of 14 s) and fetches the columns of the tables a query uses.
+  - Load tests run in the backend and e2e suites ([docs/user-guide/object-explorer.md](docs/user-guide/object-explorer.md#very-large-schemas))
 - ⬜ **Supply-chain hardening:** an SBOM for each package, signed container images and build provenance (attestations), dependency scanning in CI, and a security policy (`SECURITY.md` for reporting vulnerabilities)
 
 ## Milestone 2.2 — Operations ⬜

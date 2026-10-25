@@ -59,10 +59,21 @@ class Security:
         return self.server_mode and self.db.user_count() == 0
 
     def bootstrap(self) -> None:
-        """Create the initial admin from FBADMIN_ADMIN_EMAIL / FBADMIN_ADMIN_PASSWORD."""
+        """Create the initial admin from FBADMIN_ADMIN_EMAIL / FBADMIN_ADMIN_PASSWORD. Safe when several
+        processes (workers, replicas on one volume) start at once: only the first one creates it."""
         s = self.settings
         if self.server_mode and s.admin_username and s.admin_password and self.db.user_count() == 0:
-            self.create_user(s.admin_username, email=s.admin_email or None, password=s.admin_password, role="admin")
+            self.create_first_admin(s.admin_username, email=s.admin_email or None, password=s.admin_password)
+
+    def create_first_admin(self, username: str, *, email: str | None, password: str) -> dict[str, Any] | None:
+        """The first administrator (bootstrap or the setup page); None if a user exists already."""
+        self.check_password_strength(password)
+        vault, _ = vault_create(password)
+        user = self.db.create_first_user(username, email=email, password_hash=hash_password(password), role="admin",
+                                         auth_source=INTERNAL, vault=vault)
+        if user is not None:
+            self._migrate_desktop_servers(user["id"])
+        return user
 
     @staticmethod
     def check_password_strength(password: str) -> None:

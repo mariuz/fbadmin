@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactElement } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactElement, type ReactNode } from "react";
 import { api, withSchema } from "../api";
 import { errMsg, keys, selectionKey, useApp } from "../context";
 import { OBJECT_TYPES, type Selection, type Server } from "../types";
@@ -23,15 +23,28 @@ export interface NodeSpec {
   title?: string;
 }
 
+/** Expanded state of rows that a virtual list may unmount (key -> state). */
+type NodeStore = Map<string, { open: boolean; children: NodeSpec[] | null }>;
+
+/** Folders with more children than this render only the rows in view (very large schemas). */
+export const VIRTUAL_MIN = 400;
+const OVERSCAN_PX = 600;
+
 function TreeNode(props: {
   spec: NodeSpec;
   depth: number;
   onContext: (e: { clientX: number; clientY: number }, sel: Selection) => void;
+  store?: NodeStore;
+  pos?: [number, number]; // aria-posinset, aria-setsize (virtual lists)
 }) {
   const app = useApp();
   const { spec } = props;
-  const [open, setOpen] = useState(false);
-  const [children, setChildren] = useState<NodeSpec[] | null>(null);
+  const saved = props.store?.get(spec.key);
+  const [open, setOpen] = useState(saved?.open ?? false);
+  const [children, setChildren] = useState<NodeSpec[] | null>(saved?.children ?? null);
+  useEffect(() => {
+    if (props.store && (open || children)) props.store.set(spec.key, { open, children });
+  }, [open, children]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // touch: long-press opens the context menu; the selected row also gets a "⋮" button
@@ -83,6 +96,8 @@ function TreeNode(props: {
         aria-level={props.depth + 1}
         aria-selected={selected}
         aria-expanded={spec.load ? open : undefined}
+        aria-posinset={props.pos?.[0]}
+        aria-setsize={props.pos?.[1]}
         tabIndex={selected ? 0 : -1}
         data-level={props.depth}
         data-expandable={spec.load ? "1" : "0"}
@@ -129,8 +144,100 @@ function TreeNode(props: {
       {open && children && children.length === 0 && !error && (
         <div className="tree-empty" style={{ paddingLeft: 26 + (props.depth + 1) * 16 }}>{t("No items")}</div>
       )}
-      {open && children?.map((c) => <TreeNode key={c.key} spec={c} depth={props.depth + 1} onContext={props.onContext} />)}
+      {open && children && children.length > VIRTUAL_MIN
+        ? <VirtualChildren items={children} depth={props.depth + 1} onContext={props.onContext} />
+        : open && children?.map((c) => <TreeNode key={c.key} spec={c} depth={props.depth + 1} onContext={props.onContext} />)}
     </>
+  );
+}
+
+/** A row whose height is reported (rows grow when expanded, and are taller on touch screens). */
+function Measured(props: { onHeight: (h: number) => void; children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const cb = useRef(props.onHeight);
+  cb.current = props.onHeight;
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    cb.current(el.offsetHeight);
+    const ro = new ResizeObserver(() => cb.current(el.offsetHeight));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return <div ref={ref} role="none">{props.children}</div>;
+}
+
+/**
+ * The children of a very large folder (tens of thousands of tables): only the rows in and near the
+ * visible part of the tree are rendered; spacers stand in for the others. Heights are measured, so
+ * expanded tables (their columns) and touch-sized rows work; expanded state survives scrolling.
+ */
+function VirtualChildren(props: { items: NodeSpec[]; depth: number; onContext: (e: { clientX: number; clientY: number }, sel: Selection) => void }) {
+  const { items } = props;
+  const box = useRef<HTMLDivElement>(null);
+  const store = useRef<NodeStore>(new Map());
+  const heights = useRef(new Map<string, number>());
+  const [est, setEst] = useState(24);
+  const [version, setVersion] = useState(0);
+  const [range, setRange] = useState<[number, number]>([0, 80]);
+  const pending = useRef(false);
+
+  const offsets = useMemo(() => {
+    const out = new Float64Array(items.length + 1);
+    for (let i = 0; i < items.length; i++) out[i + 1] = out[i] + (heights.current.get(items[i].key) ?? est);
+    return out;
+  }, [items, version, est]);
+
+  const update = () => {
+    const el = box.current;
+    const sc = el?.closest(".tree") as HTMLElement | null;
+    if (!el || !sc) return;
+    const top = el.getBoundingClientRect().top - sc.getBoundingClientRect().top; // box top within the viewport
+    const from = -top - OVERSCAN_PX;
+    const to = -top + sc.clientHeight + OVERSCAN_PX;
+    const find = (y: number) => { // first index whose bottom is below y
+      let lo = 0, hi = items.length;
+      while (lo < hi) { const mid = (lo + hi) >> 1; if (offsets[mid + 1] <= y) lo = mid + 1; else hi = mid; }
+      return lo;
+    };
+    const start = find(from);
+    const end = Math.min(items.length, Math.max(start + 1, find(to) + 1));
+    setRange((r) => (r[0] === start && r[1] === end ? r : [start, end]));
+  };
+
+  useLayoutEffect(update, [offsets]);
+  useEffect(() => {
+    const sc = box.current?.closest(".tree") as HTMLElement | null;
+    if (!sc) return;
+    const on = () => update();
+    sc.addEventListener("scroll", on, { passive: true });
+    const ro = new ResizeObserver(on);
+    ro.observe(sc);
+    return () => { sc.removeEventListener("scroll", on); ro.disconnect(); };
+  }, [offsets]);
+
+  const onHeight = (key: string, h: number) => {
+    if (!h || heights.current.get(key) === h) return;
+    if (!heights.current.size) setEst(h); // the first row tells the usual row height
+    heights.current.set(key, h);
+    if (!pending.current) {
+      pending.current = true;
+      requestAnimationFrame(() => { pending.current = false; setVersion((v) => v + 1); });
+    }
+  };
+
+  const [start, end] = range;
+  return (
+    <div ref={box} role="none" className="tree-virtual">
+      <div role="none" aria-hidden="true" style={{ height: offsets[start] }} />
+      {items.slice(start, end).map((c, i) => (
+        <Measured key={c.key} onHeight={(h) => onHeight(c.key, h)}>
+          <TreeNode spec={c} depth={props.depth} onContext={props.onContext} store={store.current}
+            pos={[start + i + 1, items.length]} />
+        </Measured>
+      ))}
+      <div role="none" aria-hidden="true" style={{ height: offsets[items.length] - offsets[end] }} />
+    </div>
   );
 }
 
@@ -251,8 +358,16 @@ export function Tree() {
     switch (e.key) {
       case "ArrowDown": focus(rows[Math.min(rows.length - 1, i + 1)]); break;
       case "ArrowUp": focus(rows[Math.max(0, i - 1)]); break;
-      case "Home": focus(rows[0]); break;
-      case "End": focus(rows[rows.length - 1]); break;
+      case "Home": case "End": {
+        // virtual lists render only rows in view: scroll to the end first, then focus the row there
+        const tree = e.currentTarget;
+        tree.scrollTop = e.key === "Home" ? 0 : tree.scrollHeight;
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          const now = Array.from(tree.querySelectorAll<HTMLElement>(".tree-row"));
+          focus(e.key === "Home" ? now[0] : now[now.length - 1]);
+        }));
+        break;
+      }
       case "ArrowRight":
         if (!cur) return;
         if (cur.dataset.expandable === "1" && cur.dataset.open !== "1") (cur.querySelector(".twisty") as HTMLElement)?.click();
@@ -291,7 +406,12 @@ export function Tree() {
   if (app.servers.length === 0) return <div className="tree">{emptyHint}</div>;
   return (
     <>
-      <div className="tree" role="tree" aria-label={t("Object Explorer")} onKeyDown={onTreeKey}>
+      {/* with nothing selected no row is a tab stop: the tree is one and hands focus to its first row */}
+      <div className="tree" role="tree" aria-label={t("Object Explorer")} onKeyDown={onTreeKey}
+        tabIndex={app.selection ? undefined : 0}
+        onFocus={(e) => {
+          if (e.target === e.currentTarget) e.currentTarget.querySelector<HTMLElement>(".tree-row")?.focus();
+        }}>
         {app.servers.map((s) => (
           <TreeNode key={s.id} spec={serverSpec(s)} depth={0} onContext={onContext} />
         ))}

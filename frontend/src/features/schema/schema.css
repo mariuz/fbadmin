@@ -82,7 +82,9 @@ table.sch-map tr.off td { opacity: .5; }
 /* ERD */
 .sch-erd { flex: 1; position: relative; min-height: 0; overflow: hidden; background: var(--bg);
   background-image: radial-gradient(var(--border) 1px, transparent 1px); background-size: 22px 22px; }
-.sch-erd-canvas { width: 100%; height: 100%; display: block; cursor: grab; user-select: none; }
+.sch-erd-canvas { width: 100%; height: 100%; display: block; cursor: grab; user-select: none;
+  touch-action: none; /* fingers pan, pinch and drag the diagram, not the page */ }
+.sch-erd-canvas .erd-grip { cursor: crosshair; }
 .sch-erd-canvas:active { cursor: grabbing; }
 .sch-erd-canvas .erd-row:hover rect { fill: var(--hover); }
 .sch-erd-canvas .erd-handle { fill: var(--panel); stroke: var(--muted); stroke-width: 1; cursor: crosshair; opacity: 0; }

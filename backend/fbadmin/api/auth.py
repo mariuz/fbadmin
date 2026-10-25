@@ -122,7 +122,8 @@ def setup(body: SetupIn, request: Request, response: Response):
     sec = get_state().security
     if not sec.needs_setup():
         raise SecurityError(409, "Setup has already been completed", "setup_done")
-    sec.create_user(body.username, email=body.email, password=body.password, role="admin")
+    if sec.create_first_admin(body.username, email=body.email, password=body.password) is None:
+        raise SecurityError(409, "Setup has already been completed", "setup_done")  # by a concurrent request
     p = sec.login_password(body.username, body.password, request.client.host if request.client else None)
     return _login_response(request, response, p)
 

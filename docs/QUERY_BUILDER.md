@@ -119,6 +119,13 @@ keys are read again from the database; tables that no longer exist are left out,
 The builder does **not** parse other SQL: a `SELECT` without that comment is refused with a
 message rather than half-understood.
 
+## Touch screens
+
+Drag a table by its header with a finger, and pinch (or use the zoom buttons) to zoom. To join two
+columns without a mouse, tap **⇄** next to one column, then next to a column of another table; a
+hint shows the first column until you tap the second (or **Cancel**). See [Phones and
+tablets](MOBILE.md#on-a-tablet).
+
 ## Keyboard
 
 The canvas is a mouse convenience. Everything can be done with the keyboard in the grids under it

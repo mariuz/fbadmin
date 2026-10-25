@@ -271,20 +271,20 @@ export function TableDialog(props: { serverId: string; dbId: string; name?: stri
                     <button className="btn icon small" title={t("Move up")} onClick={(e) => { e.stopPropagation(); set({ columns: move(tbl.columns, i, -1) }); setSelCol(i - 1 >= 0 ? i - 1 : i); }}>↑</button>
                     <button className="btn icon small" title={t("Move down")} onClick={(e) => { e.stopPropagation(); set({ columns: move(tbl.columns, i, 1) }); setSelCol(i + 1 < tbl.columns.length ? i + 1 : i); }}>↓</button>
                   </td>
-                  <td><input className="text" value={c.name} onChange={(e) => setSpec(renameColumn(tbl, i, e.target.value.toUpperCase()))} />
+                  <td><input className="text" aria-label={t("Name of column {n}", { n: i + 1 })} value={c.name} onChange={(e) => setSpec(renameColumn(tbl, i, e.target.value.toUpperCase()))} />
                     {c.orig_name && c.orig_name !== c.name && <div className="muted small">{t("was {name}", { name: c.orig_name })}</div>}</td>
                   <td style={{ minWidth: 220 }}>
                     {c.computed !== null && c.computed !== undefined ? <span className="mono small">COMPUTED BY {c.computed}</span>
                       : c.domain ? <span className="mono">{c.domain} <span className="muted">{t("(domain)")}</span></span>
-                        : <TypePicker compact value={c.data_type} lk={lk} onChange={(v) => set({ columns: tbl.columns.map((x, j) => (j === i ? { ...x, data_type: v } : x)) })} />}
+                        : <TypePicker compact label={t("Data type of {column}", { column: c.name })} value={c.data_type} lk={lk} onChange={(v) => set({ columns: tbl.columns.map((x, j) => (j === i ? { ...x, data_type: v } : x)) })} />}
                   </td>
-                  <td style={{ textAlign: "center" }}><input type="checkbox" checked={!!c.not_null} disabled={c.computed != null}
+                  <td style={{ textAlign: "center" }}><input type="checkbox" aria-label={t("{column} not null", { column: c.name })} checked={!!c.not_null} disabled={c.computed != null}
                     onChange={(e) => set({ columns: tbl.columns.map((x, j) => (j === i ? { ...x, not_null: e.target.checked } : x)) })} /></td>
-                  <td style={{ textAlign: "center" }}><input type="checkbox" checked={!!pk?.columns.includes(c.name)} disabled={c.computed != null}
+                  <td style={{ textAlign: "center" }}><input type="checkbox" aria-label={t("{column} in the primary key", { column: c.name })} checked={!!pk?.columns.includes(c.name)} disabled={c.computed != null}
                     onChange={(e) => togglePk(c.name, e.target.checked)} /></td>
-                  <td><input className="text mono" value={c.identity ? `identity (${c.identity.toLowerCase()})` : c.default ?? ""} disabled={!!c.identity || c.computed != null}
+                  <td><input className="text mono" aria-label={t("Default of {column}", { column: c.name })} value={c.identity ? `identity (${c.identity.toLowerCase()})` : c.default ?? ""} disabled={!!c.identity || c.computed != null}
                     onChange={(e) => set({ columns: tbl.columns.map((x, j) => (j === i ? { ...x, default: e.target.value || null } : x)) })} /></td>
-                  <td><input className="text" value={c.comment ?? ""} onChange={(e) => set({ columns: tbl.columns.map((x, j) => (j === i ? { ...x, comment: e.target.value } : x)) })} /></td>
+                  <td><input className="text" aria-label={t("Comment on {column}", { column: c.name })} value={c.comment ?? ""} onChange={(e) => set({ columns: tbl.columns.map((x, j) => (j === i ? { ...x, comment: e.target.value } : x)) })} /></td>
                   <td className="nowrap">
                     <button className="btn small" onClick={(e) => { e.stopPropagation(); setSelCol(i); }}>{t("Edit…")}</button>
                     <button className="btn icon small" title={t("Drop column")} onClick={(e) => {

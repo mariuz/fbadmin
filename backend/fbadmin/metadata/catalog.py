@@ -109,6 +109,15 @@ def _engine_leftover_index(r: dict) -> bool:
     return r["name"].startswith("RDB$TEMP_DEPEND") and not r.get("constraint_name")
 
 
+class _Captured(Exception):
+    def __init__(self, sql: str, params):
+        super().__init__(sql)
+        self.sql, self.params = sql, params
+
+
+_ORDER_BY_TAIL = re.compile(r"\s+ORDER\s+BY\s+[^()']*$", re.I)
+
+
 class Catalog(CatalogExtras):
     """Metadata reader bound to a single open connection."""
 
@@ -162,6 +171,8 @@ class Catalog(CatalogExtras):
             sql = _PLG_PROF.sub("PLG$PROFILER.PLG$PROF_", sql)
         if params and self.inline_params:
             sql, params = inline_params(sql, list(params)), []
+        if getattr(self, "_capture", False):  # count_objects: only the final SQL is wanted
+            raise _Captured(sql, params)
         cur = self.conn.cursor()
         try:
             cur.execute(sql, list(params))
@@ -251,10 +262,34 @@ class Catalog(CatalogExtras):
             if t in ("users", "system_tables"):
                 continue
             try:
-                out[t] = len(self.list_objects(t))
+                out[t] = self.count_objects(t)
             except Exception:
                 out[t] = 0
         return out
+
+    def count_objects(self, otype: str) -> int:
+        """``len(list_objects(otype))`` without fetching the list: ``SELECT COUNT(*)`` over the same query
+        (every ``_list_*`` is one query whose rows map 1:1 to objects). With tens of thousands of objects
+        this is milliseconds instead of seconds, which keeps opening a database in the tree fast."""
+        self._capture = True
+        try:
+            self.list_objects(otype)
+        except _Captured as c:
+            sql, params = c.sql, c.params
+        else:  # pragma: no cover - every lister runs a query
+            raise RuntimeError(f"{otype}: no query")
+        finally:
+            self._capture = False
+        sql = _ORDER_BY_TAIL.sub("", sql)
+        cur = self.conn.cursor()
+        try:
+            cur.execute(f"SELECT COUNT(*) FROM ({sql})", list(params))
+            return int(cur.fetchone()[0])
+        finally:
+            try:
+                cur.close()
+            except Exception:  # noqa: BLE001
+                pass
 
     # -------------------------------------------------------------- listing
     def list_objects(self, otype: str) -> list[dict[str, Any]]:

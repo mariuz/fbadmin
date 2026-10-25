@@ -9,6 +9,7 @@ import { getPrefs } from "../prefs";
 import { N_, t } from "../i18n";
 import { AI_TASKS, AssistantPane, askAi, useAiStatus } from "./Assistant";
 import { ResultGrid, download } from "./ResultGrid";
+import { useLazyColumns } from "./lazyColumns";
 import { getResultViews } from "../registry";
 import {
   SqlEditor, clearErrors, formatEditor, lineColToOffset, selectionOrAll, showError, type ExtraCompletions,
@@ -212,6 +213,8 @@ export function QueryTool(props: { serverId: string; dbId: string; schema?: stri
   const [history, setHistory] = useState<HistoryEntry[]>(() => load(HISTORY_KEY, []));
   const [snippets, setSnippets] = useState<Snippet[]>(() => load(SNIPPETS_KEY, DEFAULT_SNIPPETS));
   const [schema, setSchema] = useState<Record<string, string[]>>({});
+  const [lazyColumns, setLazyColumns] = useState(false); // very large schema: columns fetched on demand
+  useLazyColumns(props.serverId, props.dbId, sql, lazyColumns, schema, setSchema);
   const [extra, setExtra] = useState<ExtraCompletions>({});
   const [editorH, setEditorH] = useState(260);
   const [showTx, setShowTx] = useState(false);
@@ -245,6 +248,7 @@ export function QueryTool(props: { serverId: string; dbId: string; schema?: stri
     api.completion(props.serverId, props.dbId)
       .then((c) => {
         setSchema(c.relations);
+        setLazyColumns(!!c.lazy_columns);
         setExtra({ procedures: c.procedures, functions: c.functions, packages: c.packages });
       })
       .catch(() => {});

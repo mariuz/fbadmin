@@ -71,7 +71,11 @@ class SecurityDB:
                 c.execute("PRAGMA journal_mode=WAL")
                 c.executescript(SCHEMA)
                 if "token" not in {r[1] for r in c.execute("PRAGMA table_info(audit)")}:
-                    c.execute("ALTER TABLE audit ADD COLUMN token TEXT")  # API token name (2.0)
+                    try:
+                        c.execute("ALTER TABLE audit ADD COLUMN token TEXT")  # API token name (2.0)
+                    except sqlite3.OperationalError as exc:  # another process added it meanwhile
+                        if "duplicate column" not in str(exc).lower():
+                            raise
                 if new:
                     os.chmod(self.path, 0o600)
                 self._conn = c
@@ -113,13 +117,41 @@ class SecurityDB:
             raise ValueError("Role must be 'admin' or 'user'")
         if self.find_user(username):
             raise ValueError(f"User {username!r} already exists")
-        cur = self.execute(
-            "INSERT INTO users (username, email, password_hash, role, active, auth_source, vault, created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (username, email, password_hash, role, int(active), auth_source,
-             json.dumps(vault) if vault else None, time.time()),
-        )
+        row = (username, email, password_hash, role, int(active), auth_source,
+               json.dumps(vault) if vault else None, time.time())
+        try:
+            cur = self.execute(
+                "INSERT INTO users (username, email, password_hash, role, active, auth_source, vault, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)", row)
+        except sqlite3.IntegrityError:  # created by another request or process just now
+            raise ValueError(f"User {username!r} already exists") from None
         return self.get_user(cur.lastrowid)  # type: ignore[return-value]
+
+    def create_first_user(self, username: str, *, email: str | None, password_hash: str | None, role: str,
+                          auth_source: str, vault: dict | None = None) -> dict[str, Any] | None:
+        """Create a user only while there are none, atomically - also across processes sharing the data
+        directory (``BEGIN IMMEDIATE`` takes SQLite's write lock). None: another request or process
+        created the first user meanwhile (e.g. several workers bootstrapping the admin at startup)."""
+        username = username.strip()
+        if not username:
+            raise ValueError("Username is required")
+        with self._lock:
+            c = self.conn()
+            c.execute("BEGIN IMMEDIATE")
+            try:
+                if c.execute("SELECT COUNT(*) FROM users").fetchone()[0]:
+                    c.execute("ROLLBACK")
+                    return None
+                cur = c.execute(
+                    "INSERT INTO users (username, email, password_hash, role, active, auth_source, vault, created_at) "
+                    "VALUES (?, ?, ?, ?, 1, ?, ?, ?)",
+                    (username, email, password_hash, role, auth_source, json.dumps(vault) if vault else None,
+                     time.time()))
+                c.execute("COMMIT")
+            except BaseException:
+                c.execute("ROLLBACK")
+                raise
+            return self.get_user(cur.lastrowid)
 
     def update_user(self, user_id: int, **changes: Any) -> dict[str, Any]:
         allowed = {"email", "password_hash", "role", "active", "vault", "last_login", "auth_source"}

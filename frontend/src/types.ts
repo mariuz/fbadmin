@@ -97,6 +97,8 @@ export interface Completion {
   procedures: string[];
   functions: string[];
   packages: Record<string, string[]>;
+  /** very large schema: relations come without columns; ask /completion/columns for the ones in use */
+  lazy_columns?: boolean;
 }
 
 export interface Job {

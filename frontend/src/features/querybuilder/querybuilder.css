@@ -2,6 +2,16 @@
 .qb .toolbar label { display: inline-flex; align-items: center; gap: 5px; }
 .qb .toolbar .qb-pick { max-width: 260px; }
 .qb-top { display: flex; flex: 1 1 55%; min-height: 160px; border-bottom: 1px solid var(--border); }
+.qb-canvas-wrap { flex: 1; min-width: 0; display: flex; flex-direction: column; position: relative; }
+.qb-zoom { position: absolute; right: 16px; bottom: 16px; z-index: 3; display: flex; gap: 2px; padding: 2px; border: 1px solid var(--border);
+  border-radius: var(--radius); background: var(--panel); box-shadow: 0 2px 8px rgba(0, 0, 0, .12); }
+.qb-join-hint { display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: var(--accent-soft); border-bottom: 1px solid var(--border); font-size: 13px; }
+.qb-join-btn { flex: none; min-width: 36px; min-height: 36px; margin-right: -6px; border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--panel); color: var(--text); cursor: pointer; }
+.qb-join-btn.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.qb-box-head { touch-action: none; }
+.qb-canvas.touch .qb-col { height: 40px; } /* = TOUCH_ROW in Canvas.tsx */
+.qb-canvas.touch .qb-col input[type="checkbox"] { width: 20px; height: 20px; }
 .qb-canvas { flex: 1; min-width: 0; overflow: auto; position: relative; background:
   radial-gradient(circle, var(--border) 1px, transparent 1px) 0 0 / 18px 18px, var(--bg); }
 .qb-lines { position: absolute; left: 0; top: 0; pointer-events: none; }
@@ -53,3 +63,5 @@
 .qb-custom input { flex: 1; }
 .qb-load { display: flex; flex-direction: column; gap: 6px; }
 .qb-load textarea { width: 100%; }
+/* warnings: the warning colour marks the line; the text keeps full contrast (WCAG AA) */
+.qb-issues li.warn { color: var(--text); border-left: 3px solid var(--warn); padding-left: 6px; list-style: none; }

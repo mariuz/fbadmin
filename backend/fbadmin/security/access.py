@@ -590,6 +590,7 @@ _DB_RULES: list[tuple[str, re.Pattern[str], int, Any, str]] = [
     ("GET", re.compile(r"^/debug/routine$"), READ, "q:name", ""),
     ("GET", re.compile(r"^/debug/"), READ, None, ""),
     ("POST", re.compile(r"^/debug/parse$"), READ, None, ""),
+    ("POST", re.compile(r"^/completion/columns$"), READ, None, ""),
     ("*", re.compile(r"^/debug/"), WRITE, None, ""),
     ("POST", re.compile(r"^/datacompare/[^/]+/apply$"), WRITE, None, "whole"),
     ("POST", re.compile(r"^/upgrade/check$"), READ, None, "whole"),

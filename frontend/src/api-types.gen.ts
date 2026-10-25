@@ -1913,10 +1913,33 @@ export interface paths {
         /**
          * Completion
          * @description Names for editor autocompletion: relations with columns, procedures, functions, packages.
+         *
+         *     With very large schemas (more than ``COMPLETION_COLUMNS`` columns) only the relation names are sent
+         *     (``lazy_columns: true``); the editor then asks ``/completion/columns`` for the tables a query uses.
          */
         get: operations["completion_api_servers__server_id__databases__db_id__completion_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/servers/{server_id}/databases/{db_id}/completion/columns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Completion Columns
+         * @description Columns of some relations, for autocompletion in very large schemas (see ``completion``).
+         */
+        post: operations["completion_columns_api_servers__server_id__databases__db_id__completion_columns_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4809,6 +4832,11 @@ export interface components {
         CodeIn: {
             /** Code */
             code: string;
+        };
+        /** ColumnsIn */
+        ColumnsIn: {
+            /** Relations */
+            relations: string[];
         };
         /** CompareIn */
         CompareIn: {
@@ -10298,6 +10326,42 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    completion_columns_api_servers__server_id__databases__db_id__completion_columns_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                server_id: string;
+                db_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ColumnsIn"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

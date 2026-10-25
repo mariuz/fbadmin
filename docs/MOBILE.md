@@ -63,6 +63,20 @@ remembers your choice in the browser. Context menus open next to the row, as on 
 On touch screens, tree rows, menu items and toolbar buttons are at least 44 px high, and the
 selected tree row has a **⋮** button for its context menu. This applies to touch laptops too.
 
+The canvases work with fingers:
+
+- **ERD**: drag the background to pan, drag a table's header to move it, and pinch with two fingers
+  to zoom around the pinch point. To create a foreign key, drag a column's ● (it has a larger,
+  invisible touch area) onto another column.
+- **Query builder**:
+  - Drag a table by its header, and pinch or use the zoom buttons (40–150 %).
+  - One finger still scrolls the canvas.
+  - Dragging a column onto another column needs a mouse (HTML drag and drop does not work with
+    touch). Instead, tap **⇄** next to a column, then **⇄** next to a column of another table.
+  - Column rows are 40 px high.
+- **Table designer**: the grids of columns, constraints, indices and triggers scroll sideways
+  instead of squeezing their fields, and checkboxes and buttons are finger-sized.
+
 ## Add to the home screen
 
 fbadmin has a web app manifest and icons, so you can add it to your home screen. It then opens in
@@ -90,5 +104,6 @@ off when the system asks for reduced motion.
 
 - Full editing tools (table designer, ERD, query builder canvas, schema diff) are usable but
   cramped on a phone; use a tablet or desktop for them.
-- Dragging (the Object Explorer to the query builder, column resizing, the splitters) needs a mouse.
+- Dragging from the Object Explorer onto the query builder, and resizing grid columns, need a
+  mouse. On a tablet, add tables with **Add table** instead.
 - On touch screens there are no hover tooltips.
