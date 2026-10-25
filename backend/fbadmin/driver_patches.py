@@ -30,6 +30,11 @@
    (``isc_spb_process_name``), so the attachments of their gbak/gfix actions can be found in
    ``MON$ATTACHMENTS`` and detached when the job is cancelled (see ``fbadmin/jobs.py``).
 
+6. firebirdsql 1.5.0 describes statement parameters too, but when that description needs a second
+   ``op_info_sql`` call (statements with many parameters, e.g. a 60-column INSERT) it asserts the
+   wrong reply prefix (``0x08 0x07`` instead of ``isc_info_sql_bind`` = 5, ``isc_info_sql_describe_vars``
+   = 7) and every such statement fails with ``AssertionError``. Check for the right prefix.
+
 Each patch only applies if the driver source still looks the way we expect.
 """
 
@@ -54,6 +59,7 @@ def apply() -> None:
     _patch_fb4_types()
     _patch_calc_blr()
     _patch_service_process_name()
+    _patch_bind_describe()
     try:
         from firebirdsql import wireprotocol
 
@@ -68,14 +74,15 @@ def apply() -> None:
         indent = m.group(1)
         # first occurrences: the str->bytes conversion and the short-bytes branch
         src = src.replace(m.group(0), f"\n{indent}_was_str = isinstance(p, str)\n{indent}if _was_str:\n", 1)
-        hook = re.search(r"\n( +)t = type\(p\)\n\1if p is None:\n", src)
+        # 1.5.0 checks ``self._is_array_param_null(p)`` (array support) where 1.4 checked ``p is None``
+        hook = re.search(r"\n( +)t = type\(p\)\n\1if (p is None|self\._is_array_param_null\(p\)):\n", src)
         if hook is None:
             log.info("firebirdsql params_to_blr changed upstream; INT128/time zone parameter patch skipped")
         else:
-            h = hook.group(1)
+            h, cond = hook.group(1), hook.group(2)
             src = src[: hook.start()] + (
                 f"\n{h}t = type(p)\n{h}_x = _special_param(self, p)\n{h}if _x is not None:\n"
-                f"{h}    v, _b = _x\n{h}    blr += _b\n{h}elif p is None:\n"
+                f"{h}    v, _b = _x\n{h}    blr += _b\n{h}elif {cond}:\n"
             ) + src[hook.end():]
         block = re.search(
             r"\n( +)v = p\n\1nbytes = len\(v\)\n\1pad_length = \(\(4-nbytes\) & 3\)\n"
@@ -98,6 +105,29 @@ def apply() -> None:
         wireprotocol.WireProtocol.params_to_blr = ns["params_to_blr"]
     except Exception:  # noqa: BLE001 - never break startup because of a patch
         log.exception("could not patch firebirdsql params_to_blr")
+
+
+def _patch_bind_describe() -> None:
+    try:
+        from firebirdsql import fbcore, xsqlvar
+
+        fn = getattr(xsqlvar, "parse_xsqlda", None)
+        if fn is None or getattr(fn, "_fbadmin", False):
+            return
+        src = textwrap.dedent(inspect.getsource(fn))
+        bad = "assert buf2[:2] == bytes([0x08, 0x07])"
+        if bad not in src:
+            return  # fixed upstream (or never present)
+        src = src.replace(bad, "assert buf2[:2] == bytes([isc_info_sql_bind, isc_info_sql_describe_vars])")
+        ns: dict = {}
+        exec(compile(src, "<fbadmin driver patch>", "exec"), xsqlvar.__dict__, ns)  # noqa: S102
+        patched = ns["parse_xsqlda"]
+        patched._fbadmin = True
+        xsqlvar.parse_xsqlda = patched
+        if getattr(fbcore, "parse_xsqlda", None) is fn:
+            fbcore.parse_xsqlda = patched
+    except Exception:  # noqa: BLE001
+        log.exception("could not patch firebirdsql parse_xsqlda")
 
 
 ISC_SPB_PROCESS_NAME = 112
