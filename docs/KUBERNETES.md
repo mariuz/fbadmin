@@ -1,6 +1,6 @@
 # Kubernetes: Firebird clusters of the operator
 
-When fbadmin runs in a Kubernetes cluster, or has a kubeconfig, **Kubernetes** in the top bar
+When fbadmin runs in a Kubernetes cluster, or has a kubeconfig, the **⎈ Kubernetes** button in the top bar
 lists the Firebird clusters of the
 [cloudnative-firebird](https://github.com/mariuz/cloudnative-firebird) operator
 (`FirebirdCluster` resources) and manages them. Only administrators see the page. fbadmin acts

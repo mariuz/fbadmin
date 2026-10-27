@@ -1,4 +1,4 @@
-# What fbadmin's Kubernetes page (Kubernetes in the top bar, docs/KUBERNETES.md) may do with the
+# What fbadmin's Kubernetes page (the ⎈ button in the top bar, docs/KUBERNETES.md) may do with the
 # operator's clusters in this namespace. Drop the verbs you don't want to offer: fbadmin shows
 # Kubernetes' refusal and the rest keeps working (a read-only Role still lists the clusters).
 apiVersion: v1

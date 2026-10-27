@@ -44,7 +44,9 @@ function TopbarButton() {
     loadStatus().then((s) => setOn(s.enabled));
   }, [auth]);
   if (!on) return null;
-  return <button className="tb" onClick={() => app.openTab({ kind: "kubernetes", title: t("Kubernetes") })}>⎈ {t("Kubernetes")}</button>;
+  // icon only: the desktop bar is full at common widths (the label is the accessible name and tooltip)
+  return <button className="tb" title={t("Kubernetes")} aria-label={t("Kubernetes")}
+    onClick={() => app.openTab({ kind: "kubernetes", title: t("Kubernetes") })}><span aria-hidden="true">⎈</span></button>;
 }
 
 function age(ts: number | null) {

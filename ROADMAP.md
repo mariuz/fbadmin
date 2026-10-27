@@ -254,7 +254,7 @@ Also fixed in this milestone:
 - ⬜ **Backup encryption and restore drills:** optional encryption of backups kept by fbadmin and uploaded to the cloud; periodic restore drills with a report
 - ⬜ **Query regression tracking:** keep slow statements and their plans over time and flag statements whose plan or duration got worse
 - ⬜ **Audit log forwarding:** send the audit log to a central logging system (syslog, webhook)
-- ✅ **Kubernetes operator integration:** Kubernetes in the top bar lists the `FirebirdCluster`s of the cloudnative-firebird operator with their instances, backups, scheduled backups, databases, users and events; scale, hibernate, rolling or single-instance restart, switchover, fence, back up, restore into a new file, instance logs, and register the cluster as an fbadmin server with the password from its Secret; uses fbadmin's service account (RBAC in `deploy/k8s-operator` and the Helm chart's `kubernetes` values) or a kubeconfig; every action is audited ([docs/KUBERNETES.md](docs/KUBERNETES.md))
+- ✅ **Kubernetes operator integration:** the ⎈ Kubernetes button in the top bar lists the `FirebirdCluster`s of the cloudnative-firebird operator with their instances, backups, scheduled backups, databases, users and events; scale, hibernate, rolling or single-instance restart, switchover, fence, back up, restore into a new file, instance logs, and register the cluster as an fbadmin server with the password from its Secret; uses fbadmin's service account (RBAC in `deploy/k8s-operator` and the Helm chart's `kubernetes` values) or a kubeconfig; every action is audited ([docs/KUBERNETES.md](docs/KUBERNETES.md))
 
 ## Milestone 2.3 — Insight and collaboration ⬜
 

@@ -7,7 +7,7 @@ This example runs fbadmin next to a Firebird cluster managed by
   volume, the primary Service `fbcluster` and the database `demo.fdb`.
 - **fbadmin** registers that cluster at startup from a ConfigMap (`FBADMIN_SERVERS_FILE`). It
   reads the password from the cluster's superuser Secret, so nothing has to be typed into the UI.
-- **The Kubernetes page** (Kubernetes in the top bar) shows the `FirebirdCluster` with its
+- **The Kubernetes page** (the ⎈ button in the top bar) shows the `FirebirdCluster` with its
   instances, backups and events, and scales, hibernates, restarts, switches over, fences, backs
   up and restores it. It uses the `fbadmin` service account and the Role in `rbac.yaml`; see
   [docs/KUBERNETES.md](../../docs/KUBERNETES.md).

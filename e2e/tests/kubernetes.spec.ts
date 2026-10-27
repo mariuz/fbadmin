@@ -78,7 +78,10 @@ async function audit(what: string) {
 }
 
 test("clusters, instances, backups, events; accessible in every theme", async () => {
-  await page.locator(".topbar button", { hasText: "Kubernetes" }).click();
+  await page.locator(".topbar").getByRole("button", { name: "Kubernetes", exact: true }).click();
+  // the extra topbar button must not push the bar's last buttons out of the window
+  const bar = await page.locator(".topbar").evaluate((el) => ({ scroll: el.scrollWidth, client: el.clientWidth }));
+  expect(bar.scroll, "topbar overflows").toBeLessThanOrEqual(bar.client);
   await expect(pane()).toContainText("service account, API server https://10.96.0.1:443; namespaces: prod");
   await expect(pane().locator("table.grid").first().locator("tbody tr")).toContainText("fbcluster");
   const view = pane().locator(".mt-section", { hasText: "Cluster fbcluster" });
