@@ -2087,6 +2087,7 @@
   "Table {name}": "Таблица {name}",
   "Tables": "Таблицы",
   "Tables ({count})": "Таблицы ({count})",
+  "Tables compared with the live database": "Таблицы в сравнении с рабочей базой данных",
   "Tables include / exclude": "Включение / исключение таблиц",
   "Tables needing attention ({count})": "Таблицы, требующие внимания ({count})",
   "Tables:": "Таблицы:",

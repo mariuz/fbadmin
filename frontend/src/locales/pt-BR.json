@@ -2087,6 +2087,7 @@
   "Table {name}": "Tabela {name}",
   "Tables": "Tabelas",
   "Tables ({count})": "Tabelas ({count})",
+  "Tables compared with the live database": "Tabelas comparadas com o banco de dados em uso",
   "Tables include / exclude": "Incluir / excluir tabelas",
   "Tables needing attention ({count})": "Tabelas que precisam de atenção ({count})",
   "Tables:": "Tabelas:",

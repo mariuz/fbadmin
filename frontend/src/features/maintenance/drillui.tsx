@@ -128,7 +128,7 @@ export function DrillReportView(props: { scheduleId: string; refreshKey: number 
         <li key={i} className={c.ok ? "ok" : c.ok === null ? "warn" : "err"}><span aria-hidden="true">{c.ok ? "✓" : c.ok === null ? "▲" : "✕"}</span> {c.message}</li>
       ))}</ul>
       {r.compare && r.compare.tables.length > 0 && (
-        <div className="grid-wrap" style={{ maxHeight: 280 }}><table className="grid">
+        <div className="grid-wrap" style={{ maxHeight: 280 }} tabIndex={0} role="region" aria-label={t("Tables compared with the live database")}><table className="grid">
           <thead><tr><th>{t("Table")}</th><th>{t("Rows in the backup")}</th><th>{t("Rows in the live database")}</th><th>{t("Status")}</th></tr></thead>
           <tbody>{r.compare.tables.map((x) => (
             <tr key={x.table}><td className="mono">{x.table}</td><td className="num">{x.backup_rows ?? "—"}</td><td className="num">{x.live_rows ?? "—"}</td>

@@ -232,7 +232,7 @@ export function SchedulesPanel(props: { visible: boolean; serverId?: string; dbI
         <DriftReportView scheduleId={selected} refreshKey={items.find((s) => s.id === selected)?.last_run ?? 0} />}
       <Section title={selected ? t("History of this schedule") : t("History (all schedules)")} right={selected && <button className="btn small" onClick={() => setSelected(null)}>{t("Show all")}</button>}>
         {history.length === 0 ? <div className="muted">{t("No runs yet.")}</div> : (
-          <div className="grid-wrap" style={{ maxHeight: 320 }}><table className="grid">
+          <div className="grid-wrap" style={{ maxHeight: 320 }} tabIndex={0} role="region" aria-label={selected ? t("History of this schedule") : t("History (all schedules)")}><table className="grid">
             <thead><tr><th>{t("Started")}</th><th>{t("Schedule")}</th><th>{t("Kind")}</th><th>{t("Status")}</th><th>{t("Duration")}</th><th>{t("Result")}</th></tr></thead>
             <tbody>{history.map((h, i) => (
               <tr key={i}>

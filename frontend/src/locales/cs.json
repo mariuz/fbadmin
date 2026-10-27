@@ -2087,6 +2087,7 @@
   "Table {name}": "Tabulka {name}",
   "Tables": "Tabulky",
   "Tables ({count})": "Tabulky ({count})",
+  "Tables compared with the live database": "Tabulky porovnané s živou databází",
   "Tables include / exclude": "Zahrnutí / vyloučení tabulek",
   "Tables needing attention ({count})": "Tabulky vyžadující pozornost ({count})",
   "Tables:": "Tabulky:",
