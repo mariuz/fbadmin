@@ -32,6 +32,7 @@ from . import overview
 from . import querybuilder
 from . import access
 from . import driver as driver_api
+from . import kubernetes
 
 ROUTERS: list[APIRouter] = [
     servers.router,
@@ -66,4 +67,5 @@ ROUTERS: list[APIRouter] = [
     querybuilder.router,
     access.router,
     driver_api.router,
+    kubernetes.router,
 ]

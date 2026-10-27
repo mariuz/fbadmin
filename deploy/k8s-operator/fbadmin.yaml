@@ -1,6 +1,7 @@
 # fbadmin next to the operator-managed cluster. It is registered at startup from the ConfigMap
 # below (FBADMIN_SERVERS_FILE): host = the operator's primary Service, password = the cluster's
-# superuser Secret. Nothing has to be entered in the UI.
+# superuser Secret. Nothing has to be entered in the UI. With the service account of rbac.yaml,
+# Kubernetes in the top bar also shows and manages the FirebirdCluster (docs/KUBERNETES.md).
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -29,6 +30,7 @@ spec:
     metadata:
       labels: { app.kubernetes.io/name: fbadmin }
     spec:
+      serviceAccountName: fbadmin          # rbac.yaml: the Kubernetes page manages the cluster
       securityContext: { runAsNonRoot: true, runAsUser: 1000, fsGroup: 1000 }
       containers:
         - name: fbadmin

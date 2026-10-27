@@ -142,7 +142,8 @@ the right to delete those attachments: the same user, or SYSDBA/`RDB$ADMIN`.
 ## Scheduled jobs
 
 pgAgent-like schedules for **backups** (streamed into `<data dir>/backups/<schedule id>/`
-with **retention**: keep the last N files), **sweeps** and **online validations**.
+with **retention**: keep the last N files), **sweeps**, **online validations**, **schema snapshots**
+([Schema history](SCHEMA_HISTORY.md)) and **schema drift checks** ([Schema drift detection](SCHEMA_DRIFT.md)).
 
 * Standard 5-field cron expressions (`minute hour day-of-month month day-of-week`) with
   lists, ranges, steps, month/day names and `@hourly`/`@daily`/`@weekly`/`@monthly`/`@yearly`
@@ -286,6 +287,7 @@ published Signature V4 examples and needs no network.
 | `/api/servers/{sid}/trace/…` | templates, preview, sessions, events, stop, download |
 | `/api/schedules/…` | schedules CRUD, run, history, backups, cron preview |
 | `POST /api/schedules/{id}/backups/verify` (`{"path": …}`) | test restore of one archived backup (job) |
+| `GET /api/schedules/{id}/drift` | latest report of a schema drift check ([details](SCHEMA_DRIFT.md#api)) |
 | `GET/POST /api/storage/targets`, `GET/PUT/DELETE /api/storage/targets/{id}` | cloud storage targets (admins only in server mode) |
 | `POST /api/storage/targets/{id}/test`, `GET …/targets/{id}/objects?prefix=` | test a target, list its objects (newest first) |
 

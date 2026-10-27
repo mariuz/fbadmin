@@ -1,0 +1,28 @@
+/* Kubernetes operator integration (roadmap 2.2) */
+:root { --k8s-ok: #1b6e2a; --k8s-busy: #0b5cad; --k8s-bad: #b71c1c; --k8s-idle: #5f6670; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --k8s-ok: #7cd88a; --k8s-busy: #7fb8ff; --k8s-bad: #ff8a80; --k8s-idle: #b4bcc6; }
+}
+:root[data-theme="dark"] { --k8s-ok: #7cd88a; --k8s-busy: #7fb8ff; --k8s-bad: #ff8a80; --k8s-idle: #b4bcc6; }
+:root[data-theme="contrast"] { --k8s-ok: #7CFC00; --k8s-busy: #9cd0ff; --k8s-bad: #ff8a80; --k8s-idle: #e0e0e0; }
+
+.k8s-phase, .k8s-cond { display: inline-block; font-size: 12px; padding: 0 6px; border: 1px solid currentColor; border-radius: 999px; }
+.k8s-phase.ok, .k8s-cond.ok { color: var(--k8s-ok); }
+.k8s-phase.busy { color: var(--k8s-busy); }
+.k8s-phase.bad, .k8s-cond.bad { color: var(--k8s-bad); }
+.k8s-phase.idle, .k8s-cond.idle { color: var(--k8s-idle); }
+.k8s-facts { display: grid; grid-template-columns: max-content 1fr max-content 1fr; gap: 4px 12px; margin: 0 0 10px; }
+.k8s-facts dt { color: var(--muted); }
+.k8s-facts dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.k8s-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.k8s-form { margin-top: 10px; }
+.k8s-rowbtns { white-space: nowrap; }
+.k8s-rowbtns .btn + .btn { margin-left: 4px; }
+.k8s-restore { margin-top: 8px; flex-wrap: wrap; }
+.k8s-logs { margin-top: 8px; border: 1px solid var(--border); border-radius: var(--radius); padding: 6px; }
+.k8s-logs pre { margin: 6px 0 0; max-height: 320px; overflow: auto; font-size: 12px; white-space: pre-wrap; }
+.k8s-conds { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+@media (max-width: 700px) {
+  .k8s-facts { grid-template-columns: max-content 1fr; }
+  .k8s-rowbtns { white-space: normal; }
+}

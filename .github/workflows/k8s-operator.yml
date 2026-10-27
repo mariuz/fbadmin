@@ -1,6 +1,7 @@
 # End-to-end: deploy/k8s-operator on a kind cluster with the cloudnative-firebird operator.
 # The operator creates the Firebird cluster; fbadmin registers it from its ConfigMap
-# (FBADMIN_SERVERS_FILE) and is checked through its REST API: connect, DDL, data.
+# (FBADMIN_SERVERS_FILE) and is checked through its REST API: connect, DDL, data. Then the
+# Kubernetes page's API (/api/kubernetes) drives the cluster: register, backup, restore, hibernate.
 name: Kubernetes operator example
 
 on:
@@ -9,6 +10,8 @@ on:
     paths:
       - deploy/k8s-operator/**
       - backend/fbadmin/preconfig.py
+      - backend/fbadmin/kube/**
+      - backend/fbadmin/api/kubernetes.py
       - Dockerfile
       - .github/workflows/k8s-operator.yml
   schedule:
@@ -94,6 +97,68 @@ jobs:
           assert rows == [[1, "managed by the operator"]], rows
           print("ok:", rows)
           PY
+      - name: The Kubernetes page manages the cluster (/api/kubernetes)
+        run: |
+          kubectl -n fbadmin-demo port-forward svc/fbadmin 5051:80 >/dev/null 2>&1 &
+          for _ in $(seq 1 30); do curl -fsS http://127.0.0.1:5051/api/health && break; sleep 1; done
+          python3 - <<'PY'
+          import json, subprocess, time, urllib.error, urllib.request
+          B = "http://127.0.0.1:5051"
+          def req(m, p, body=None):
+              r = urllib.request.Request(B + p, method=m, data=json.dumps(body).encode() if body is not None else None,
+                                         headers={"Content-Type": "application/json"})
+              try:
+                  with urllib.request.urlopen(r, timeout=60) as f:
+                      return json.loads(f.read() or b"null")
+              except urllib.error.HTTPError as e:
+                  raise SystemExit(f"{m} {p}: {e.code} {e.read().decode()}")
+          def until(what, fn, timeout=300):
+              end = time.time() + timeout
+              while time.time() < end:
+                  v = fn()
+                  if v:
+                      return v
+                  time.sleep(3)
+              raise SystemExit(f"timed out waiting for {what}")
+          st = req("GET", "/api/kubernetes/status")
+          assert st["enabled"] and st["operator"] and st["namespaces"] == ["fbadmin-demo"], st
+          [c] = req("GET", "/api/kubernetes/clusters")
+          assert (c["namespace"], c["name"], c["instances"]) == ("fbadmin-demo", "fbcluster", 1), c
+          K = "/api/kubernetes/clusters/fbadmin-demo/fbcluster"
+          d = req("GET", K)
+          assert [p["name"] for p in d["pods"]] == ["fbcluster-0"] and d["pods"][0]["role"] == "primary", d["pods"]
+          print("logs:", req("GET", K + "/logs?pod=fbcluster-0&tail=5")["text"][-300:])
+          reg = req("POST", K + "/register", {})
+          assert reg["server_id"] == "k8s-fbadmin-demo-fbcluster" and reg["password_from_secret"], reg
+          sid = reg["server_id"]
+          print("register:", reg)
+          b = req("POST", K + "/backups", {"type": "logical"})["name"]
+          bk = until(f"backup {b}", lambda: next((x for x in req("GET", K)["backups"]
+                                                  if x["name"] == b and x["phase"] in ("Completed", "Failed")), None))
+          assert bk["phase"] == "Completed", bk
+          print("backup:", bk)
+          r = req("POST", K + "/restores", {"backup": b, "target": "restored.fdb"})
+          phase = lambda: subprocess.run(["kubectl", "-n", "fbadmin-demo", "get", "firebirdrestore", r["name"], "-o",
+                                          "jsonpath={.status.phase}"], capture_output=True, text=True).stdout
+          ph = until(f"restore {r['name']}", lambda: phase() in ("Completed", "Failed") and phase())
+          assert ph == "Completed", ph
+          db = req("POST", f"/api/servers/{sid}/databases", {"name": "restored", "path": "/var/lib/firebird/data/restored.fdb"})
+          req("POST", f"/api/servers/{sid}/connect", {})
+          rows = req("GET", f"/api/servers/{sid}/databases/{db['id']}/tables/K8S_DEMO/data")["rows"]
+          assert rows == [[1, "managed by the operator"]], rows
+          print("restored:", rows)
+          PY
+      - name: Hibernate and wake up through fbadmin
+        run: |
+          kubectl -n fbadmin-demo port-forward svc/fbadmin 5052:80 >/dev/null 2>&1 &
+          for _ in $(seq 1 30); do curl -fsS http://127.0.0.1:5052/api/health && break; sleep 1; done
+          api() { curl -fsS -X POST -H 'Content-Type: application/json' -d "$2" "http://127.0.0.1:5052/api/kubernetes/clusters/fbadmin-demo/fbcluster/$1"; echo; }
+          api hibernate '{"on": true}'
+          kubectl -n fbadmin-demo wait pod/fbcluster-0 --for=delete --timeout=180s
+          curl -fsS http://127.0.0.1:5052/api/kubernetes/clusters | grep -q '"hibernated":true'
+          api hibernate '{"on": false}'
+          for _ in $(seq 1 60); do kubectl -n fbadmin-demo get pod fbcluster-0 >/dev/null 2>&1 && break; sleep 5; done
+          kubectl -n fbadmin-demo wait pod/fbcluster-0 --for=condition=Ready --timeout=300s
       - name: Diagnostics
         if: failure()
         run: |

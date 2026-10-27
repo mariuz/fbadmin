@@ -77,6 +77,7 @@ nav:
       - PSQL debugging and tests: PSQL_DEBUGGING.md
       - Schema tools: SCHEMA_TOOLS.md
       - Schema history in git: SCHEMA_HISTORY.md
+      - Schema drift detection: SCHEMA_DRIFT.md
       - Data compare: DATA_COMPARE.md
       - Firebird 6 and SQL schemas: FIREBIRD6.md
       - Upgrade assistant: UPGRADE.md
@@ -90,6 +91,7 @@ nav:
       - Configuration: admin/configuration.md
       - Database drivers (pure Python and native): DRIVERS.md
       - Deployment (Docker, Kubernetes): admin/deployment.md
+      - Kubernetes operator clusters: KUBERNETES.md
       - Command-line tool: CLI.md
       - Local databases (embedded engine): EMBEDDED.md
       - Security and server mode: SECURITY.md

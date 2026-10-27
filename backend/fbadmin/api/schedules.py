@@ -1,18 +1,19 @@
-"""Scheduled jobs (cron) for backups with retention, sweeps and validations."""
+"""Scheduled jobs (cron): backups with retention, sweeps, validations, schema snapshots and drift checks."""
 
 from __future__ import annotations
 
 from datetime import datetime
 from typing import Literal
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from ..maintenance import archive, ops
+from ..maintenance import archive, drift, ops
+from ..maintenance.drift import DriftOptions
 from ..maintenance.cron import Cron
 from ..maintenance.scheduler import Schedule, UploadOptions, get_scheduler
 from ..security import runas
-from ..security.access import ADMIN, require_level
+from ..security.access import ADMIN, READ, require_level
 from ..security.core import require_admin
 from .deps import get_state
 
@@ -21,7 +22,7 @@ router = APIRouter(prefix="/api/schedules", tags=["schedules"])
 
 class ScheduleIn(BaseModel):
     name: str
-    kind: Literal["backup", "sweep", "validate", "schema_snapshot"] = "backup"
+    kind: Literal["backup", "sweep", "validate", "schema_snapshot", "schema_drift"] = "backup"
     server_id: str
     database_id: str
     cron: str
@@ -31,11 +32,12 @@ class ScheduleIn(BaseModel):
     verify: bool = False
     verify_path: str | None = None
     upload: UploadOptions | None = None
+    drift: DriftOptions | None = None
 
 
 class ScheduleUpdate(BaseModel):
     name: str | None = None
-    kind: Literal["backup", "sweep", "validate", "schema_snapshot"] | None = None
+    kind: Literal["backup", "sweep", "validate", "schema_snapshot", "schema_drift"] | None = None
     cron: str | None = None
     enabled: bool | None = None
     keep: int | None = None
@@ -45,6 +47,7 @@ class ScheduleUpdate(BaseModel):
     verify: bool | None = None
     verify_path: str | None = None  # null clears it
     upload: UploadOptions | None = None  # null removes the upload
+    drift: DriftOptions | None = None
 
 
 class VerifyIn(BaseModel):
@@ -67,6 +70,29 @@ def _upload_allowed(upload) -> None:
     """Uploads use the cloud credentials of storage targets, which only administrators manage."""
     if upload:
         require_admin()  # desktop mode: allowed
+
+
+def _drift_allowed(kind: str | None, opts: DriftOptions | None, server_id: str, database_id: str) -> None:
+    """A drift check reads the baseline's schema: the baseline database, or the database whose schema history
+    is used, must be visible with at least read access."""
+    if kind != "schema_drift":
+        return
+    opts = opts or DriftOptions()
+    if opts.baseline == "database":
+        if not (opts.server_id and opts.database_id):
+            raise ValueError("Choose the database to compare with")
+        if (opts.server_id, opts.database_id) == (server_id, database_id):
+            raise ValueError("The baseline database is the database itself")
+        sid, did = opts.server_id, opts.database_id
+    else:
+        sid, did = opts.history_db(server_id, database_id)
+        from .. import schemahistory
+
+        if schemahistory.get_store().find(sid, did) is None:
+            raise ValueError("The baseline database has no schema history repository: set one up in its "
+                             "Schema history tab first")
+    get_state().store.get_database(sid, did)
+    require_level(sid, did, READ, "the drift check's baseline")
 
 
 def _visible(s: dict) -> bool:
@@ -96,6 +122,7 @@ def cron_preview(expr: str, count: int = 5):
 def create(body: ScheduleIn):
     _allowed(body.server_id, body.database_id)
     _upload_allowed(body.upload)
+    _drift_allowed(body.kind, body.drift, body.server_id, body.database_id)
     data = body.model_dump(exclude_none=True)
     data["run_as"] = runas.issue(body.server_id, f"schedule: {body.name}")  # server mode: runs as the current user
     s = get_scheduler().add(Schedule(**data))
@@ -124,6 +151,9 @@ def update(schedule_id: str, body: ScheduleUpdate):
     _allowed(changes.get("server_id") or cur.server_id, changes.get("database_id") or cur.database_id)
     if changes.get("upload") is not None and (cur.upload is None or changes["upload"] != cur.upload.model_dump()):
         _upload_allowed(changes["upload"])
+    kind = changes.get("kind") or cur.kind
+    opts = DriftOptions(**changes["drift"]) if changes.get("drift") is not None else cur.drift
+    _drift_allowed(kind, opts, changes.get("server_id") or cur.server_id, changes.get("database_id") or cur.database_id)
     new_cred = runas.issue(changes.get("server_id") or cur.server_id, f"schedule: {changes.get('name') or cur.name}")
     if new_cred is not None:  # whoever saves the schedule last is the user it runs as
         changes["run_as"] = new_cred
@@ -152,6 +182,16 @@ def run_now(schedule_id: str):
 def history(schedule_id: str, limit: int = 100):
     _check(get_scheduler().get(schedule_id))
     return get_scheduler().history_for(schedule_id, limit)
+
+
+@router.get("/{schedule_id}/drift")
+def drift_report(schedule_id: str):
+    """The latest report of a drift check: the differences and the script that makes the database match."""
+    _check(get_scheduler().get(schedule_id))
+    report = drift.load_report(schedule_id)
+    if report is None:
+        raise HTTPException(404, "This schedule has not checked for drift yet")
+    return report
 
 
 @router.get("/{schedule_id}/backups")

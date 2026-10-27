@@ -50,16 +50,30 @@ export interface TraceEvent { seq: number; time: string; pid: number; type: stri
 export interface TraceTemplate { id: string; label: string; description: string; params: Record<string, number> }
 
 export interface Schedule {
-  id: string; name: string; kind: "backup" | "sweep" | "validate" | "schema_snapshot"; server_id: string; database_id: string; cron: string;
+  id: string; name: string; kind: "backup" | "sweep" | "validate" | "schema_snapshot" | "schema_drift"; server_id: string; database_id: string; cron: string;
   enabled: boolean; keep: number; options: Record<string, any>; created_at: number; last_run: number | null;
   last_status: string | null; next_run: number | null;
   verify: boolean; verify_path: string | null; upload: { target_id: string; prefix: string; keep: number } | null;
+  drift: DriftOptions | null;
+}
+export interface DriftOptions {
+  baseline: "history" | "database"; history_server_id: string | null; history_database_id: string | null; ref: string | null; fetch: boolean;
+  server_id: string | null; database_id: string | null; ignore_types: string[]; ignore_names: string[];
+}
+export type DriftStatus = "missing" | "extra" | "changed";
+export interface DriftItem { schema: string | null; type: string; name: string; status: DriftStatus; baseline_ddl: string | null; database_ddl: string | null }
+export interface DriftReport {
+  server_id: string; database_id: string; database: string; checked_at: number; duration_ms: number; drift: boolean;
+  baseline: { kind: "history" | "database"; label: string; ref?: string; commit?: string; subject?: string; server_id: string; database_id: string };
+  summary: Record<DriftStatus, number>; items: DriftItem[]; ignored: number; warnings: string[]; script: string; truncated?: boolean;
+  ignore_types: string[]; ignore_names: string[];
 }
 export interface HistoryItem {
   schedule_id: string; schedule_name: string; kind: string; job_id: string | null; started_at: number; finished_at: number; status: string;
   error: string | null; file?: string; size?: number; removed?: string[]; validation_errors?: number;
   verify?: { ok: boolean; error?: string; seconds?: number; tables?: number };
   upload?: { ok: boolean; error?: string; target?: string; key?: string; removed?: string[] };
+  drift?: boolean; summary?: Record<DriftStatus, number>; ignored?: number; baseline?: string;
 }
 
 export const mapi = {
@@ -125,6 +139,7 @@ export const mapi = {
   scheduleHistory: (id?: string) => request<HistoryItem[]>("GET", id ? `/api/schedules/${id}/history` : "/api/schedules/history"),
   scheduleBackups: (id: string) => request<ArchiveItem[]>("GET", `/api/schedules/${id}/backups`),
   verifyBackup: (id: string, path: string) => request<Job>("POST", `/api/schedules/${id}/backups/verify`, { path }),
+  driftReport: (id: string) => request<DriftReport>("GET", `/api/schedules/${id}/drift`),
   cronPreview: (expr: string) => request<{ next: string[] }>("GET", `/api/schedules/cron-preview?expr=${encodeURIComponent(expr)}`),
 };
 

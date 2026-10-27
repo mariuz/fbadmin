@@ -105,7 +105,8 @@ in the schedule history (and raises the *schedule failed* alert).
   (`FBADMIN_SCHEMA_HISTORY_DELAY`, default 5 seconds; further DDL in that time restarts the wait, so a
   long script gives one commit). In the Query Tool with autocommit off, the snapshot waits for the
   **Commit**. Running the DDL is not slowed down: the hook only checks the statement text. DDL run by
-  other programs is picked up by the next manual or scheduled snapshot.
+  other programs is picked up by the next manual or scheduled snapshot. To be told about such changes
+  instead, schedule a [drift check](SCHEMA_DRIFT.md) against the history.
 
 ## Reading the history
 

@@ -99,6 +99,9 @@ resource creates the cluster, and fbadmin registers its primary Service from a C
 taking the password from the cluster's superuser Secret. A CI workflow
 (`.github/workflows/k8s-operator.yml`) runs it end to end on kind. See
 [the example's README](https://github.com/mariuz/fbadmin/tree/main/deploy/k8s-operator).
+With a service account and RBAC, **Kubernetes** in the top bar also lists and manages the
+operator's clusters (scale, hibernate, restart, switchover, backups and restores); see
+[Kubernetes operator clusters](../KUBERNETES.md).
 
 Any other way of running Firebird on Kubernetes works the same way, because fbadmin only
 needs an endpoint and credentials. This includes the StatefulSet above, a Helm chart, or

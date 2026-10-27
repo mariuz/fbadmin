@@ -7,6 +7,10 @@ This example runs fbadmin next to a Firebird cluster managed by
   volume, the primary Service `fbcluster` and the database `demo.fdb`.
 - **fbadmin** registers that cluster at startup from a ConfigMap (`FBADMIN_SERVERS_FILE`). It
   reads the password from the cluster's superuser Secret, so nothing has to be typed into the UI.
+- **The Kubernetes page** (Kubernetes in the top bar) shows the `FirebirdCluster` with its
+  instances, backups and events, and scales, hibernates, restarts, switches over, fences, backs
+  up and restores it. It uses the `fbadmin` service account and the Role in `rbac.yaml`; see
+  [docs/KUBERNETES.md](../../docs/KUBERNETES.md).
 
 ```bash
 # 1. the operator (CRDs + Deployment), from a checkout of cloudnative-firebird
@@ -33,7 +37,9 @@ How it's tested:
 - **CI, end to end:** `.github/workflows/k8s-operator.yml` runs on a kind cluster. It builds the
   operator at a pinned commit and fbadmin from this repository, applies this directory, waits
   for the operator to bring the cluster up, then uses fbadmin's API to connect, create a table
-  and read it back.
+  and read it back. It then drives the cluster through `/api/kubernetes`: lists it, registers
+  it, takes a logical backup and waits for `Completed`, restores it into a new file and opens
+  that file, and hibernates the cluster and wakes it up again.
 - **Manifests:** server-side dry run against the operator's CRDs. The API server accepts the
   manifests and rejects invalid values (`instances: 0`) and unknown fields.
 - **fbadmin side, locally:** the image runs read-only with the ConfigMap's `servers.yaml`

@@ -1121,6 +1121,210 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/kubernetes/clusters": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Clusters */
+        get: operations["clusters_api_kubernetes_clusters_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/kubernetes/clusters/{namespace}/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Cluster */
+        get: operations["cluster_api_kubernetes_clusters__namespace___name__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/kubernetes/clusters/{namespace}/{name}/backups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Backup */
+        post: operations["backup_api_kubernetes_clusters__namespace___name__backups_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/kubernetes/clusters/{namespace}/{name}/fence": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Fence */
+        post: operations["fence_api_kubernetes_clusters__namespace___name__fence_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/kubernetes/clusters/{namespace}/{name}/hibernate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Hibernate */
+        post: operations["hibernate_api_kubernetes_clusters__namespace___name__hibernate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/kubernetes/clusters/{namespace}/{name}/logs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Logs */
+        get: operations["logs_api_kubernetes_clusters__namespace___name__logs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/kubernetes/clusters/{namespace}/{name}/register": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Register */
+        post: operations["register_api_kubernetes_clusters__namespace___name__register_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/kubernetes/clusters/{namespace}/{name}/restart": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Restart */
+        post: operations["restart_api_kubernetes_clusters__namespace___name__restart_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/kubernetes/clusters/{namespace}/{name}/restores": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Restore */
+        post: operations["restore_api_kubernetes_clusters__namespace___name__restores_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/kubernetes/clusters/{namespace}/{name}/scale": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Scale */
+        post: operations["scale_api_kubernetes_clusters__namespace___name__scale_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/kubernetes/clusters/{namespace}/{name}/switchover": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Switchover */
+        post: operations["switchover_api_kubernetes_clusters__namespace___name__switchover_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/kubernetes/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Status */
+        get: operations["status_api_kubernetes_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/library": {
         parameters: {
             query?: never;
@@ -1632,6 +1836,26 @@ export interface paths {
          * @description Test-restore one archived backup into a scratch database (then dropped), as a background job.
          */
         post: operations["verify_backup_api_schedules__schedule_id__backups_verify_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/schedules/{schedule_id}/drift": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Drift Report
+         * @description The latest report of a drift check: the differences and the script that makes the database match.
+         */
+        get: operations["drift_report_api_schedules__schedule_id__drift_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -5018,6 +5242,34 @@ export interface components {
             source: components["schemas"]["Side"];
             target: components["schemas"]["Side"];
         };
+        /** DriftOptions */
+        DriftOptions: {
+            /**
+             * Baseline
+             * @default history
+             * @enum {string}
+             */
+            baseline?: "history" | "database";
+            /** Database Id */
+            database_id?: string | null;
+            /**
+             * Fetch
+             * @default false
+             */
+            fetch?: boolean;
+            /** History Database Id */
+            history_database_id?: string | null;
+            /** History Server Id */
+            history_server_id?: string | null;
+            /** Ignore Names */
+            ignore_names?: string[];
+            /** Ignore Types */
+            ignore_types?: string[];
+            /** Ref */
+            ref?: string | null;
+            /** Server Id */
+            server_id?: string | null;
+        };
         /** DriverIn */
         DriverIn: {
             /** Driver */
@@ -5089,6 +5341,13 @@ export interface components {
             table?: string | null;
             /** Table Name */
             table_name?: string | null;
+        };
+        /** FenceIn */
+        FenceIn: {
+            /** Instance */
+            instance: string;
+            /** On */
+            on: boolean;
         };
         /** FetchIn */
         FetchIn: {
@@ -5394,6 +5653,11 @@ export interface components {
             /** Register As */
             register_as?: string | null;
         };
+        /** OnOff */
+        OnOff: {
+            /** On */
+            on: boolean;
+        };
         /** OnlineIn */
         OnlineIn: {
             /**
@@ -5491,6 +5755,23 @@ export interface components {
             /** Enabled */
             enabled: boolean;
         };
+        /** RegisterIn */
+        RegisterIn: {
+            /** Host */
+            host?: string | null;
+            /** Password */
+            password?: string | null;
+            /**
+             * Port
+             * @default 3050
+             */
+            port?: number;
+            /**
+             * Shared
+             * @default false
+             */
+            shared?: boolean;
+        };
         /** RenderIn */
         RenderIn: {
             /**
@@ -5512,6 +5793,11 @@ export interface components {
         ReplicaModeIn: {
             /** Mode */
             mode: string;
+        };
+        /** RestartIn */
+        RestartIn: {
+            /** Instance */
+            instance?: string | null;
         };
         /** RestoreOptions */
         RestoreOptions: {
@@ -5700,12 +5986,18 @@ export interface components {
             /** Run Id */
             run_id?: string | null;
         };
+        /** ScaleIn */
+        ScaleIn: {
+            /** Instances */
+            instances: number;
+        };
         /** ScheduleIn */
         ScheduleIn: {
             /** Cron */
             cron: string;
             /** Database Id */
             database_id: string;
+            drift?: components["schemas"]["DriftOptions"] | null;
             /**
              * Enabled
              * @default true
@@ -5721,7 +6013,7 @@ export interface components {
              * @default backup
              * @enum {string}
              */
-            kind?: "backup" | "sweep" | "validate" | "schema_snapshot";
+            kind?: "backup" | "sweep" | "validate" | "schema_snapshot" | "schema_drift";
             /** Name */
             name: string;
             options?: components["schemas"]["BackupOptions"] | null;
@@ -5742,12 +6034,13 @@ export interface components {
             cron?: string | null;
             /** Database Id */
             database_id?: string | null;
+            drift?: components["schemas"]["DriftOptions"] | null;
             /** Enabled */
             enabled?: boolean | null;
             /** Keep */
             keep?: number | null;
             /** Kind */
-            kind?: ("backup" | "sweep" | "validate" | "schema_snapshot") | null;
+            kind?: ("backup" | "sweep" | "validate" | "schema_snapshot" | "schema_drift") | null;
             /** Name */
             name?: string | null;
             options?: components["schemas"]["BackupOptions"] | null;
@@ -5938,6 +6231,11 @@ export interface components {
             password?: string | null;
             /** Security Db */
             security_db?: string | null;
+        };
+        /** SwitchoverIn */
+        SwitchoverIn: {
+            /** Target */
+            target: string;
         };
         /** TableIn */
         TableIn: {
@@ -6283,6 +6581,28 @@ export interface components {
             tags?: {
                 [key: string]: string | null;
             } | null;
+        };
+        /** BackupIn */
+        fbadmin__api__kubernetes__BackupIn: {
+            /** Database */
+            database?: string | null;
+            /** Level */
+            level?: number | null;
+            /** Name */
+            name?: string | null;
+            /**
+             * Type
+             * @default logical
+             * @enum {string}
+             */
+            type?: "logical" | "physical";
+        };
+        /** RestoreIn */
+        fbadmin__api__kubernetes__RestoreIn: {
+            /** Backup */
+            backup: string;
+            /** Target */
+            target?: string | null;
         };
         /** BackupIn */
         fbadmin__api__maintenance__BackupIn: {
@@ -8574,6 +8894,402 @@ export interface operations {
             };
         };
     };
+    clusters_api_kubernetes_clusters_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    cluster_api_kubernetes_clusters__namespace___name__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                namespace: string;
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    backup_api_kubernetes_clusters__namespace___name__backups_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                namespace: string;
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["fbadmin__api__kubernetes__BackupIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fence_api_kubernetes_clusters__namespace___name__fence_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                namespace: string;
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FenceIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    hibernate_api_kubernetes_clusters__namespace___name__hibernate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                namespace: string;
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OnOff"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    logs_api_kubernetes_clusters__namespace___name__logs_get: {
+        parameters: {
+            query: {
+                pod: string;
+                tail?: number;
+                container?: string;
+            };
+            header?: never;
+            path: {
+                namespace: string;
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    register_api_kubernetes_clusters__namespace___name__register_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                namespace: string;
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegisterIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restart_api_kubernetes_clusters__namespace___name__restart_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                namespace: string;
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RestartIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restore_api_kubernetes_clusters__namespace___name__restores_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                namespace: string;
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["fbadmin__api__kubernetes__RestoreIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    scale_api_kubernetes_clusters__namespace___name__scale_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                namespace: string;
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScaleIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    switchover_api_kubernetes_clusters__namespace___name__switchover_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                namespace: string;
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SwitchoverIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    status_api_kubernetes_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
     library_info_api_library_get: {
         parameters: {
             query?: never;
@@ -9687,6 +10403,37 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    drift_report_api_schedules__schedule_id__drift_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                schedule_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };

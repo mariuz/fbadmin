@@ -46,3 +46,34 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- define "fbadmin.claimName" -}}
 {{- default (printf "%s-data" (include "fbadmin.fullname" .)) .Values.persistence.existingClaim }}
 {{- end }}
+
+{{/*
+RBAC rules of the Kubernetes page (docs/KUBERNETES.md).
+*/}}
+{{- define "fbadmin.kubernetesRules" -}}
+- apiGroups: [firebird.cloudnative-firebird.io]
+  resources: [firebirdclusters]
+  verbs: {{ ternary "[get, list, patch]" "[get, list]" .Values.kubernetes.manage }}
+- apiGroups: [firebird.cloudnative-firebird.io]
+  resources: [firebirdbackups, firebirdrestores]
+  verbs: {{ ternary "[get, list, create]" "[get, list]" .Values.kubernetes.manage }}
+- apiGroups: [firebird.cloudnative-firebird.io]
+  resources: [firebirdscheduledbackups, firebirddatabases, firebirdusers]
+  verbs: [get, list]
+- apiGroups: [""]
+  resources: [pods]
+  verbs: {{ ternary "[get, list, delete]" "[get, list]" .Values.kubernetes.manage }}
+- apiGroups: [""]
+  resources: [pods/log, events]
+  verbs: [get, list]
+{{- if .Values.kubernetes.manage }}
+- apiGroups: [apps]
+  resources: [statefulsets]
+  verbs: [get, patch]
+{{- end }}
+{{- if .Values.kubernetes.readSecrets }}
+- apiGroups: [""]
+  resources: [secrets]
+  verbs: [get]
+{{- end }}
+{{- end }}

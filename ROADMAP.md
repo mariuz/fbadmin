@@ -12,7 +12,7 @@ scope.
 
 **Status:** milestones 0.1 to 2.0, the engineering backlog and the phone and tablet layout are
 implemented and verified in CI against real services. Firebird 6.0 final support waits for the
-6.0 release; milestones 2.1, 2.2 and 3.0 below are planned. The current release is **2.1.1** ([release notes](docs/release-notes/v2.1.1.md)): on
+6.0 release; milestones 2.1, 2.2, 2.3 and 3.0 below are planned. The current release is **2.1.1** ([release notes](docs/release-notes/v2.1.1.md)): on
 [PyPI](https://pypi.org/project/firebird-admin/) (`pip install firebird-admin`), on
 [GitHub Releases](https://github.com/mariuz/fbadmin/releases) with desktop installers for Windows,
 macOS and Linux, as a Docker image, and documented at https://mariuz.github.io/fbadmin/.
@@ -241,17 +241,29 @@ Also fixed in this milestone:
   - Folders with more than 400 objects render only the visible rows; expanded state and screen-reader positions are kept.
   - Autocompletion of very large schemas loads table names first (2.5 s instead of 14 s) and fetches the columns of the tables a query uses.
   - Load tests run in the backend and e2e suites ([docs/user-guide/object-explorer.md](docs/user-guide/object-explorer.md#very-large-schemas))
+- ⬜ **firebirdsql 1.5.1:** once it is on PyPI, require it (`firebirdsql>=1.5.1`), remove the three workarounds for 1.5.0 (bind-describe assert, read-ahead buffer, compressed fetch wait) and rerun the benchmarks in [docs/DRIVERS.md](docs/DRIVERS.md). 1.5.1 carries fbadmin's upstream fixes and the faster wire encryption ([nakagami/pyfirebirdsql#144](https://github.com/nakagami/pyfirebirdsql/pull/144), [#145](https://github.com/nakagami/pyfirebirdsql/pull/145))
+- ⬜ **Revisit the *Automatic* driver choice with benchmarks:** with firebirdsql 1.5.1 the pure-Python driver fetches rows faster than the native one on Firebird 4+, while BLOBs and backups stay much faster natively; decide from measurements whether Automatic stays native everywhere
+- ⬜ **Prepared statements in fbadmin's loops:** grid edits, imports and data compare scripts run one statement many times; use `prep()` / `executemany` so they gain from the driver's fewer round trips (about 2x on a LAN with the pending upstream change)
 - ⬜ **Supply-chain hardening:** an SBOM for each package, signed container images and build provenance (attestations), dependency scanning in CI, and a security policy (`SECURITY.md` for reporting vulnerabilities)
 
 ## Milestone 2.2 — Operations ⬜
 
-- ⬜ **Schema drift detection:** on a schedule, compare a production database with its git schema history or with another database, and alert when they differ
+- ✅ **Schema drift detection:** a scheduled *schema drift check* compares a database with its schema history in git (a branch, tag, commit or a fetched `origin/<branch>`; its own repository or another database's) or with another database; differences are listed as missing, extra or changed with both DDL versions and the script that makes the database match; object types and name patterns can be ignored; the `schema.drift` alert is sent for new or changed drift and once when it is gone ([docs/SCHEMA_DRIFT.md](docs/SCHEMA_DRIFT.md))
 - ⬜ **Versioned migrations:** numbered SQL scripts in git applied in order, a per-database record of what was applied, dry run first (Flyway-style), from the UI and the command-line tool
 - ⬜ **Replication setup wizard:** configure primary and replica end to end (publication, `replication.conf`, replica creation from a backup) and verify that changes arrive
 - ⬜ **Backup encryption and restore drills:** optional encryption of backups kept by fbadmin and uploaded to the cloud; periodic restore drills with a report
 - ⬜ **Query regression tracking:** keep slow statements and their plans over time and flag statements whose plan or duration got worse
 - ⬜ **Audit log forwarding:** send the audit log to a central logging system (syslog, webhook)
-- ⬜ **Kubernetes operator integration:** manage Firebird clusters of the cloudnative-firebird operator from the UI
+- ✅ **Kubernetes operator integration:** Kubernetes in the top bar lists the `FirebirdCluster`s of the cloudnative-firebird operator with their instances, backups, scheduled backups, databases, users and events; scale, hibernate, rolling or single-instance restart, switchover, fence, back up, restore into a new file, instance logs, and register the cluster as an fbadmin server with the password from its Secret; uses fbadmin's service account (RBAC in `deploy/k8s-operator` and the Helm chart's `kubernetes` values) or a kubeconfig; every action is audited ([docs/KUBERNETES.md](docs/KUBERNETES.md))
+
+## Milestone 2.3 — Insight and collaboration ⬜
+
+- ⬜ **SQL notebooks:** SQL cells, notes, results and charts in one saved document, shared in server mode; for runbooks ("monthly health check", "month-end close") and for handing over an investigation
+- ⬜ **Anonymised copies of production:** copy a database to a development or test server with masking rules per column (fake e-mails and names, shuffled values, scrambled numbers), consistent across foreign keys; built on backup/restore, the test data generator and data compare
+- ⬜ **Guided performance check-up ("why is it slow?"):** one ranked report from what fbadmin already collects (OAT gap, sweep settings, gstat fill and record versions, outdated index selectivity, cache size, lock waits) with a fix action per finding, such as *recompute selectivity* or *sweep now*
+- ⬜ **Database timeline:** one history per database of schema changes, audit log entries, backups and test restores, alerts and upgrades, to answer "what changed before it broke?"
+- ⬜ **Push notifications for alerts:** Web Push to the installed phone app, next to the e-mail, Slack and webhook channels
+- ⬜ **Shareable links** in server mode to an object, a saved query or a result snapshot, opened with the viewer's own permissions
 
 ## Milestone 3.0 — Teams and distribution ⬜
 

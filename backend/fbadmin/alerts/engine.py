@@ -89,11 +89,14 @@ class Engine:
         return not (rule.database_id and rule.database_id != database_id)
 
     def emit(self, event: str, level: str, title: str, message: str, *, server_id: str | None = None,
-             database_id: str | None = None, key: str | None = None, details: dict | None = None) -> list[dict]:
-        """Raise an event; every matching rule sends it unless the rule is cooling down."""
+             database_id: str | None = None, key: str | None = None, details: dict | None = None,
+             force: bool = False) -> list[dict]:
+        """Raise an event; every matching rule sends it unless the rule is cooling down (``force``: send it
+        anyway, for news such as a changed drift or a resolved one)."""
         rules = [r for r in self.store.rules.values() if self.matches(r, event, server_id, database_id)]
         return [a for r in rules if (a := self._fire(r, level, title, message, server_id, database_id,
-                                                      key or f"{event}:{server_id}:{database_id}", details))]
+                                                      key or f"{event}:{server_id}:{database_id}", details,
+                                                      force=force))]
 
     def _fire(self, rule: Rule, level: str, title: str, message: str, server_id: str | None,
               database_id: str | None, key: str, details: dict | None, *, force: bool = False) -> dict | None:

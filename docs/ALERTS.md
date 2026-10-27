@@ -80,6 +80,7 @@ database.
 | `backup.verify_failed` | A scheduled backup could not be restored in its [test restore](MAINTENANCE.md#test-restores). |
 | `validation.errors` | A scheduled online validation reported errors. |
 | `upload.failed` | A backup could not be uploaded to its [cloud storage target](MAINTENANCE.md#cloud-storage-targets). |
+| `schema.drift` | A scheduled [drift check](SCHEMA_DRIFT.md) found differences from its baseline. A different drift is sent at once, even during the cool-down; when the drift is gone, one *resolved* message follows. |
 
 `schedule.failed` also covers the three more specific events. A rule on `schedule.failed` and
 another on `backup.verify_failed` therefore both send their message when a test restore fails.

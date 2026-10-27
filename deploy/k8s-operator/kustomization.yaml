@@ -8,4 +8,5 @@ resources:
   - namespace.yaml
   - firebird-secret.yaml
   - firebirdcluster.yaml
+  - rbac.yaml
   - fbadmin.yaml

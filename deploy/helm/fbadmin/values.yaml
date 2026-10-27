@@ -117,6 +117,19 @@ firebirdServers: []
 #    databases:
 #      - { name: main, path: /var/lib/firebird/data/main.fdb }
 
+# The Kubernetes page (docs/KUBERNETES.md): Firebird clusters of the cloudnative-firebird
+# operator, managed with this release's service account. It mounts the service account token and
+# creates a Role + RoleBinding in each namespace (or, with namespaces ["*"], a ClusterRole).
+kubernetes:
+  enabled: false
+  # Namespaces with FirebirdClusters; empty: the release namespace; ["*"]: every namespace.
+  namespaces: []
+  # false: list and inspect only (no scale, restart, backup, ...).
+  manage: true
+  # Read the clusters' superuser Secrets for "Register in fbadmin" (any Secret of the namespaces:
+  # Kubernetes can't limit this to Secrets named in a FirebirdCluster). Without it, type the password.
+  readSecrets: false
+
 # Extra environment variables for the container.
 extraEnv: []
 #  - name: FBADMIN_META_POOL_SIZE

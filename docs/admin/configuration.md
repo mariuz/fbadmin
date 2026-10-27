@@ -29,6 +29,9 @@ fbadmin-desktop [--port PORT] [--browser] [--log-level LEVEL]
 | `FBADMIN_FBCLIENT` | | Path of `libfbclient` for the native driver (default: the embedded engine's, else the system library path). Overrides the setting in the UI |
 | `FBADMIN_UPDATE_CHECK` | `ask` | `off` forbids the opt-in update check (see [Privacy](../PRIVACY.md)) |
 | `FBADMIN_SERVERS_FILE` | unset | YAML/JSON file of Firebird servers to register at startup; see [Deployment](deployment.md#preconfigured-servers) |
+| `FBADMIN_KUBERNETES` | auto | `off` turns off the [Kubernetes page](../KUBERNETES.md); `on` also uses `$KUBECONFIG` / `~/.kube/config`. Auto: the pod's service account |
+| `FBADMIN_KUBECONFIG` / `FBADMIN_KUBE_CONTEXT` | unset | Kubeconfig file (and context) for the Kubernetes page |
+| `FBADMIN_K8S_NAMESPACES` | own namespace | Namespaces with Firebird clusters, comma-separated; `*` for all |
 | `FBADMIN_PLUGINS` | on | `off` loads no plugins: a safe mode for troubleshooting, also used when generating the API types |
 
 ## Logging

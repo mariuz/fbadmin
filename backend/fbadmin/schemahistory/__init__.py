@@ -29,7 +29,7 @@ from pydantic import BaseModel, Field
 from ..config import settings
 from ..metadata.types import quote_ident
 from . import layout
-from .gitrepo import GitError, GitMissing, Repo, check_branch, check_sha, git_binary, git_version
+from .gitrepo import GitError, GitMissing, Repo, check_branch, check_ref, check_sha, git_binary, git_version
 
 __all__ = ["HistoryConfig", "GitError", "GitMissing", "get_store", "snapshot", "after_sql", "after_commit"]
 
@@ -569,6 +569,31 @@ def migration(server_id: str, db_id: str, sha_from: str, sha_to: str) -> dict[st
     script = header + ("\n".join(parts) if parts else "/* The schemas are identical: nothing to do */\n")
     summary = {k: sum(1 for i in items if i["status"] == k) for k in ("create", "alter", "drop")}
     return {"items": items, "summary": summary, "warnings": warnings, "script": script}
+
+
+def snapshots_at(server_id: str, db_id: str, ref: str | None = None, *, fetch: bool = False,
+                 log=None) -> dict[str, Any]:
+    """The schema stored at ``ref`` (default: the configured branch) in a database's history repository:
+    ``{"commit", "ref", "subject", "time", "snapshots": {schema ("" before Firebird 6): Snapshot}}``.
+    With ``fetch`` the remote is fetched first, so ``origin/<branch>`` is current."""
+    log = log or (lambda _m: None)
+    c = get_store().get(server_id, db_id)
+    repo = open_repo(c)
+    ref = check_ref(ref or c.branch)
+    if fetch:
+        if not c.remote_url:
+            raise ValueError("The schema history repository has no remote to fetch from")
+        log(f"Fetching {c.remote_url}")
+        with _lock_for(repo.path):
+            repo.set_remote(c.remote_url)
+            repo.fetch()
+    sha = repo.resolve(ref)
+    p = repo.run("show", f"{sha}:{_repo_path(c, layout.SNAPSHOT_FILE)}", check=False)
+    if p.returncode != 0:
+        raise KeyError(f"Commit {sha[:10]} ({ref}) has no {layout.SNAPSHOT_FILE}")
+    subject, when = (repo.out("log", "-1", "--format=%s%x00%ct", sha).rstrip("\n").split("\0") + ["", "0"])[:2]
+    return {"commit": sha, "ref": ref, "subject": subject, "time": int(when or 0),
+            "snapshots": layout.snapshots_from_json(p.stdout)}
 
 
 # ------------------------------------------------------------------ after DDL (background)

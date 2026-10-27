@@ -343,6 +343,19 @@ jobs:
       - uses: azure/setup-helm@v4
       - run: helm lint deploy/helm/fbadmin
       - run: helm template t deploy/helm/fbadmin --set serverMode.enabled=true --set ingress.enabled=true > /dev/null
+      - name: Kubernetes page RBAC (release namespace, listed namespaces, cluster-wide, read-only)
+        run: |
+          # count of Role, RoleBinding, ClusterRole, ClusterRoleBinding documents
+          kinds() {
+            out=$(helm template t deploy/helm/fbadmin -n fb "$@")
+            for k in Role RoleBinding ClusterRole ClusterRoleBinding; do grep -c "^kind: $k\$" <<<"$out" || true; done | paste -sd,
+          }
+          test "$(kinds --set kubernetes.enabled=true)" = 1,1,0,0
+          test "$(kinds --set kubernetes.enabled=true --set 'kubernetes.namespaces={a,b}')" = 2,2,0,0
+          test "$(kinds --set kubernetes.enabled=true --set 'kubernetes.namespaces={*}')" = 0,0,1,1
+          test "$(kinds)" = 0,0,0,0
+          helm template t deploy/helm/fbadmin --set kubernetes.enabled=true --set kubernetes.manage=false | grep -q 'verbs: \[get, list\]'
+          helm template t deploy/helm/fbadmin --set kubernetes.enabled=true | grep -q 'automountServiceAccountToken: true'
 
   docker:
     name: Docker image

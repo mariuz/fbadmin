@@ -19,6 +19,7 @@ TIMEOUT = 60
 PUSH_TIMEOUT = 180
 SHA = re.compile(r"^[0-9a-fA-F]{4,64}$")
 BRANCH = re.compile(r"^(?!-)(?!.*\.\.)(?!.*//)(?!.*@\{)[A-Za-z0-9._/-]{1,100}(?<![./])$")
+REF = BRANCH  # branches, tags, origin/<branch> and commit ids share the same safe characters
 
 
 class GitError(ValueError):
@@ -49,6 +50,13 @@ def check_branch(name: str) -> str:
     if not BRANCH.match(name or "") or name.endswith(".lock"):
         raise ValueError(f"Invalid branch name: {name!r}")
     return name
+
+
+def check_ref(ref: str) -> str:
+    """A branch, tag, remote branch (``origin/main``) or commit id; no options or revision syntax."""
+    if not REF.match(ref or "") or ".." in ref or ref.endswith((".lock", "/")) or "//" in ref:
+        raise ValueError(f"Invalid git reference: {ref!r}")
+    return ref
 
 
 def check_sha(sha: str) -> str:
@@ -136,6 +144,18 @@ class Repo:
             self.run("remote", "set-url" if "origin" in has else "add", "origin", url)
         elif "origin" in has:
             self.run("remote", "remove", "origin")
+
+    def resolve(self, ref: str) -> str:
+        """The commit id ``ref`` points to."""
+        p = self.run("rev-parse", "--verify", "-q", f"{check_ref(ref)}^{{commit}}", check=False)
+        sha = p.stdout.strip()
+        if p.returncode != 0 or not sha:
+            raise KeyError(f"No commit {ref!r} in the schema history repository")
+        return sha
+
+    def fetch(self) -> str:
+        p = self.run("fetch", "--quiet", "--prune", "origin", auth=True, timeout=PUSH_TIMEOUT)
+        return self._scrub((p.stdout + p.stderr).strip())
 
     def push(self, branch: str) -> str:
         p = self.run("push", "--porcelain", "origin", f"HEAD:refs/heads/{check_branch(branch)}", auth=True,

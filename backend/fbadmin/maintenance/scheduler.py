@@ -1,4 +1,5 @@
-"""Scheduled maintenance jobs (pgAgent-like): backups with retention and sweeps on a cron schedule.
+"""Scheduled maintenance jobs (pgAgent-like): backups with retention, sweeps, validations, schema snapshots
+and schema drift checks on a cron schedule.
 
 Schedules and their run history are stored as JSON in the data directory. An
 in-process thread checks every few seconds which schedules are due and runs
@@ -22,7 +23,8 @@ from pydantic import BaseModel, Field
 
 from .. import alerts, jobs
 from ..config import settings
-from . import archive, ops, verify
+from . import archive, drift, ops, verify
+from .drift import DriftOptions
 from .cron import Cron
 
 HISTORY_KEEP = 500
@@ -38,7 +40,7 @@ class UploadOptions(BaseModel):
 class Schedule(BaseModel):
     id: str = Field(default_factory=lambda: uuid.uuid4().hex[:10])
     name: str
-    kind: Literal["backup", "sweep", "validate", "schema_snapshot"] = "backup"
+    kind: Literal["backup", "sweep", "validate", "schema_snapshot", "schema_drift"] = "backup"
     server_id: str
     database_id: str
     cron: str
@@ -48,6 +50,7 @@ class Schedule(BaseModel):
     verify: bool = False              # test-restore each backup into a scratch database, then drop it
     verify_path: str | None = None    # scratch database path on the server (default: next to the database)
     upload: UploadOptions | None = None
+    drift: DriftOptions | None = None  # kind schema_drift
     # server mode: run as the user who scheduled it (security/runas.py); never returned by the API
     run_as: dict | None = None
     created_at: float = Field(default_factory=time.time)
@@ -131,6 +134,7 @@ class Scheduler:
             gone = self.schedules.pop(sid)
             self._next.pop(sid, None)
             self._save()
+        drift.delete_report(sid)
         from ..security import runas
 
         runas.revoke(gone.run_as)
@@ -202,11 +206,13 @@ class Scheduler:
             extra: dict = {}
             failure: str | None = None
             try:
-                snap = s.kind == "schema_snapshot"  # no service connection needed
+                snap = s.kind in ("schema_snapshot", "schema_drift")  # no service connection needed
                 with (nullcontext() if snap else st.manager.service(s.server_id)) as svc, \
                         (nullcontext() if snap else st.manager.detach_on_cancel(s.server_id, db.path)):
                     major = 0 if snap else ops.option_major(svc)
-                    if snap:
+                    if s.kind == "schema_drift":
+                        extra = self._schema_drift(s, db, log)
+                    elif snap:
                         extra, failure = self._schema_snapshot(s, log)
                     elif s.kind == "backup":
                         extra, failure = self._backup(s, db, svc, major, log)
@@ -224,7 +230,8 @@ class Scheduler:
                                         "and run a full validation (gfix -v -full).",
                                         server_id=s.server_id, database_id=s.database_id, key=f"validate:{s.id}",
                                         details={"errors": errors})
-                log("Done" if not failure else failure)
+                if not extra.get("drift"):
+                    log("Done" if not failure else failure)
             except Exception as exc:
                 if isinstance(exc, jobs.Cancelled) or jobs.cancelling():
                     self._record(s, job_ref.get("id"), started, "cancelled", None, **extra)
@@ -235,12 +242,45 @@ class Scheduler:
             if failure:
                 self._record(s, job_ref.get("id"), started, "failed", failure, **extra)
                 raise RuntimeError(failure)
-            self._record(s, job_ref.get("id"), started, "finished", None, **extra)
+            self._record(s, job_ref.get("id"), started, "drift" if extra.get("drift") else "finished", None,
+                         **extra)
 
         job = st.jobs.start(f"scheduled-{s.kind}", f"Scheduled {s.kind}: {s.name} ({db.name})", s.server_id, fn,
                             cancellable=True)
         job_ref["id"] = job.id
         return job.summary()
+
+    def _schema_drift(self, s: Schedule, db, log) -> dict:
+        """Compare the schema with the baseline; alert on new or changed drift, and once when it is gone."""
+        opts = s.drift or DriftOptions()
+        report = drift.check(s.server_id, s.database_id, opts, log)
+        report["schedule_id"] = s.id
+        drift.save_report(s.id, report)
+        with self._lock:
+            prev = next((h for h in reversed(self.history)
+                         if h["schedule_id"] == s.id and h["status"] in ("drift", "finished")), None)
+        was = (prev or {}).get("drift") or False
+        before = (prev or {}).get("fingerprint") or ""
+        summary = report["summary"]
+        base = report["baseline"]["label"]
+        if report["drift"]:
+            parts = [f"{summary[k]} {k}" for k in ("missing", "extra", "changed") if summary[k]]
+            names = ", ".join(f"{i['name']} ({i['status']})" for i in report["items"][:10])
+            more = len(report["items"]) - 10
+            alerts.emit("schema.drift", "warning", f"Schema drift in {db.name}",
+                        f"The schema of {db.name} differs from {base}: {', '.join(parts)}. {names}"
+                        + (f" and {more} more" if more > 0 else "") + ". The report and a script that makes the "
+                        "database match the baseline are in the schedule's drift report.",
+                        server_id=s.server_id, database_id=s.database_id, key=f"drift:{s.id}",
+                        details={"schedule_id": s.id, "summary": summary, "baseline": base},
+                        force=report["fingerprint"] != before)  # new or changed drift is news
+        elif was:
+            alerts.emit("schema.drift", "resolved", f"Resolved: schema drift in {db.name}",
+                        f"The schema of {db.name} matches {base} again.",
+                        server_id=s.server_id, database_id=s.database_id, key=f"drift:{s.id}",
+                        details={"schedule_id": s.id, "baseline": base}, force=True)
+        return {"drift": report["drift"], "summary": summary, "ignored": report["ignored"],
+                "fingerprint": report["fingerprint"], "baseline": base}
 
     def _schema_snapshot(self, s: Schedule, log) -> tuple[dict, str | None]:
         """Commit the schema to the database's history repository (see ``fbadmin.schemahistory``)."""

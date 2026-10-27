@@ -22,3 +22,4 @@ import "./charts";
 import "./querybuilder";
 import "./access";
 import "./driver";
+import "./kubernetes";
