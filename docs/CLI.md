@@ -188,6 +188,20 @@ Other options: `--page-size`, `--buffers`, `--parallel N` (Firebird 5+), `--deac
 `--read-only`, `--skip-table`/`--skip-data`, `--include-table`/`--include-data`,
 `--fix-fss-data CHARSET`, `--fix-fss-metadata CHARSET`, and the encryption options.
 
+## backup-decrypt, backup-key
+
+Backups that fbadmin encrypted (`*.fbk.enc`, see [Backup encryption](BACKUP_ENCRYPTION_DRILLS.md)) are
+decrypted without the web server, for example on a recovery machine:
+
+```bash
+fbadmin backup-decrypt app_20261027-020000.fbk.enc --key fbk1:…          # writes app_20261027-020000.fbk
+fbadmin backup-decrypt app.fbk.enc --key-file /run/secrets/backup-key -o /tmp/app.fbk
+fbadmin backup-key                                                       # a new key for FBADMIN_BACKUP_KEY
+```
+
+Without `--key`/`--key-file` the key comes from `FBADMIN_BACKUP_KEY` or fbadmin's data directory
+(`--data-dir`). A wrong key or a damaged file ends with exit code 4 and no output file.
+
 ## extract
 
 ```sh

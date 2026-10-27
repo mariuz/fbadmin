@@ -1,5 +1,5 @@
-"""Scheduled maintenance jobs (pgAgent-like): backups with retention, sweeps, validations, schema snapshots
-and schema drift checks on a cron schedule.
+"""Scheduled maintenance jobs (pgAgent-like): backups with retention (optionally encrypted), sweeps, validations,
+schema snapshots, schema drift checks and restore drills on a cron schedule.
 
 Schedules and their run history are stored as JSON in the data directory. An
 in-process thread checks every few seconds which schedules are due and runs
@@ -23,8 +23,9 @@ from pydantic import BaseModel, Field
 
 from .. import alerts, jobs
 from ..config import settings
-from . import archive, drift, ops, verify
+from . import archive, backupcrypt, drift, drill, ops, verify
 from .drift import DriftOptions
+from .drill import DrillOptions
 from .cron import Cron
 
 HISTORY_KEEP = 500
@@ -40,7 +41,7 @@ class UploadOptions(BaseModel):
 class Schedule(BaseModel):
     id: str = Field(default_factory=lambda: uuid.uuid4().hex[:10])
     name: str
-    kind: Literal["backup", "sweep", "validate", "schema_snapshot", "schema_drift"] = "backup"
+    kind: Literal["backup", "sweep", "validate", "schema_snapshot", "schema_drift", "restore_drill"] = "backup"
     server_id: str
     database_id: str
     cron: str
@@ -50,7 +51,9 @@ class Schedule(BaseModel):
     verify: bool = False              # test-restore each backup into a scratch database, then drop it
     verify_path: str | None = None    # scratch database path on the server (default: next to the database)
     upload: UploadOptions | None = None
+    encrypt: bool = False             # encrypt the backups with the active backup key (backupcrypt)
     drift: DriftOptions | None = None  # kind schema_drift
+    drill: DrillOptions | None = None  # kind restore_drill
     # server mode: run as the user who scheduled it (security/runas.py); never returned by the API
     run_as: dict | None = None
     created_at: float = Field(default_factory=time.time)
@@ -135,6 +138,7 @@ class Scheduler:
             self._next.pop(sid, None)
             self._save()
         drift.delete_report(sid)
+        drill.delete_report(sid)
         from ..security import runas
 
         runas.revoke(gone.run_as)
@@ -206,12 +210,15 @@ class Scheduler:
             extra: dict = {}
             failure: str | None = None
             try:
-                snap = s.kind in ("schema_snapshot", "schema_drift")  # no service connection needed
+                # no service connection to the schedule's server needed (a drill opens its own)
+                snap = s.kind in ("schema_snapshot", "schema_drift", "restore_drill")
                 with (nullcontext() if snap else st.manager.service(s.server_id)) as svc, \
                         (nullcontext() if snap else st.manager.detach_on_cancel(s.server_id, db.path)):
                     major = 0 if snap else ops.option_major(svc)
                     if s.kind == "schema_drift":
                         extra = self._schema_drift(s, db, log)
+                    elif s.kind == "restore_drill":
+                        extra, failure = self._restore_drill(s, db, log)
                     elif snap:
                         extra, failure = self._schema_snapshot(s, log)
                     elif s.kind == "backup":
@@ -282,6 +289,85 @@ class Scheduler:
         return {"drift": report["drift"], "summary": summary, "ignored": report["ignored"],
                 "fingerprint": report["fingerprint"], "baseline": base}
 
+    def _restore_drill(self, s: Schedule, db, log) -> tuple[dict, str | None]:
+        """Restore the newest backup into a scratch database and check it (``drill``); alert when it fails,
+        and once when a drill works again."""
+        from ..api.deps import get_state
+        from ..connections import connect
+
+        st = get_state()
+        opts = s.drill or DrillOptions()
+        rsid = opts.server_id or s.server_id
+        rsrv = st.store.get(rsid)
+        pw = st.store.password_for(rsid) or ""
+        opts = opts.model_copy(update={"path": drill.scratch_path(
+            db.path if rsid == s.server_id else (rsrv.databases[0].path if rsrv.databases else db.path),
+            s.id, opts.path)})
+        report: dict = {"schedule_id": s.id, "started_at": time.time(), "server": rsrv.name, "database": db.name}
+        try:
+            if opts.source == "storage":
+                if not opts.target_id:
+                    raise ValueError("Choose the storage target of the drill")
+                source = drill.newest_stored(opts.target_id, opts.prefix, log)
+            else:
+                bsid = opts.backup_schedule_id
+                if not bsid:
+                    raise ValueError("Choose the backup schedule whose backups the drill restores")
+                self.get(bsid)
+                source = drill.newest_archived(bsid)
+            log(f"Newest backup: {source['name']} ({source['size']} bytes, "
+                f"{datetime.fromtimestamp(source['modified']).isoformat(sep=' ', timespec='minutes')})")
+
+            def live_counts(tables: list[str]):
+                with st.manager.meta(s.server_id, s.database_id) as conn:
+                    cur = conn.cursor()
+                    live = drill._user_tables(cur)
+                    conn.commit()
+                    return drill._counts(conn, live)
+
+            try:
+                report.update(drill.run(
+                    opts=opts, schedule_id=s.id, source=source, svc_factory=lambda: st.manager.service(rsid),
+                    connect=lambda p: connect(rsrv, p, pw), live_counts=live_counts,
+                    registered=[d.path for d in rsrv.databases], log=log))
+            finally:
+                if source.get("kind") == "storage":
+                    source["local"].unlink(missing_ok=True)
+            if report.get("kept"):
+                from ..store import DatabaseEntry
+
+                if not any(d.path == opts.path for d in rsrv.databases):
+                    st.store.add_database(rsid, DatabaseEntry(name=f"{db.name} (restore drill)", path=opts.path))
+        except jobs.Cancelled:
+            raise
+        except Exception as exc:  # noqa: BLE001 - no backup, no target, ...: the drill failed
+            report.setdefault("checks", []).append({"code": "source", "ok": False,
+                                                    "message": str(exc).strip() or exc.__class__.__name__})
+        failed = [c for c in report.get("checks", []) if c["ok"] is False]
+        report["ok"] = not failed
+        report["finished_at"] = time.time()
+        drill.save_report(s.id, report)
+        with self._lock:
+            prev = next((h for h in reversed(self.history) if h["schedule_id"] == s.id
+                         and h["status"] in ("failed", "finished")), None)
+        src = report.get("source") or {}
+        extra = {"drill_ok": report["ok"], "backup": src.get("name"), "age_hours": src.get("age_hours"),
+                 "recovery_seconds": report.get("recovery_seconds"), "rows": report.get("rows"),
+                 "failed_checks": [c["code"] for c in failed]}
+        if failed:
+            msg = "; ".join(c["message"] for c in failed)
+            alerts.emit("restore.drill_failed", "critical", f"Restore drill failed: {db.name}",
+                        f"The restore drill \"{s.name}\" of {db.name} failed: {msg}. The drill report has the details.",
+                        server_id=s.server_id, database_id=s.database_id, key=f"drill:{s.id}",
+                        details={"schedule_id": s.id, "backup": src.get("name"), "checks": [c["code"] for c in failed]})
+            return extra, f"Restore drill failed: {msg}"
+        if prev and prev["status"] == "failed":
+            alerts.emit("restore.drill_failed", "resolved", f"Resolved: restore drill of {db.name}",
+                        f"The restore drill \"{s.name}\" of {db.name} works again.",
+                        server_id=s.server_id, database_id=s.database_id, key=f"drill:{s.id}",
+                        details={"schedule_id": s.id}, force=True)
+        return extra, None
+
     def _schema_snapshot(self, s: Schedule, log) -> tuple[dict, str | None]:
         """Commit the schema to the database's history repository (see ``fbadmin.schemahistory``)."""
         from .. import schemahistory
@@ -299,10 +385,18 @@ class Scheduler:
         from ..api.deps import get_state
 
         st = get_state()
-        dest = archive.new_path(s.id, db.name)
+        key = None
+        if s.encrypt:
+            key = backupcrypt.keyring().active()
+            if key is None:
+                raise ValueError("The schedule encrypts its backups but there is no backup key: create one under "
+                                 "Backup encryption (or set FBADMIN_BACKUP_KEY)")
+        dest = archive.new_path(s.id, db.name, encrypted=key is not None)
         log(f"Backing up {db.path} to {dest}")
-        size = ops.backup_to_local_file(svc, db.path, dest, s.options, major, log)
+        size = ops.backup_to_local_file(svc, db.path, dest, s.options, major, log, key=key[1] if key else None)
         extra: dict = {"file": f"{dest.parent.name}/{dest.name}", "size": size}
+        if key:
+            extra["encrypted"] = key[0]
         if s.verify:
             srv = st.store.get(s.server_id)
             try:

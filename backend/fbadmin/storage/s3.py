@@ -122,6 +122,10 @@ class S3Client(BaseClient):
     def delete(self, key: str) -> None:
         self._call("DELETE", key, ok=(200, 204))
 
+    def get_range(self, key: str, start: int, end: int) -> Response:
+        return self._call("GET", key, headers={"Range": f"bytes={start}-{end}"}, ok=(200, 206),
+                          timeout=base.UPLOAD_TIMEOUT)
+
     def list(self, prefix: str) -> list[dict]:
         out: list[dict] = []
         token = ""

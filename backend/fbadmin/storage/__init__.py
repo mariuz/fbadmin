@@ -48,12 +48,12 @@ def object_prefix(t: Target, prefix: str = "") -> str:
 
 
 def select_expired(objects: list[dict], folder: str, keep: int, protect: str = "") -> list[dict]:
-    """The ``.fbk`` objects directly under ``folder`` beyond the newest ``keep`` (``protect`` always counts
+    """The ``.fbk`` (and encrypted ``.fbk.enc``) objects directly under ``folder`` beyond the newest ``keep`` (``protect`` always counts
     as the newest). ``keep <= 0`` keeps everything."""
     if keep <= 0:
         return []
     base = folder.strip("/") + "/" if folder.strip("/") else ""
-    backups = [o for o in objects if o["key"].startswith(base) and o["key"].endswith(".fbk")
+    backups = [o for o in objects if o["key"].startswith(base) and o["key"].endswith((".fbk", ".fbk.enc"))
                and "/" not in o["key"][len(base):]]
     ordered = sort_newest(backups)
     ordered.sort(key=lambda o: o["key"] != protect)  # stable: the protected key first

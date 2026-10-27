@@ -65,6 +65,7 @@ class BackupIn(BaseModel):
     target: str = "archive"  # archive (fbadmin host) | server (path on the Firebird server)
     backup_file: str | None = None
     options: ops.BackupOptions = Field(default_factory=ops.BackupOptions)
+    encrypt: bool = False  # archive: encrypt with the active backup key
 
 
 class _Download:
@@ -147,6 +148,13 @@ def backup_job(server_id: str, db_id: str, body: BackupIn):
     db = _db(server_id, db_id)
     if body.target == "server" and not body.backup_file:
         raise ValueError("backup_file (a path on the Firebird server) is required")
+    key = None
+    if body.encrypt and body.target == "archive":
+        from ..maintenance import backupcrypt
+
+        key = backupcrypt.keyring().active()
+        if key is None:
+            raise ValueError("There is no backup key yet: create one under Backup encryption")
 
     def run(log):
         with st.manager.service(server_id) as svc, st.manager.detach_on_cancel(server_id, db.path):
@@ -155,9 +163,9 @@ def backup_job(server_id: str, db_id: str, body: BackupIn):
                 log(f"Backing up {db.path} to {body.backup_file} (on the server)")
                 ops.backup_server_file(svc, db.path, body.backup_file, body.options, major, log)
             else:
-                dest = archive.new_path("manual", db.name)
-                log(f"Backing up {db.path} into the fbadmin archive")
-                ops.backup_to_local_file(svc, db.path, dest, body.options, major, log)
+                dest = archive.new_path("manual", db.name, encrypted=key is not None)
+                log(f"Backing up {db.path} into the fbadmin archive" + (" (encrypted)" if key else ""))
+                ops.backup_to_local_file(svc, db.path, dest, body.options, major, log, key=key[1] if key else None)
         log("Backup completed")
 
     return _job("backup", f"Backup {db.name}", server_id, run, cancellable=True)
@@ -266,9 +274,30 @@ def archive_list(server_id: str):
 
 
 @router.get("/maintenance/archive/download")
-def archive_download(server_id: str, path: str):
+def archive_download(server_id: str, path: str, decrypt: bool = False):
+    """The archived file; with ``decrypt`` an encrypted backup is decrypted on the way (as ``.fbk``)."""
     p = archive.resolve(path)
-    return FileResponse(p, media_type="application/octet-stream", filename=p.name)
+    if not decrypt or not p.name.endswith(archive.ENC_SUFFIX):
+        return FileResponse(p, media_type="application/octet-stream", filename=p.name)
+    from ..maintenance import backupcrypt
+
+    f = open(p, "rb")  # noqa: SIM115 - closed by the generator
+    try:
+        reader = backupcrypt.DecryptingReader(f)
+    except Exception:
+        f.close()
+        raise
+
+    def chunks():
+        try:
+            while data := reader.read(backupcrypt.CHUNK):
+                yield data
+        finally:
+            f.close()
+
+    name = p.name.removesuffix(".enc")
+    return StreamingResponse(chunks(), media_type="application/octet-stream",
+                             headers={"Content-Disposition": f'attachment; filename="{name}"'})
 
 
 @router.delete("/maintenance/archive", status_code=204)

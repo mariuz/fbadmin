@@ -14,6 +14,11 @@ from pathlib import Path
 from ..config import settings
 
 SUFFIX = ".fbk"
+ENC_SUFFIX = ".fbk.enc"  # encrypted by fbadmin (backupcrypt)
+
+
+def is_backup_name(name: str) -> bool:
+    return name.endswith(SUFFIX) or name.endswith(ENC_SUFFIX)
 
 
 def root() -> Path:
@@ -24,21 +29,21 @@ def _safe(name: str) -> str:
     return re.sub(r"[^A-Za-z0-9_.-]+", "_", name).strip("._") or "backup"
 
 
-def new_path(folder: str, db_name: str) -> Path:
+def new_path(folder: str, db_name: str, encrypted: bool = False) -> Path:
     stamp = time.strftime("%Y%m%d-%H%M%S")
-    base = root() / _safe(folder) / f"{_safe(db_name)}_{stamp}"
-    p = base.with_suffix(SUFFIX)
-    n = 1
-    while p.exists():
-        p = Path(f"{base}_{n}{SUFFIX}")
+    base = f"{root() / _safe(folder) / _safe(db_name)}_{stamp}"
+    n = 0
+    while True:
+        stem = base if n == 0 else f"{base}_{n}"
+        if not Path(stem + SUFFIX).exists() and not Path(stem + ENC_SUFFIX).exists():
+            return Path(stem + (ENC_SUFFIX if encrypted else SUFFIX))
         n += 1
-    return p
 
 
 def resolve(rel: str) -> Path:
     r = root().resolve()
     p = (r / rel).resolve()
-    if r not in p.parents or p.suffix != SUFFIX:
+    if r not in p.parents or not is_backup_name(p.name):
         raise ValueError("Invalid backup path")
     if not p.is_file():
         raise LookupError(f"Backup {rel!r} not found")
@@ -49,11 +54,17 @@ def list_backups(folder: str | None = None) -> list[dict]:
     r = root()
     if not r.exists():
         return []
+    from . import backupcrypt
+
     out = []
-    for p in r.glob(f"{_safe(folder) if folder else '*'}/*{SUFFIX}"):
+    for p in r.glob(f"{_safe(folder) if folder else '*'}/*"):
+        if not is_backup_name(p.name) or not p.is_file():
+            continue
         st = p.stat()
+        enc = backupcrypt.info(p) if p.name.endswith(ENC_SUFFIX) else None
         out.append({"path": f"{p.parent.name}/{p.name}", "folder": p.parent.name, "name": p.name,
-                    "size": st.st_size, "modified": st.st_mtime})
+                    "size": st.st_size, "modified": st.st_mtime, "encrypted": enc is not None,
+                    "key_id": enc["key_id"] if enc else None})
     out.sort(key=lambda b: b["modified"], reverse=True)
     return out
 

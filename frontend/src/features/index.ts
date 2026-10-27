@@ -23,3 +23,4 @@ import "./querybuilder";
 import "./access";
 import "./driver";
 import "./kubernetes";
+import "./replication-setup";

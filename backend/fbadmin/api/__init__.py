@@ -33,6 +33,8 @@ from . import querybuilder
 from . import access
 from . import driver as driver_api
 from . import kubernetes
+from . import replication_setup
+from . import backup_keys
 
 ROUTERS: list[APIRouter] = [
     servers.router,
@@ -68,4 +70,6 @@ ROUTERS: list[APIRouter] = [
     access.router,
     driver_api.router,
     kubernetes.router,
+    replication_setup.router,
+    backup_keys.router,
 ]

@@ -849,6 +849,95 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/backup-keys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Keys */
+        get: operations["list_keys_api_backup_keys_get"];
+        put?: never;
+        /** Create Key */
+        post: operations["create_key_api_backup_keys_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/backup-keys/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Import Key */
+        post: operations["import_key_api_backup_keys_import_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/backup-keys/{key_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove
+         * @description A key that archived backups still need is only removed with ``force``: they can't be read without it.
+         */
+        delete: operations["remove_api_backup_keys__key_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/backup-keys/{key_id}/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Activate */
+        post: operations["activate_api_backup_keys__key_id__activate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/backup-keys/{key_id}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Export */
+        post: operations["export_api_backup_keys__key_id__export_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/datacompare/compare": {
         parameters: {
             query?: never;
@@ -1734,6 +1823,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/replication/conf/write": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Conf Write
+         * @description Put a block into a replication.conf that fbadmin can reach (a local Firebird, a mounted volume).
+         */
+        post: operations["conf_write_api_replication_conf_write_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/schedules": {
         parameters: {
             query?: never;
@@ -1854,6 +1963,26 @@ export interface paths {
          * @description The latest report of a drift check: the differences and the script that makes the database match.
          */
         get: operations["drift_report_api_schedules__schedule_id__drift_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/schedules/{schedule_id}/drill": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Drill Report
+         * @description The latest report of a restore drill: the backup used, each check, timings and row counts.
+         */
+        get: operations["drill_report_api_schedules__schedule_id__drill_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3605,6 +3734,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/servers/{server_id}/databases/{db_id}/replication/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check Send
+         * @description Insert a check row on the primary; GET .../check/{token} tells when it is on the replica.
+         */
+        post: operations["check_send_api_servers__server_id__databases__db_id__replication_check_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/servers/{server_id}/databases/{db_id}/replication/check/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Check Poll */
+        get: operations["check_poll_api_servers__server_id__databases__db_id__replication_check__token__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/servers/{server_id}/databases/{db_id}/replication/journal": {
         parameters: {
             query?: never;
@@ -3679,6 +3845,106 @@ export interface paths {
          *     closes its own connections to it (metadata and Query Tool tabs); other attachments must be gone.
          */
         post: operations["set_replica_mode_api_servers__server_id__databases__db_id__replication_replica_mode_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/servers/{server_id}/databases/{db_id}/replication/setup/plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Setup Plan
+         * @description What the setup will do, its checks (errors block it) and the replication.conf blocks.
+         */
+        post: operations["setup_plan_api_servers__server_id__databases__db_id__replication_setup_plan_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/servers/{server_id}/databases/{db_id}/replication/setup/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Setup Reopen
+         * @description Close fbadmin's own connections to the database (metadata and Query Tool tabs), so that it is opened
+         *     again - and its replication.conf block read - once no other application keeps it open.
+         */
+        post: operations["setup_reopen_api_servers__server_id__databases__db_id__replication_setup_reopen_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/servers/{server_id}/databases/{db_id}/replication/setup/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Setup Restore
+         * @description After a manual transfer: restore the copy on the replica server and finish the setup.
+         */
+        post: operations["setup_restore_api_servers__server_id__databases__db_id__replication_setup_restore_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/servers/{server_id}/databases/{db_id}/replication/setup/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Setup Run
+         * @description Publication and the journal check (asynchronous), the copy, and - when both servers see the copy
+         *     directory - the restore, replica mode and registration. With ``transfer: manual`` the job ends after the
+         *     copy (``waiting_for_transfer``); POST .../setup/restore continues once the file is on the replica server.
+         */
+        post: operations["setup_run_api_servers__server_id__databases__db_id__replication_setup_run_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/servers/{server_id}/databases/{db_id}/replication/setup/runs/{job_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Setup Result */
+        get: operations["setup_result_api_servers__server_id__databases__db_id__replication_setup_runs__job_id__get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -4328,7 +4594,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Archive Download */
+        /**
+         * Archive Download
+         * @description The archived file; with ``decrypt`` an encrypted backup is decrypted on the way (as ``.fbk``).
+         */
         get: operations["archive_download_api_servers__server_id__maintenance_archive_download_get"];
         put?: never;
         post?: never;
@@ -5044,14 +5313,6 @@ export interface components {
                 [key: string]: unknown;
             } | null;
         };
-        /** CheckIn */
-        CheckIn: {
-            /**
-             * Target
-             * @default 5.0
-             */
-            target?: string;
-        };
         /** CodeIn */
         CodeIn: {
             /** Code */
@@ -5105,6 +5366,15 @@ export interface components {
             role?: string;
         } & {
             [key: string]: unknown;
+        };
+        /** ConfWriteIn */
+        ConfWriteIn: {
+            /** Block */
+            block: string;
+            /** Database */
+            database: string;
+            /** Path */
+            path: string;
         };
         /** ConfigIn */
         ConfigIn: {
@@ -5269,6 +5539,55 @@ export interface components {
             ref?: string | null;
             /** Server Id */
             server_id?: string | null;
+        };
+        /** DrillOptions */
+        DrillOptions: {
+            /** Backup Schedule Id */
+            backup_schedule_id?: string | null;
+            /**
+             * Compare
+             * @default true
+             */
+            compare?: boolean;
+            /**
+             * Count Rows
+             * @default true
+             */
+            count_rows?: boolean;
+            /**
+             * Keep
+             * @default false
+             */
+            keep?: boolean;
+            /**
+             * Max Age Hours
+             * @default 26
+             */
+            max_age_hours?: number | null;
+            /** Max Minutes */
+            max_minutes?: number | null;
+            /** Path */
+            path?: string | null;
+            /**
+             * Prefix
+             * @default
+             */
+            prefix?: string;
+            /** Server Id */
+            server_id?: string | null;
+            /**
+             * Source
+             * @default schedule
+             * @enum {string}
+             */
+            source?: "schedule" | "storage";
+            /** Target Id */
+            target_id?: string | null;
+            /**
+             * Validate Db
+             * @default true
+             */
+            validate_db?: boolean;
         };
         /** DriverIn */
         DriverIn: {
@@ -5457,6 +5776,16 @@ export interface components {
             truncate?: boolean;
             /** Upload Id */
             upload_id: string;
+        };
+        /** KeyIn */
+        KeyIn: {
+            /**
+             * Activate
+             * @default false
+             */
+            activate?: boolean;
+            /** Key */
+            key: string;
         };
         /** LibraryCopyIn */
         LibraryCopyIn: {
@@ -5998,11 +6327,17 @@ export interface components {
             /** Database Id */
             database_id: string;
             drift?: components["schemas"]["DriftOptions"] | null;
+            drill?: components["schemas"]["DrillOptions"] | null;
             /**
              * Enabled
              * @default true
              */
             enabled?: boolean;
+            /**
+             * Encrypt
+             * @default false
+             */
+            encrypt?: boolean;
             /**
              * Keep
              * @default 7
@@ -6013,7 +6348,7 @@ export interface components {
              * @default backup
              * @enum {string}
              */
-            kind?: "backup" | "sweep" | "validate" | "schema_snapshot" | "schema_drift";
+            kind?: "backup" | "sweep" | "validate" | "schema_snapshot" | "schema_drift" | "restore_drill";
             /** Name */
             name: string;
             options?: components["schemas"]["BackupOptions"] | null;
@@ -6035,12 +6370,15 @@ export interface components {
             /** Database Id */
             database_id?: string | null;
             drift?: components["schemas"]["DriftOptions"] | null;
+            drill?: components["schemas"]["DrillOptions"] | null;
             /** Enabled */
             enabled?: boolean | null;
+            /** Encrypt */
+            encrypt?: boolean | null;
             /** Keep */
             keep?: number | null;
             /** Kind */
-            kind?: ("backup" | "sweep" | "validate" | "schema_snapshot" | "schema_drift") | null;
+            kind?: ("backup" | "sweep" | "validate" | "schema_snapshot" | "schema_drift" | "restore_drill") | null;
             /** Name */
             name?: string | null;
             options?: components["schemas"]["BackupOptions"] | null;
@@ -6161,15 +6499,6 @@ export interface components {
             retention_hours?: number | null;
             /** Slow Seconds */
             slow_seconds?: number | null;
-        };
-        /** SetupIn */
-        SetupIn: {
-            /** Email */
-            email?: string | null;
-            /** Password */
-            password: string;
-            /** Username */
-            username: string;
         };
         /** ShutdownIn */
         ShutdownIn: {
@@ -6522,6 +6851,15 @@ export interface components {
             /** Username */
             username: string;
         };
+        /** SetupIn */
+        fbadmin__api__auth__SetupIn: {
+            /** Email */
+            email?: string | null;
+            /** Password */
+            password: string;
+            /** Username */
+            username: string;
+        };
         /** ExecuteIn */
         fbadmin__api__databases__ExecuteIn: {
             /** Sql */
@@ -6608,6 +6946,11 @@ export interface components {
         fbadmin__api__maintenance__BackupIn: {
             /** Backup File */
             backup_file?: string | null;
+            /**
+             * Encrypt
+             * @default false
+             */
+            encrypt?: boolean;
             options?: components["schemas"]["BackupOptions"];
             /**
              * Target
@@ -6660,6 +7003,59 @@ export interface components {
              * @default false
              */
             with_stats?: boolean;
+        };
+        /** CheckIn */
+        fbadmin__api__replication_setup__CheckIn: {
+            /** Peer Db */
+            peer_db: string;
+            /** Peer Server */
+            peer_server: string;
+        };
+        /** RestoreIn */
+        fbadmin__api__replication_setup__RestoreIn: {
+            /** Archive Directory */
+            archive_directory?: string | null;
+            /**
+             * Archive Timeout
+             * @default 10
+             */
+            archive_timeout?: number | null;
+            /** Copy Directory */
+            copy_directory?: string | null;
+            /** Copy Directory Replica */
+            copy_directory_replica?: string | null;
+            /** Copy File */
+            copy_file: string;
+            /** Journal Directory */
+            journal_directory?: string | null;
+            /**
+             * Mode
+             * @default async
+             * @enum {string}
+             */
+            mode?: "async" | "sync";
+            /** Replica Name */
+            replica_name?: string | null;
+            /** Replica Path */
+            replica_path: string;
+            /** Replica Server Id */
+            replica_server_id: string;
+            /** Source Directory */
+            source_directory?: string | null;
+            /** Sync Address */
+            sync_address?: string | null;
+            /** Sync Password */
+            sync_password?: string | null;
+            /** Sync User */
+            sync_user?: string | null;
+            /** Tables */
+            tables?: string[] | null;
+            /**
+             * Transfer
+             * @default shared
+             * @enum {string}
+             */
+            transfer?: "shared" | "manual";
         };
         /** PreviewIn */
         fbadmin__api__schema__PreviewIn: {
@@ -6740,6 +7136,58 @@ export interface components {
             template?: string;
             /** Time Threshold */
             time_threshold?: number | null;
+        };
+        /** CheckIn */
+        fbadmin__api__upgrade__CheckIn: {
+            /**
+             * Target
+             * @default 5.0
+             */
+            target?: string;
+        };
+        /** SetupIn */
+        fbadmin__monitoring__repl_setup__SetupIn: {
+            /** Archive Directory */
+            archive_directory?: string | null;
+            /**
+             * Archive Timeout
+             * @default 10
+             */
+            archive_timeout?: number | null;
+            /** Copy Directory */
+            copy_directory?: string | null;
+            /** Copy Directory Replica */
+            copy_directory_replica?: string | null;
+            /** Journal Directory */
+            journal_directory?: string | null;
+            /**
+             * Mode
+             * @default async
+             * @enum {string}
+             */
+            mode?: "async" | "sync";
+            /** Replica Name */
+            replica_name?: string | null;
+            /** Replica Path */
+            replica_path: string;
+            /** Replica Server Id */
+            replica_server_id: string;
+            /** Source Directory */
+            source_directory?: string | null;
+            /** Sync Address */
+            sync_address?: string | null;
+            /** Sync Password */
+            sync_password?: string | null;
+            /** Sync User */
+            sync_user?: string | null;
+            /** Tables */
+            tables?: string[] | null;
+            /**
+             * Transfer
+             * @default shared
+             * @enum {string}
+             */
+            transfer?: "shared" | "manual";
         };
     };
     responses: never;
@@ -8209,7 +8657,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["SetupIn"];
+                "application/json": components["schemas"]["fbadmin__api__auth__SetupIn"];
             };
         };
         responses: {
@@ -8424,6 +8872,172 @@ export interface operations {
                 "application/json": components["schemas"]["VaultIn"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_keys_api_backup_keys_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    create_key_api_backup_keys_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    import_key_api_backup_keys_import_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KeyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_api_backup_keys__key_id__delete: {
+        parameters: {
+            query?: {
+                force?: boolean;
+            };
+            header?: never;
+            path: {
+                key_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    activate_api_backup_keys__key_id__activate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_api_backup_keys__key_id__export_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {
@@ -10142,6 +10756,39 @@ export interface operations {
             };
         };
     };
+    conf_write_api_replication_conf_write_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfWriteIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_schedules_api_schedules_get: {
         parameters: {
             query?: never;
@@ -10422,6 +11069,37 @@ export interface operations {
         };
     };
     drift_report_api_schedules__schedule_id__drift_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                schedule_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    drill_report_api_schedules__schedule_id__drill_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -14099,6 +14777,75 @@ export interface operations {
             };
         };
     };
+    check_send_api_servers__server_id__databases__db_id__replication_check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                server_id: string;
+                db_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["fbadmin__api__replication_setup__CheckIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    check_poll_api_servers__server_id__databases__db_id__replication_check__token__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                server_id: string;
+                db_id: string;
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     replication_journal_api_servers__server_id__databases__db_id__replication_journal_get: {
         parameters: {
             query?: {
@@ -14218,6 +14965,179 @@ export interface operations {
                 "application/json": components["schemas"]["ReplicaModeIn"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    setup_plan_api_servers__server_id__databases__db_id__replication_setup_plan_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                server_id: string;
+                db_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["fbadmin__monitoring__repl_setup__SetupIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    setup_reopen_api_servers__server_id__databases__db_id__replication_setup_reopen_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                server_id: string;
+                db_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    setup_restore_api_servers__server_id__databases__db_id__replication_setup_restore_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                server_id: string;
+                db_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["fbadmin__api__replication_setup__RestoreIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    setup_run_api_servers__server_id__databases__db_id__replication_setup_run_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                server_id: string;
+                db_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["fbadmin__monitoring__repl_setup__SetupIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    setup_result_api_servers__server_id__databases__db_id__replication_setup_runs__job_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                server_id: string;
+                db_id: string;
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {
@@ -15551,7 +16471,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["CheckIn"];
+                "application/json": components["schemas"]["fbadmin__api__upgrade__CheckIn"];
             };
         };
         responses: {
@@ -15908,6 +16828,7 @@ export interface operations {
         parameters: {
             query: {
                 path: string;
+                decrypt?: boolean;
             };
             header?: never;
             path: {

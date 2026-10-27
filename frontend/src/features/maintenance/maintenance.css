@@ -90,3 +90,13 @@ table.grid tr.sel td { background: var(--select) !important; }
   .drift-split .sch-list { width: auto; max-height: 220px; border-right: 0; border-bottom: 1px solid var(--border); }
   .drift-split .sch-detail { min-height: 300px; border-left: 0; }
 }
+
+/* restore drills and backup keys */
+.drill-facts { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; margin: 4px 0 10px; }
+.drill-facts dt { color: var(--muted); }
+.drill-facts dd { margin: 0; }
+.drill-checks { list-style: none; padding: 0; margin: 6px 0 10px; display: flex; flex-direction: column; gap: 3px; }
+.drill-checks li.ok span { color: var(--ok); }
+.drill-checks li.err { color: var(--danger); }
+.drill-checks li.warn span { color: var(--warn); }
+.key-shown { border: 1px solid var(--warn); border-radius: var(--radius); padding: 8px 10px; margin-top: 8px; max-width: 760px; }

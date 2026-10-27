@@ -8,6 +8,7 @@ import { registerMenu, registerTabKind } from "../../registry";
 import { IconCopy, IconRefresh } from "../../components/Icons";
 import { Modal } from "../../components/Modal";
 import "../monitoring/monitoring.css";
+import { CheckButton, openReplicationSetup } from "../replication-setup";
 
 const base = (sid: string, dbid: string) => `/api/servers/${sid}/databases/${dbid}/replication`;
 interface JournalEvent { time: string | null; segment: number | null; error: boolean; text: string }
@@ -133,6 +134,7 @@ function ReplicationTab(props: { serverId: string; dbId: string; visible: boolea
     <div className="mon">
       <div className="toolbar">
         <button className="btn" onClick={load}><IconRefresh /> {t("Refresh")}</button>
+        {st?.supported && st.replica_mode === "none" && <button className="btn" onClick={() => openReplicationSetup(app, props.serverId, props.dbId)}>{t("Set up a replica…")}</button>}
         {error && <span className="err">{error}</span>}
       </div>
       <div className="mon-body">
@@ -204,6 +206,7 @@ function ReplicationTab(props: { serverId: string; dbId: string; visible: boolea
                 <tr><td>{t("Peer GUID")}</td><td>{st.peer.guid}</td></tr>
               </tbody></table>
             ))}
+            {peerObj && st.replica_mode === "none" && st.publication_enabled && !st.peer?.error && <CheckButton serverId={props.serverId} dbId={props.dbId} peerServer={peerObj.server} peerDb={peerObj.db} />}
             <p className="muted">{t("Lag is approximated from RDB$GET_CONTEXT('SYSTEM', 'REPLICATION_SEQUENCE') on both sides (journal segment numbers). Exact apply status is only in the server's replication.log.")}</p>
             <h3>{t("Journal")}</h3>
             <JournalPanel serverId={props.serverId} dbId={props.dbId} visible={props.visible} tick={tick} />

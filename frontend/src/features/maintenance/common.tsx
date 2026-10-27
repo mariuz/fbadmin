@@ -87,7 +87,8 @@ export function JobLog(props: { job: Job | null; onDone?: (j: Job) => void; maxH
         <CancelJobButton job={job} onCancel={setJob} />
       </div>
       {job.error && <div className="err" style={{ whiteSpace: "pre-wrap" }}>{job.error}</div>}
-      <div className="log" ref={ref} style={{ maxHeight: props.maxHeight ?? 260 }}>{(job.log ?? []).join("\n") || "…"}</div>
+      <div className="log" ref={ref} role="log" tabIndex={0} aria-label={t("Log of {job}", { job: job.description })}
+        style={{ maxHeight: props.maxHeight ?? 260 }}>{(job.log ?? []).join("\n") || "…"}</div>
     </div>
   );
 }

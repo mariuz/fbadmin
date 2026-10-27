@@ -1,4 +1,5 @@
-"""Scheduled jobs (cron): backups with retention, sweeps, validations, schema snapshots and drift checks."""
+"""Scheduled jobs (cron): backups with retention, sweeps, validations, schema snapshots, drift checks and restore
+drills."""
 
 from __future__ import annotations
 
@@ -8,8 +9,9 @@ from typing import Literal
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from ..maintenance import archive, drift, ops
+from ..maintenance import archive, drift, drill, ops
 from ..maintenance.drift import DriftOptions
+from ..maintenance.drill import DrillOptions
 from ..maintenance.cron import Cron
 from ..maintenance.scheduler import Schedule, UploadOptions, get_scheduler
 from ..security import runas
@@ -22,7 +24,7 @@ router = APIRouter(prefix="/api/schedules", tags=["schedules"])
 
 class ScheduleIn(BaseModel):
     name: str
-    kind: Literal["backup", "sweep", "validate", "schema_snapshot", "schema_drift"] = "backup"
+    kind: Literal["backup", "sweep", "validate", "schema_snapshot", "schema_drift", "restore_drill"] = "backup"
     server_id: str
     database_id: str
     cron: str
@@ -32,12 +34,14 @@ class ScheduleIn(BaseModel):
     verify: bool = False
     verify_path: str | None = None
     upload: UploadOptions | None = None
+    encrypt: bool = False
     drift: DriftOptions | None = None
+    drill: DrillOptions | None = None
 
 
 class ScheduleUpdate(BaseModel):
     name: str | None = None
-    kind: Literal["backup", "sweep", "validate", "schema_snapshot", "schema_drift"] | None = None
+    kind: Literal["backup", "sweep", "validate", "schema_snapshot", "schema_drift", "restore_drill"] | None = None
     cron: str | None = None
     enabled: bool | None = None
     keep: int | None = None
@@ -47,7 +51,9 @@ class ScheduleUpdate(BaseModel):
     verify: bool | None = None
     verify_path: str | None = None  # null clears it
     upload: UploadOptions | None = None  # null removes the upload
+    encrypt: bool | None = None
     drift: DriftOptions | None = None
+    drill: DrillOptions | None = None
 
 
 class VerifyIn(BaseModel):
@@ -95,6 +101,38 @@ def _drift_allowed(kind: str | None, opts: DriftOptions | None, server_id: str, 
     require_level(sid, did, READ, "the drift check's baseline")
 
 
+def _drill_allowed(kind: str | None, opts: DrillOptions | None, server_id: str) -> None:
+    """A drill restores on its server (admin level there), reads a backup schedule's archive (that schedule must
+    be the user's to see) or a storage target (administrators)."""
+    if kind != "restore_drill":
+        return
+    opts = opts or DrillOptions()
+    rsid = opts.server_id or server_id
+    get_state().store.get(rsid)
+    require_level(rsid, None, ADMIN, "the restore drill's server")
+    if opts.source == "storage":
+        if not opts.target_id:
+            raise ValueError("Choose the storage target the drill takes the newest backup from")
+        require_admin()
+        from ..storage import get_store
+
+        get_store().get(opts.target_id)
+    else:
+        if not opts.backup_schedule_id:
+            raise ValueError("Choose the backup schedule whose newest backup the drill restores")
+        b = get_scheduler().get(opts.backup_schedule_id)
+        if b.kind != "backup":
+            raise ValueError("The drill's source must be a backup schedule")
+        _allowed(b.server_id, b.database_id)
+
+
+def _encrypt_allowed(encrypt: bool | None) -> None:
+    from ..maintenance import backupcrypt
+
+    if encrypt and backupcrypt.keyring().active() is None:
+        raise ValueError("There is no backup key yet: create one under Backup encryption (or set FBADMIN_BACKUP_KEY)")
+
+
 def _visible(s: dict) -> bool:
     try:
         _allowed(s["server_id"], s["database_id"])
@@ -123,6 +161,8 @@ def create(body: ScheduleIn):
     _allowed(body.server_id, body.database_id)
     _upload_allowed(body.upload)
     _drift_allowed(body.kind, body.drift, body.server_id, body.database_id)
+    _drill_allowed(body.kind, body.drill, body.server_id)
+    _encrypt_allowed(body.kind == "backup" and body.encrypt)
     data = body.model_dump(exclude_none=True)
     data["run_as"] = runas.issue(body.server_id, f"schedule: {body.name}")  # server mode: runs as the current user
     s = get_scheduler().add(Schedule(**data))
@@ -154,6 +194,10 @@ def update(schedule_id: str, body: ScheduleUpdate):
     kind = changes.get("kind") or cur.kind
     opts = DriftOptions(**changes["drift"]) if changes.get("drift") is not None else cur.drift
     _drift_allowed(kind, opts, changes.get("server_id") or cur.server_id, changes.get("database_id") or cur.database_id)
+    dopts = DrillOptions(**changes["drill"]) if changes.get("drill") is not None else cur.drill
+    _drill_allowed(kind, dopts, changes.get("server_id") or cur.server_id)
+    if changes.get("encrypt"):
+        _encrypt_allowed(kind == "backup")
     new_cred = runas.issue(changes.get("server_id") or cur.server_id, f"schedule: {changes.get('name') or cur.name}")
     if new_cred is not None:  # whoever saves the schedule last is the user it runs as
         changes["run_as"] = new_cred
@@ -191,6 +235,16 @@ def drift_report(schedule_id: str):
     report = drift.load_report(schedule_id)
     if report is None:
         raise HTTPException(404, "This schedule has not checked for drift yet")
+    return report
+
+
+@router.get("/{schedule_id}/drill")
+def drill_report(schedule_id: str):
+    """The latest report of a restore drill: the backup used, each check, timings and row counts."""
+    _check(get_scheduler().get(schedule_id))
+    report = drill.load_report(schedule_id)
+    if report is None:
+        raise HTTPException(404, "This drill has not run yet")
     return report
 
 

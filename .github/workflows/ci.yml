@@ -166,7 +166,7 @@ jobs:
           FBADMIN_TEST_OIDC_ISSUER: http://127.0.0.1:5556/dex
 
   storage:
-    name: Cloud storage and alerts (SeaweedFS S3, Azurite, fake-gcs-server, Mailpit SMTP)
+    name: Cloud storage, restore drills and alerts (SeaweedFS S3, Azurite, fake-gcs-server, Mailpit SMTP)
     runs-on: ubuntu-latest
     services:
       firebird:
@@ -197,12 +197,48 @@ jobs:
         run: |
           test -n "$FBADMIN_TEST_S3_ENDPOINT" && test -n "$FBADMIN_TEST_AZURE_ENDPOINT" && test -n "$FBADMIN_TEST_GCS_ENDPOINT"
           test -n "$FBADMIN_TEST_SMTP_HOST"
-          pytest -q backend/tests/test_storage.py backend/tests/test_storage_real.py backend/tests/test_alerts.py -rs
+          pytest -q backend/tests/test_storage.py backend/tests/test_storage_real.py backend/tests/test_drill_storage_real.py backend/tests/test_alerts.py -rs
         env:
           FBADMIN_TEST_DIR: /var/lib/firebird/data
       - name: Emulator logs
         if: failure()
         run: for c in fbs3 fbazurite fbgcs fbadmin-mailpit; do echo "== $c"; docker logs --tail 100 "$c" 2>&1; done
+
+  replication:
+    name: Replication setup (Firebird ${{ matrix.firebird }} primary and replica)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        firebird: ["4", "5"]
+    services:
+      firebird:
+        image: firebirdsql/firebird:${{ matrix.firebird }}
+        env:
+          FIREBIRD_ROOT_PASSWORD: masterkey
+        ports:
+          - 3050:3050
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e "backend[dev]"
+      # two servers sharing /repl, each with a replication.conf file on the runner that the tests write
+      - name: Start the primary (3060) and the replica (3061)
+        run: scripts/replication-test-servers.sh
+        env:
+          FB_VERSION: ${{ matrix.firebird }}
+          FBADMIN_REPL_DIR: ${{ runner.temp }}/fbadmin-repl
+      - name: Replication setup tests
+        run: pytest -q backend/tests/test_replication_setup.py backend/tests/test_replication.py -rs
+        env:
+          FBADMIN_TEST_DIR: /var/lib/firebird/data
+          FBADMIN_TEST_REPL: "1"
+          FBADMIN_REPL_DIR: ${{ runner.temp }}/fbadmin-repl
+      - name: Server logs
+        if: failure()
+        run: for c in fbrepl-p fbrepl-r; do echo "== $c"; docker exec "$c" tail -50 /opt/firebird/replication.log; done
 
   frontend:
     name: Frontend build
@@ -309,6 +345,12 @@ jobs:
         run: for _ in $(seq 1 30); do (echo > /dev/tcp/127.0.0.1/3050) 2>/dev/null && break; sleep 1; done
       - name: Firebird 5 with a fixed RemoteAuxPort (event monitor)
         run: scripts/events-test-server.sh 5
+      - name: Replication primary and replica (replica setup spec)
+        run: scripts/replication-test-servers.sh
+        env:
+          REPL_PRIMARY_PORT: "3062"
+          REPL_REPLICA_PORT: "3063"
+          FBADMIN_REPL_DIR: ${{ runner.temp }}/fbadmin-repl
       - name: Run the e2e tests
         working-directory: e2e
         run: FBADMIN_EMBEDDED_DIR="$RUNNER_TEMP/firebird-embedded" npx playwright test
@@ -316,6 +358,10 @@ jobs:
           FBADMIN_PYTHON: python
           FB_DB_DIR: /var/lib/firebird/data
           FB_EVENTS_PORT: "3060"
+          FB_REPL: "1"
+          FB_REPL_PRIMARY_PORT: "3062"
+          FB_REPL_REPLICA_PORT: "3063"
+          FB_REPL_DIR: ${{ runner.temp }}/fbadmin-repl
           FBADMIN_DRIVER: ${{ matrix.driver == 'firebirdsql' && 'firebirdsql' || '' }}
       - uses: actions/upload-artifact@v4
         if: failure()

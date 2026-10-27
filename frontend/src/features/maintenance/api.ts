@@ -34,7 +34,7 @@ export interface DbState {
   error: string | null;
 }
 
-export interface ArchiveItem { path: string; folder: string; name: string; size: number; modified: number }
+export interface ArchiveItem { path: string; folder: string; name: string; size: number; modified: number; encrypted?: boolean; key_id?: string | null }
 export interface LimboTx { id: number; multi: boolean; state: string | null; advise: string | null; host_site: string | null; remote_site: string | null; db_path: string | null }
 
 export interface GstatIndex { name: string; id: number; depth?: number; leaf_buckets?: number; nodes?: number; average_key_length?: number; total_dup?: number; max_dup?: number; clustering_factor?: number; fill_distribution: number[]; [k: string]: any }
@@ -50,12 +50,28 @@ export interface TraceEvent { seq: number; time: string; pid: number; type: stri
 export interface TraceTemplate { id: string; label: string; description: string; params: Record<string, number> }
 
 export interface Schedule {
-  id: string; name: string; kind: "backup" | "sweep" | "validate" | "schema_snapshot" | "schema_drift"; server_id: string; database_id: string; cron: string;
+  id: string; name: string; kind: "backup" | "sweep" | "validate" | "schema_snapshot" | "schema_drift" | "restore_drill"; server_id: string; database_id: string; cron: string;
   enabled: boolean; keep: number; options: Record<string, any>; created_at: number; last_run: number | null;
   last_status: string | null; next_run: number | null;
   verify: boolean; verify_path: string | null; upload: { target_id: string; prefix: string; keep: number } | null;
-  drift: DriftOptions | null;
+  drift: DriftOptions | null; encrypt?: boolean; drill?: DrillOptions | null;
 }
+export interface DrillOptions {
+  source: "schedule" | "storage"; backup_schedule_id: string | null; target_id: string | null; prefix: string;
+  server_id: string | null; path: string | null; validate_db: boolean; count_rows: boolean; compare: boolean;
+  max_age_hours: number | null; max_minutes: number | null; keep: boolean;
+}
+export interface DrillCheck { code: string; ok: boolean | null; message: string }
+export interface DrillReport {
+  schedule_id: string; started_at: number; finished_at: number; ok: boolean; server: string; database: string;
+  checks: DrillCheck[];
+  source?: { kind: "archive" | "storage"; name: string; size: number; modified: number; age_hours: number; encrypted: boolean; key_id: string | null; target?: string; key?: string; download_seconds?: number };
+  restore?: { path: string; seconds?: number }; recovery_seconds?: number; validation_errors?: number; rows?: number;
+  restored?: { tables: number; views: number; procedures: number; triggers: number; sequences: number };
+  compare?: { tables: Array<{ table: string; backup_rows: number | string | null; live_rows: number | string | null; status: string }>; missing: string[]; extra: string[]; differs: number } | null;
+  tables?: Array<{ table: string; backup_rows: number | string }>; kept?: boolean;
+}
+export interface BackupKey { id: string; source: "environment" | "stored"; active: boolean; created: number | null; archived_backups: number }
 export interface DriftOptions {
   baseline: "history" | "database"; history_server_id: string | null; history_database_id: string | null; ref: string | null; fetch: boolean;
   server_id: string | null; database_id: string | null; ignore_types: string[]; ignore_names: string[];
@@ -73,7 +89,8 @@ export interface HistoryItem {
   error: string | null; file?: string; size?: number; removed?: string[]; validation_errors?: number;
   verify?: { ok: boolean; error?: string; seconds?: number; tables?: number };
   upload?: { ok: boolean; error?: string; target?: string; key?: string; removed?: string[] };
-  drift?: boolean; summary?: Record<DriftStatus, number>; ignored?: number; baseline?: string;
+  drift?: boolean; summary?: Record<DriftStatus, number>; ignored?: number; baseline?: string; encrypted?: string;
+  drill_ok?: boolean; backup?: string | null; age_hours?: number | null; recovery_seconds?: number | null; rows?: number | null; failed_checks?: string[];
 }
 
 export const mapi = {
@@ -83,7 +100,7 @@ export const mapi = {
   backupJob: (sid: string, dbid: string, body: Body<"/api/servers/{server_id}/databases/{db_id}/maintenance/backup", "post">) => request<Job>("POST", `${mdb(sid, dbid)}/backup`, body),
   restoreJob: (sid: string, body: Body<"/api/servers/{server_id}/maintenance/restore", "post">) => request<Job>("POST", `${srv(sid)}/maintenance/restore`, body),
   archive: (sid: string) => request<ArchiveItem[]>("GET", `${srv(sid)}/maintenance/archive`),
-  archiveUrl: (sid: string, path: string) => `${srv(sid)}/maintenance/archive/download?path=${encodeURIComponent(path)}`,
+  archiveUrl: (sid: string, path: string, decrypt = false) => `${srv(sid)}/maintenance/archive/download?path=${encodeURIComponent(path)}${decrypt ? "&decrypt=true" : ""}`,
   deleteArchive: (sid: string, path: string) => request<void>("DELETE", `${srv(sid)}/maintenance/archive?path=${encodeURIComponent(path)}`),
 
   nbackup: (sid: string, dbid: string, body: Body<"/api/servers/{server_id}/databases/{db_id}/maintenance/nbackup", "post">) => request<Job>("POST", `${mdb(sid, dbid)}/nbackup`, body),
@@ -140,6 +157,13 @@ export const mapi = {
   scheduleBackups: (id: string) => request<ArchiveItem[]>("GET", `/api/schedules/${id}/backups`),
   verifyBackup: (id: string, path: string) => request<Job>("POST", `/api/schedules/${id}/backups/verify`, { path }),
   driftReport: (id: string) => request<DriftReport>("GET", `/api/schedules/${id}/drift`),
+  drillReport: (id: string) => request<DrillReport>("GET", `/api/schedules/${id}/drill`),
+  backupKeys: () => request<{ keys: BackupKey[]; active: string | null; missing: Array<{ id: string; archived_backups: number }> }>("GET", "/api/backup-keys"),
+  createBackupKey: () => request<{ id: string; key: string; active: boolean }>("POST", "/api/backup-keys"),
+  importBackupKey: (key: string, activate: boolean) => request<{ id: string }>("POST", "/api/backup-keys/import", { key, activate }),
+  activateBackupKey: (id: string) => request<{ active: string }>("POST", `/api/backup-keys/${id}/activate`),
+  exportBackupKey: (id: string) => request<{ id: string; key: string }>("POST", `/api/backup-keys/${id}/export`),
+  deleteBackupKey: (id: string, force = false) => request<void>("DELETE", `/api/backup-keys/${id}${force ? "?force=true" : ""}`),
   cronPreview: (expr: string) => request<{ next: string[] }>("GET", `/api/schedules/cron-preview?expr=${encodeURIComponent(expr)}`),
 };
 

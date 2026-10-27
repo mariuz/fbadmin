@@ -155,6 +155,7 @@ NBK_DIRECT = 7
 NBK_GUID = 8
 NBK_OPT_NO_TRIGGERS = 0x01
 NBK_OPT_INPLACE = 0x02
+NBK_OPT_SEQUENCE = 0x04  # nbackup -SEQ: keep the replication sequence (Firebird 4.0.1+)
 
 # --- statistics ------------------------------------------------------------------------
 STS_DATA_PAGES = 0x01

@@ -207,6 +207,40 @@ class BaseClient:
     def upload_file(self, path: Path, key: str, log: Callable[[str], None] = nolog) -> dict:
         raise NotImplementedError
 
+    def get_range(self, key: str, start: int, end: int) -> Response:
+        """GET bytes ``start``..``end`` (inclusive) of an object: 206, or 200 with the whole object."""
+        raise NotImplementedError
+
+    def download_file(self, key: str, dest: Path, log: Callable[[str], None] = nolog) -> int:
+        """Download an object into ``dest`` in ranged chunks (each retried on its own); written as
+        ``dest.part`` and renamed when complete."""
+        size = self.size_of(key)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        tmp = dest.with_name(dest.name + ".part")
+        got = 0
+        try:
+            with open(tmp, "wb") as f:
+                while got < size:
+                    end = min(size, got + CHUNK_SIZE) - 1
+                    res = self.get_range(key, got, end)
+                    if res.status == 200:  # the whole object (Range ignored)
+                        f.seek(0)
+                        f.truncate()
+                        f.write(res.body)
+                        got = len(res.body)
+                        break
+                    if len(res.body) != end - got + 1:
+                        raise StorageError(f"{self.provider}: short read of {key} at {got}")
+                    f.write(res.body)
+                    got += len(res.body)
+                    log(f"Downloaded {got}/{size} bytes of {key}")
+            if got != size:
+                raise StorageError(f"{self.provider}: {key} has {size} bytes but {got} were downloaded")
+            tmp.replace(dest)
+        finally:
+            tmp.unlink(missing_ok=True)
+        return got
+
     def test(self) -> dict:
         """Write, list, stat and delete a tiny object under the target's prefix."""
         key = join_key(self.prefix, f".fbadmin-test-{secrets.token_hex(6)}")

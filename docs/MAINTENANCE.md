@@ -143,7 +143,8 @@ the right to delete those attachments: the same user, or SYSDBA/`RDB$ADMIN`.
 
 pgAgent-like schedules for **backups** (streamed into `<data dir>/backups/<schedule id>/`
 with **retention**: keep the last N files), **sweeps**, **online validations**, **schema snapshots**
-([Schema history](SCHEMA_HISTORY.md)) and **schema drift checks** ([Schema drift detection](SCHEMA_DRIFT.md)).
+([Schema history](SCHEMA_HISTORY.md)), **schema drift checks** ([Schema drift detection](SCHEMA_DRIFT.md)) and
+**restore drills** ([Backup encryption and restore drills](BACKUP_ENCRYPTION_DRILLS.md)).
 
 * Standard 5-field cron expressions (`minute hour day-of-month month day-of-week`) with
   lists, ranges, steps, month/day names and `@hourly`/`@daily`/`@weekly`/`@monthly`/`@yearly`
@@ -181,6 +182,10 @@ found`). A validation with errors fails the run and raises the `validation.error
 
 Each schedule can also **upload** its backups to a cloud storage target (below), with its own
 folder and its own retention (*Keep last N in the cloud*).
+
+Backups can be **encrypted** (*Encrypt the backups*), and **restore drills** regularly restore the newest
+backup, from the archive or from cloud storage, possibly on another server, and check it: see
+[Backup encryption and restore drills](BACKUP_ENCRYPTION_DRILLS.md).
 
 ## Cloud storage targets
 
@@ -288,6 +293,7 @@ published Signature V4 examples and needs no network.
 | `/api/schedules/…` | schedules CRUD, run, history, backups, cron preview |
 | `POST /api/schedules/{id}/backups/verify` (`{"path": …}`) | test restore of one archived backup (job) |
 | `GET /api/schedules/{id}/drift` | latest report of a schema drift check ([details](SCHEMA_DRIFT.md#api)) |
+| `GET /api/schedules/{id}/drill`, `/api/backup-keys/…` | restore drill report, backup keys ([details](BACKUP_ENCRYPTION_DRILLS.md#api)) |
 | `GET/POST /api/storage/targets`, `GET/PUT/DELETE /api/storage/targets/{id}` | cloud storage targets (admins only in server mode) |
 | `POST /api/storage/targets/{id}/test`, `GET …/targets/{id}/objects?prefix=` | test a target, list its objects (newest first) |
 

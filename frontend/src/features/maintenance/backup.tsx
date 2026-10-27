@@ -20,6 +20,7 @@ export function BackupPanel(props: { serverId: string; dbId: string; onArchiveCh
   const [opts, setOpts] = useState(defaultBackupOpts);
   const [serverFile, setServerFile] = useState(db.path.replace(/\.(fdb|gdb)$/i, "") + `_${stamp()}.fbk`);
   const [job, setJob] = useState<Job | null>(null);
+  const [encrypt, setEncrypt] = useState(false);
   const { busy, error, run } = useBusy();
 
   const download = () => run(async () => {
@@ -33,8 +34,9 @@ export function BackupPanel(props: { serverId: string; dbId: string; onArchiveCh
       <div className="mt-row" style={{ marginTop: 12 }}>
         <button className="btn primary" disabled={busy} onClick={download}><IconDownload /> {t("Download .fbk")}</button>
         <button className="btn" disabled={busy} onClick={() => run(async () => {
-          setJob(await mapi.backupJob(props.serverId, props.dbId, { target: "archive", options: backupPayload(opts) }));
+          setJob(await mapi.backupJob(props.serverId, props.dbId, { target: "archive", options: backupPayload(opts), encrypt }));
         })}>{t("Backup to fbadmin archive")}</button>
+        <label className="check" title={t("With the backup key that encrypts (Schedules → Backup encryption)")}><input type="checkbox" checked={encrypt} onChange={(e) => setEncrypt(e.target.checked)} /> {t("encrypted")}</label>
         <span className="sep" style={{ width: 1, height: 20, background: "var(--border)" }} />
         <input className="text" style={{ flex: 1, minWidth: 220 }} value={serverFile} onChange={(e) => setServerFile(e.target.value)} title={t("Path on the Firebird server")} />
         <button className="btn" disabled={busy || !serverFile} onClick={() => run(async () => {
@@ -154,9 +156,10 @@ export function ArchivePanel(props: { serverId: string; version: number; onResto
             <tbody>
               {items.map((a) => (
                 <tr key={a.path}>
-                  <td>{a.folder}</td><td>{a.name}</td><td className="num">{fmtBytes(a.size)}</td><td>{fmtTime(a.modified)}</td>
+                  <td>{a.folder}</td><td>{a.encrypted && <span title={t("Encrypted with key {id}", { id: a.key_id ?? "" })} aria-label={t("Encrypted with key {id}", { id: a.key_id ?? "" })}>🔒 </span>}{a.name}</td><td className="num">{fmtBytes(a.size)}</td><td>{fmtTime(a.modified)}</td>
                   <td>
-                    <button className="btn small" onClick={() => browserDownload(mapi.archiveUrl(props.serverId, a.path), a.name)}><IconDownload size={12} /></button>{" "}
+                    <button className="btn small" aria-label={t("Download")} title={t("Download")} onClick={() => browserDownload(mapi.archiveUrl(props.serverId, a.path), a.name)}><IconDownload size={12} /></button>{" "}
+                    {a.encrypted && <><button className="btn small" onClick={() => browserDownload(mapi.archiveUrl(props.serverId, a.path, true), a.name.replace(/\.enc$/, ""))}>{t("Download decrypted")}</button>{" "}</>}
                     <button className="btn small" onClick={() => props.onRestore(a.path)}>{t("Restore…")}</button>{" "}
                     <button className="btn small danger" onClick={async () => {
                       if (!confirm(t("Delete {path}?", { path: a.path }))) return;

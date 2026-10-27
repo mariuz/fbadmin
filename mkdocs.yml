@@ -97,6 +97,7 @@ nav:
       - Security and server mode: SECURITY.md
       - Two-factor sign-in, API tokens and permissions: PERMISSIONS.md
       - Maintenance: MAINTENANCE.md
+      - Backup encryption and restore drills: BACKUP_ENCRYPTION_DRILLS.md
       - Alerts: ALERTS.md
       - Replication: REPLICATION.md
       - Privacy: PRIVACY.md

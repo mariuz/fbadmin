@@ -1,0 +1,11 @@
+/* replication setup wizard */
+.rs .rs-radios { display: flex; flex-direction: column; gap: 4px; }
+.rs .rs-tables { display: flex; flex-wrap: wrap; gap: 4px 14px; max-height: 160px; overflow: auto; margin-top: 4px; }
+.rs .rs-checks { margin-top: 10px; max-width: 900px; }
+.rs .alert.info { border-left-color: var(--accent); }
+.rs .rs-conf { max-width: 900px; }
+.rs .rs-conf pre, .rs .rs-mkdir { margin: 6px 0; }
+.rs .rs-path { flex: 1; min-width: 220px; max-width: 520px; }
+.rs .rs-transfer { margin-top: 10px; }
+.rs .rs-ok { margin-top: 8px; color: var(--ok); font-weight: 600; }
+.rs .rs-wait { margin-top: 8px; }

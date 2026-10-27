@@ -186,16 +186,20 @@ def backup_stream(svc, db_path: str, o: BackupOptions, major: int) -> Iterator[b
     return gen()
 
 
-def backup_to_local_file(svc, db_path: str, dest: Path, o: BackupOptions, major: int, log: Log = _nolog) -> int:
-    """Stream a backup through the Services API into a local file (on the fbadmin host)."""
+def backup_to_local_file(svc, db_path: str, dest: Path, o: BackupOptions, major: int, log: Log = _nolog,
+                         key: bytes | None = None) -> int:
+    """Stream a backup through the Services API into a local file (on the fbadmin host). With ``key`` it is
+    encrypted on the way (``backupcrypt``): no plaintext copy is written."""
+    from . import backupcrypt
+
     dest.parent.mkdir(parents=True, exist_ok=True)
     tmp = dest.with_suffix(dest.suffix + ".part")
     total = 0
     next_report = 8 << 20
     try:
-        with open(tmp, "wb") as f:
+        with open(tmp, "wb") as f, backupcrypt.writer(f, key) as w:
             for chunk in backup_stream(svc, db_path, o, major):
-                f.write(chunk)
+                w.write(chunk)
                 total += len(chunk)
                 if total >= next_report:
                     log(f"{total / 1048576:.1f} MB received")
@@ -203,7 +207,7 @@ def backup_to_local_file(svc, db_path: str, dest: Path, o: BackupOptions, major:
         tmp.replace(dest)
     finally:
         tmp.unlink(missing_ok=True)
-    log(f"Backup written to {dest} ({total} bytes)")
+    log(f"Backup written to {dest} ({total} bytes{', encrypted with key ' + backupcrypt.key_id(key) if key else ''})")
     return total
 
 
@@ -224,9 +228,9 @@ def restore_from_local_file(svc, src: Path, db_path: str, o: RestoreOptions, maj
 
     Cancelling the job stops sending data and closes ``svc`` (gbak ends when its service
     connection goes away), then raises ``RestoreCancelled``."""
-    size = src.stat().st_size
+    from . import backupcrypt
+
     sent = 0
-    marks = [size * p // 10 for p in range(1, 11)]
     created = False
 
     def out(line: str) -> None:
@@ -234,7 +238,11 @@ def restore_from_local_file(svc, src: Path, db_path: str, o: RestoreOptions, maj
         created = created or bool(_CREATED.search(line))
         log(line)
 
-    with open(src, "rb") as f:
+    with backupcrypt.open_plain(src) as (f, size):
+        if isinstance(f, backupcrypt.DecryptingReader):
+            log(f"Decrypting {src.name} with key {f.key_id}")
+        marks = [size * p // 10 for p in range(1, 11)]
+
         def read(n: int) -> bytes:
             nonlocal sent
             data = f.read(n)
@@ -297,15 +305,19 @@ def nbackup(svc, db_path: str, level: int, file: str, *, direct: bool | None = N
     S.run(svc, spb, log)
 
 
-def nrestore(svc, files: list[str], db_path: str, *, inplace: bool = False, log: Log = _nolog) -> None:
+def nrestore(svc, files: list[str], db_path: str, *, inplace: bool = False, sequence: bool = False,
+             log: Log = _nolog) -> None:
+    """nbackup restore. ``sequence`` (nbackup -SEQ, Firebird 4.0.1+) keeps the replication sequence of the
+    copy, so a replica made from it applies only the journal segments written after the copy."""
     if not files:
         raise ValueError("At least one nbackup file is required")
     spb = S.Spb(S.ACT_NREST)
     for f in files:
         spb.str(S.NBK_FILE, f)
     spb.str(S.SPB_DBNAME, db_path)
-    if inplace:
-        spb.int(S.SPB_OPTIONS, S.NBK_OPT_INPLACE)
+    opts = (S.NBK_OPT_INPLACE if inplace else 0) | (S.NBK_OPT_SEQUENCE if sequence else 0)
+    if opts:
+        spb.int(S.SPB_OPTIONS, opts)
     S.run(svc, spb, log)
 
 
