@@ -17,7 +17,7 @@ The version lives in one place: `__version__` in `backend/fbadmin/__init__.py`
 2. Run `scripts/gen-api-types.sh` if the API changed; make sure CI is green.
 3. Write the release notes in `docs/release-notes/vX.Y.Z.md`; the release workflow puts them
    at the top of the GitHub Release, above the generated list of changes.
-4. Tag and push: `git tag -a v2.1.0 -m "fbadmin 2.1.0" && git push origin v2.1.0`.
+4. Tag and push: `git tag -a v2.1.1 -m "fbadmin 2.1.1" && git push origin v2.1.1`.
 
 The tag starts three workflows:
 

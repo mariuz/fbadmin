@@ -12,7 +12,7 @@ scope.
 
 **Status:** milestones 0.1 to 2.0, the engineering backlog and the phone and tablet layout are
 implemented and verified in CI against real services. Firebird 6.0 final support waits for the
-6.0 release; milestones 2.1, 2.2 and 3.0 below are planned. The current release is **2.1.0** ([release notes](docs/release-notes/v2.1.0.md)): on
+6.0 release; milestones 2.1, 2.2 and 3.0 below are planned. The current release is **2.1.1** ([release notes](docs/release-notes/v2.1.1.md)): on
 [PyPI](https://pypi.org/project/firebird-admin/) (`pip install firebird-admin`), on
 [GitHub Releases](https://github.com/mariuz/fbadmin/releases) with desktop installers for Windows,
 macOS and Linux, as a Docker image, and documented at https://mariuz.github.io/fbadmin/.
