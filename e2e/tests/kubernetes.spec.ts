@@ -9,6 +9,7 @@ import { expect, test, type Page, type Route } from "@playwright/test";
  */
 test.describe.configure({ mode: "serial" });
 
+const SHOTS = process.env.E2E_SHOTS; // directory for screenshots (optional)
 let page: Page;
 const calls: Array<{ method: string; path: string; body: unknown }> = [];
 
@@ -95,6 +96,11 @@ test("clusters, instances, backups, events; accessible in every theme", async ()
   await expect(pane()).toContainText("0 2 * * *");
   await expect(pane()).toContainText("BackupCompleted");
   await expect(pane()).toContainText("sales");
+  if (SHOTS) {  // docs/screenshots/kubernetes.png
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.mouse.move(0, 0);
+    await page.screenshot({ path: `${SHOTS}/kubernetes.png` });
+  }
   for (const theme of ["light", "dark", "contrast"]) {
     await page.evaluate((th) => { document.documentElement.dataset.theme = th; }, theme);
     await audit(`Kubernetes page (${theme} theme)`);

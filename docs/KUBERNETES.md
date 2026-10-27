@@ -7,6 +7,8 @@ lists the Firebird clusters of the
 with its own Kubernetes credentials, so what it can do is set by the RBAC you give its service
 account. Every action is written to the [audit log](SECURITY.md) as `-- kubernetes: ...`.
 
+![Kubernetes](screenshots/kubernetes.png)
+
 ## What the page shows
 
 For each cluster:
