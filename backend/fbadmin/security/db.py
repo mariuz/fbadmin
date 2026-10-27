@@ -51,6 +51,51 @@ CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);
 USER_COLUMNS = ("id", "username", "email", "role", "active", "auth_source", "created_at", "last_login")
 
 
+
+
+class Result:
+    """The fetched rows of a statement, with the parts of a cursor that callers use."""
+
+    def __init__(self, rows: list, lastrowid: int | None, rowcount: int, description):
+        self._rows, self._i = rows, 0
+        self.lastrowid, self.rowcount, self.description = lastrowid, rowcount, description
+
+    def fetchone(self):
+        if self._i >= len(self._rows):
+            return None
+        self._i += 1
+        return self._rows[self._i - 1]
+
+    def fetchall(self) -> list:
+        rest, self._i = self._rows[self._i:], len(self._rows)
+        return rest
+
+    def fetchmany(self, size: int = 1) -> list:
+        part = self._rows[self._i:self._i + size]
+        self._i += len(part)
+        return part
+
+    def __iter__(self):
+        return iter(self.fetchall())
+
+def _wal(c: sqlite3.Connection, wait: float = 15.0) -> None:
+    """Switch to WAL. Several processes opening a new database together (fbadmin workers starting at once)
+    can get "database is locked" here at once: changing the journal mode doesn't always go through the busy
+    timeout, so retry for a while (another process has usually switched it already)."""
+    deadline = time.monotonic() + wait
+    delay = 0.02
+    while True:
+        try:
+            if str(c.execute("PRAGMA journal_mode").fetchone()[0]).lower() == "wal":
+                return
+            c.execute("PRAGMA journal_mode=WAL")
+            return
+        except sqlite3.OperationalError as exc:
+            if "locked" not in str(exc).lower() and "busy" not in str(exc).lower() or time.monotonic() > deadline:
+                raise
+            time.sleep(delay)
+            delay = min(delay * 2, 0.5)
+
 class SecurityDB:
     def __init__(self, path: Path):
         self.path = path
@@ -68,7 +113,7 @@ class SecurityDB:
                 new = not self.path.exists()
                 c = sqlite3.connect(self.path, check_same_thread=False, isolation_level=None)
                 c.row_factory = sqlite3.Row
-                c.execute("PRAGMA journal_mode=WAL")
+                _wal(c)
                 c.executescript(SCHEMA)
                 if "token" not in {r[1] for r in c.execute("PRAGMA table_info(audit)")}:
                     try:
@@ -81,9 +126,13 @@ class SecurityDB:
                 self._conn = c
             return self._conn
 
-    def execute(self, sql: str, params: tuple | list = ()) -> sqlite3.Cursor:
+    def execute(self, sql: str, params: tuple | list = ()) -> Result:
+        """Run a statement and fetch its rows while holding the lock: the connection is shared by the request
+        threads, and a cursor read after the lock is released can be reset by another thread's statement
+        (fetchone() then returns None)."""
         with self._lock:
-            return self.conn().execute(sql, params)
+            cur = self.conn().execute(sql, params)
+            return Result(cur.fetchall(), cur.lastrowid, cur.rowcount, cur.description)
 
     def close(self) -> None:
         with self._lock:
