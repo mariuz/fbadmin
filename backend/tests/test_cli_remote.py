@@ -217,7 +217,8 @@ def test_ctrl_c_cancels_the_job_on_the_server(web):
     """Interrupting a remote backup to a server file cancels its job, and gbak stops on the server.
 
     The backup must still run when Ctrl+C arrives. On a fast runner it can finish first ("The job has
-    already ended", which the CLI reports correctly); then the table grows and the test tries again."""
+    already ended", or completed while the cancel was on its way; the CLI reports both correctly); then the
+    table grows and the test tries again."""
     ok(rfb(web, "sql", "@Firebird/app", "-c", "CREATE TABLE FILLER (ID INTEGER NOT NULL PRIMARY KEY, S VARCHAR(200));"))
     rows = 0
     for _attempt in range(3):
@@ -242,7 +243,8 @@ def test_ctrl_c_cancels_the_job_on_the_server(web):
         _, err = p.communicate(timeout=120)
         err = (seen + err).decode()
         assert "Cancelling the job on the server" in err, err[-2000:]
-        if "already ended" not in err:
+        # the backup can still win: the job ended before the request, or gbak finished before it was stopped
+        if p.returncode != 0 or "already ended" not in err and "Backup completed" not in err:
             break
     assert p.returncode == 130, err[-2000:]
     assert "was cancelled" in err
