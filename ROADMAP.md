@@ -246,7 +246,7 @@ Also fixed in this milestone:
 - ⬜ **Prepared statements in fbadmin's loops:** grid edits, imports and data compare scripts run one statement many times; use `prep()` / `executemany` so they gain from the driver's fewer round trips (about 2x on a LAN with the pending upstream change)
 - ⬜ **Supply-chain hardening:** an SBOM for each package, signed container images and build provenance (attestations), dependency scanning in CI, and a security policy (`SECURITY.md` for reporting vulnerabilities)
 
-## Milestone 2.2 — Operations ⬜
+## Milestone 2.2 — Operations ✅
 
 - ✅ **Schema drift detection:** a scheduled *schema drift check* compares a database with its schema history in git (a branch, tag, commit or a fetched `origin/<branch>`; its own repository or another database's) or with another database; differences are listed as missing, extra or changed with both DDL versions and the script that makes the database match; object types and name patterns can be ignored; the `schema.drift` alert is sent for new or changed drift and once when it is gone ([docs/SCHEMA_DRIFT.md](docs/SCHEMA_DRIFT.md))
 - ✅ **Versioned migrations:** `V<version>__<description>.sql` scripts from git (or a directory) applied in order; each database records what was applied (checksums, who, when, how long, failures) in `FBADMIN_MIGRATIONS`; changed, failed and out-of-order scripts block a run; a dry run on a metadata-only or full copy of the database reports each script and the schema changes, and apply needs a passed one; baseline for existing databases, repair after a failure, one run at a time; from the UI and with `fbadmin migrate` (locally or through an fbadmin server) ([docs/MIGRATIONS.md](docs/MIGRATIONS.md))
