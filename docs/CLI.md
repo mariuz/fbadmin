@@ -188,6 +188,16 @@ Other options: `--page-size`, `--buffers`, `--parallel N` (Firebird 5+), `--deac
 `--read-only`, `--skip-table`/`--skip-data`, `--include-table`/`--include-data`,
 `--fix-fss-data CHARSET`, `--fix-fss-metadata CHARSET`, and the encryption options.
 
+## migrate
+
+Versioned migrations from a directory of `V<version>__<description>.sql` scripts, see
+[Versioned migrations](MIGRATIONS.md#command-line-tool):
+
+```bash
+fbadmin migrate status  @Production/app --dir db/migrations --check   # exit 1 when scripts are pending
+fbadmin migrate apply   @Production/app --dir db/migrations           # a dry run on a copy first
+```
+
 ## backup-decrypt, backup-key
 
 Backups that fbadmin encrypted (`*.fbk.enc`, see [Backup encryption](BACKUP_ENCRYPTION_DRILLS.md)) are

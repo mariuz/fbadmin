@@ -3176,6 +3176,160 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/servers/{server_id}/databases/{db_id}/migrations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Status
+         * @description The scripts of the configured source and the database's record, with the state of each.
+         */
+        get: operations["status_api_servers__server_id__databases__db_id__migrations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/servers/{server_id}/databases/{db_id}/migrations/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Apply
+         * @description Apply the pending scripts in order. Needs a passed dry run of the same scripts (unless skipped).
+         */
+        post: operations["apply_api_servers__server_id__databases__db_id__migrations_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/servers/{server_id}/databases/{db_id}/migrations/baseline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Baseline
+         * @description Mark an existing database as being at ``version``: older scripts are never run on it.
+         */
+        post: operations["baseline_api_servers__server_id__databases__db_id__migrations_baseline_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/servers/{server_id}/databases/{db_id}/migrations/dry-run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Last Dry Run */
+        get: operations["last_dry_run_api_servers__server_id__databases__db_id__migrations_dry_run_get"];
+        put?: never;
+        /**
+         * Dry Run
+         * @description Restore a copy of the database, run the pending scripts on it, report the result and the schema changes.
+         */
+        post: operations["dry_run_api_servers__server_id__databases__db_id__migrations_dry_run_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/servers/{server_id}/databases/{db_id}/migrations/repair": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Repair
+         * @description Remove failed records and accept the checksums of changed scripts.
+         */
+        post: operations["repair_api_servers__server_id__databases__db_id__migrations_repair_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/servers/{server_id}/databases/{db_id}/migrations/runs/{job_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Run Result */
+        get: operations["run_result_api_servers__server_id__databases__db_id__migrations_runs__job_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/servers/{server_id}/databases/{db_id}/migrations/source": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Source */
+        get: operations["get_source_api_servers__server_id__databases__db_id__migrations_source_get"];
+        /** Put Source */
+        put: operations["put_source_api_servers__server_id__databases__db_id__migrations_source_put"];
+        post?: never;
+        /** Delete Source */
+        delete: operations["delete_source_api_servers__server_id__databases__db_id__migrations_source_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/servers/{server_id}/databases/{db_id}/migrations/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Status Inline */
+        post: operations["status_inline_api_servers__server_id__databases__db_id__migrations_status_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/servers/{server_id}/databases/{db_id}/monitor": {
         parameters: {
             query?: never;
@@ -5176,14 +5330,6 @@ export interface components {
             /** Sql */
             sql?: string | null;
         };
-        /** ApplyIn */
-        ApplyIn: {
-            /**
-             * Confirm
-             * @default false
-             */
-            confirm?: boolean;
-        };
         /** AskIn */
         AskIn: {
             /** Database Id */
@@ -5272,6 +5418,16 @@ export interface components {
              * @default false
              */
             zip?: boolean;
+        };
+        /** BaselineIn */
+        BaselineIn: {
+            /**
+             * Description
+             * @default Baseline
+             */
+            description?: string;
+            /** Version */
+            version: string;
         };
         /** CancelIn */
         CancelIn: {
@@ -5596,6 +5752,21 @@ export interface components {
             /** Fbclient */
             fbclient?: string | null;
         };
+        /** DryRunIn */
+        DryRunIn: {
+            /** Copy Mode */
+            copy_mode?: ("metadata" | "full") | null;
+            /** Out Of Order */
+            out_of_order?: boolean | null;
+            /** Scratch */
+            scratch?: string | null;
+            /** Scripts */
+            scripts?: components["schemas"]["ScriptIn"][] | null;
+            /** Source Ref */
+            source_ref?: string | null;
+            /** Target */
+            target?: string | null;
+        };
         /** EncryptIn */
         EncryptIn: {
             /** Key Name */
@@ -5675,6 +5846,17 @@ export interface components {
              * @default 1000
              */
             rows?: number;
+        };
+        /** FilesIn */
+        FilesIn: {
+            /** Out Of Order */
+            out_of_order?: boolean | null;
+            /** Scripts */
+            scripts?: components["schemas"]["ScriptIn"][] | null;
+            /** Source Ref */
+            source_ref?: string | null;
+            /** Target */
+            target?: string | null;
         };
         /** GenerateIn */
         GenerateIn: {
@@ -6390,6 +6572,13 @@ export interface components {
             /** Verify Path */
             verify_path?: string | null;
         };
+        /** ScriptIn */
+        ScriptIn: {
+            /** Name */
+            name: string;
+            /** Sql */
+            sql: string;
+        };
         /** ServerIn */
         ServerIn: {
             /** Auth Plugin */
@@ -6528,6 +6717,47 @@ export interface components {
             sql?: string | null;
             /** Temp Dir */
             temp_dir?: string | null;
+        };
+        /** Source */
+        Source: {
+            /**
+             * Copy Mode
+             * @default metadata
+             * @enum {string}
+             */
+            copy_mode?: "metadata" | "full";
+            /**
+             * Kind
+             * @default git
+             * @enum {string}
+             */
+            kind?: "git" | "directory";
+            /**
+             * Out Of Order
+             * @default false
+             */
+            out_of_order?: boolean;
+            /**
+             * Path
+             * @default
+             */
+            path?: string;
+            /**
+             * Ref
+             * @default main
+             */
+            ref?: string;
+            /** Scratch */
+            scratch?: string | null;
+            /** Token */
+            token?: string | null;
+            /**
+             * Token User
+             * @default x-access-token
+             */
+            token_user?: string;
+            /** Url */
+            url?: string | null;
         };
         /** StatisticsIn */
         StatisticsIn: {
@@ -6865,6 +7095,14 @@ export interface components {
             /** Sql */
             sql: string;
         };
+        /** ApplyIn */
+        fbadmin__api__datacompare__ApplyIn: {
+            /**
+             * Confirm
+             * @default false
+             */
+            confirm?: boolean;
+        };
         /** GrantIn */
         fbadmin__api__fbsecurity__GrantIn: {
             /**
@@ -6972,6 +7210,22 @@ export interface components {
              * @default server
              */
             source?: string;
+        };
+        /** ApplyIn */
+        fbadmin__api__migrations__ApplyIn: {
+            /** Out Of Order */
+            out_of_order?: boolean | null;
+            /** Scripts */
+            scripts?: components["schemas"]["ScriptIn"][] | null;
+            /**
+             * Skip Dry Run
+             * @default false
+             */
+            skip_dry_run?: boolean;
+            /** Source Ref */
+            source_ref?: string | null;
+            /** Target */
+            target?: string | null;
         };
         /** ExecuteIn */
         fbadmin__api__query__ExecuteIn: {
@@ -11853,7 +12107,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ApplyIn"];
+                "application/json": components["schemas"]["fbadmin__api__datacompare__ApplyIn"];
             };
         };
         responses: {
@@ -13576,6 +13830,383 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    status_api_servers__server_id__databases__db_id__migrations_get: {
+        parameters: {
+            query?: {
+                target?: string | null;
+            };
+            header?: never;
+            path: {
+                server_id: string;
+                db_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    apply_api_servers__server_id__databases__db_id__migrations_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                server_id: string;
+                db_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["fbadmin__api__migrations__ApplyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    baseline_api_servers__server_id__databases__db_id__migrations_baseline_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                server_id: string;
+                db_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BaselineIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    last_dry_run_api_servers__server_id__databases__db_id__migrations_dry_run_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                server_id: string;
+                db_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    dry_run_api_servers__server_id__databases__db_id__migrations_dry_run_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                server_id: string;
+                db_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DryRunIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    repair_api_servers__server_id__databases__db_id__migrations_repair_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                server_id: string;
+                db_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FilesIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_result_api_servers__server_id__databases__db_id__migrations_runs__job_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                server_id: string;
+                db_id: string;
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_source_api_servers__server_id__databases__db_id__migrations_source_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                server_id: string;
+                db_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_source_api_servers__server_id__databases__db_id__migrations_source_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                server_id: string;
+                db_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Source"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_source_api_servers__server_id__databases__db_id__migrations_source_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                server_id: string;
+                db_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    status_inline_api_servers__server_id__databases__db_id__migrations_status_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                server_id: string;
+                db_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FilesIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };

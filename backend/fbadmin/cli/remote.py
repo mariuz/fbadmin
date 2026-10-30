@@ -621,8 +621,14 @@ def _chunks(reader) -> Iterable[bytes]:
         yield chunk
 
 
+def cmd_migrate(args: argparse.Namespace, out: Out, c: Client) -> int:
+    from .migrate import cmd_remote
+
+    return cmd_remote(args, out, c)
+
+
 COMMANDS = {"servers": cmd_servers, "check": cmd_check, "sql": cmd_sql, "extract": cmd_extract, "diff": cmd_diff,
-            "backup": cmd_backup, "restore": cmd_restore}
+            "backup": cmd_backup, "restore": cmd_restore, "migrate": cmd_migrate}
 
 
 def run(args: argparse.Namespace, out: Out) -> int:

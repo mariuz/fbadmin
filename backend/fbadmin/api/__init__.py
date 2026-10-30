@@ -35,6 +35,7 @@ from . import driver as driver_api
 from . import kubernetes
 from . import replication_setup
 from . import backup_keys
+from . import migrations
 
 ROUTERS: list[APIRouter] = [
     servers.router,
@@ -72,4 +73,5 @@ ROUTERS: list[APIRouter] = [
     kubernetes.router,
     replication_setup.router,
     backup_keys.router,
+    migrations.router,
 ]

@@ -246,3 +246,24 @@ def test_ctrl_c_cancels_the_job_on_the_server(web):
             break
     assert p.returncode == 130, err[-2000:]
     assert "was cancelled" in err
+
+
+def test_migrate_remote(web, tmp_path):
+    """fbadmin migrate --url: the scripts of a local directory, run by the fbadmin server (dry run first)."""
+    d = tmp_path / "migrations"
+    d.mkdir()
+    (d / "V1__remote_t.sql").write_text("CREATE TABLE REMOTE_MIG (ID INTEGER NOT NULL PRIMARY KEY);\n")
+    (d / "V2__remote_rows.sql").write_text("INSERT INTO REMOTE_MIG VALUES (1);\n")
+    r = rfb(web, "migrate", "status", "@Firebird/app", "--dir", str(d), "--check")
+    assert r.returncode == 1 and b"pending" in r.stdout
+    r = rfb(web, "migrate", "apply", "@Firebird/app", "--dir", str(d), "--token-env", "X", env={"X": web["ro_token"]})
+    assert r.returncode != 0  # a read-only token can't
+    out = json.loads(ok(rfb(web, "migrate", "apply", "@Firebird/app", "--dir", str(d), "--json")))
+    assert out["applied"] == ["V1__remote_t.sql", "V2__remote_rows.sql"] and out["current"] == "2"
+    assert out["dry_run"]["ok"] and out["dry_run"]["source_ref"]
+    ok(rfb(web, "migrate", "status", "@Firebird/app", "--dir", str(d), "--check"))
+    (d / "V3__bad.sql").write_text("INSERT INTO NOPE VALUES (1);\n")
+    r = rfb(web, "migrate", "apply", "@Firebird/app", "--dir", str(d))
+    assert r.returncode == 4 and b"dry run failed" in r.stderr
+    audit = web["web"].call("GET", "/api/admin/audit?q=migrations")["rows"]
+    assert any("applied V1__remote_t.sql, V2__remote_rows.sql" in a["statement"] for a in audit), audit[:3]

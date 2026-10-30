@@ -34,6 +34,7 @@ fbadmin-desktop [--port PORT] [--browser] [--log-level LEVEL]
 | `FBADMIN_K8S_NAMESPACES` | own namespace | Namespaces with Firebird clusters, comma-separated; `*` for all |
 | `FBADMIN_BACKUP_KEY` | unset | Backup encryption keys (`fbk1:…`, comma-separated; the first encrypts), see [Backup encryption](../BACKUP_ENCRYPTION_DRILLS.md#keys) |
 | `FBADMIN_REPLICATION_CONF` | unset | Server mode: the `replication.conf` files the [replica setup](../REPLICATION.md#writing-replicationconf) may write |
+| `FBADMIN_MIGRATIONS_ROOT` | unset | Server mode: [migration](../MIGRATIONS.md#sources) directories on the fbadmin host must be inside it |
 | `FBADMIN_PLUGINS` | on | `off` loads no plugins: a safe mode for troubleshooting, also used when generating the API types |
 
 ## Logging

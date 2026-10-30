@@ -13,7 +13,7 @@ import sys
 from .. import __version__
 from .common import USAGE, CliError, Out, add_connection_options, add_output_options, clean_error
 
-COMMANDS = ("backup", "restore", "extract", "diff", "sql", "check", "servers", "backup-decrypt", "backup-key")
+COMMANDS = ("backup", "restore", "extract", "diff", "sql", "check", "servers", "backup-decrypt", "backup-key", "migrate")
 
 EXIT_CODES = """exit codes:
   0  success
@@ -25,7 +25,7 @@ EXIT_CODES = """exit codes:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    from . import backup, crypt, misc, remote, schema
+    from . import backup, crypt, migrate, misc, remote, schema
 
     conn = argparse.ArgumentParser(add_help=False)
     add_connection_options(conn)
@@ -45,6 +45,7 @@ def build_parser() -> argparse.ArgumentParser:
     schema.add_parsers(sub, common)
     misc.add_parsers(sub, common)
     crypt.add_parsers(sub, common)
+    migrate.add_parsers(sub, common)
     for name, sp in sub.choices.items():
         if name != "serve":
             sp.formatter_class = argparse.RawDescriptionHelpFormatter
