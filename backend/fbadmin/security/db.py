@@ -269,6 +269,14 @@ class SecurityDB:
                             (*params, limit, offset)).fetchall()
         return {"total": total, "rows": [{**dict(r), "success": bool(r["success"])} for r in rows]}
 
+    def max_audit_id(self) -> int:
+        return int(self.execute("SELECT COALESCE(MAX(id), 0) FROM audit").fetchone()[0])
+
+    def audit_after(self, after_id: int, limit: int) -> list[dict[str, Any]]:
+        """Entries after ``after_id``, oldest first (audit forwarding)."""
+        rows = self.execute("SELECT * FROM audit WHERE id > ? ORDER BY id LIMIT ?", (after_id, limit)).fetchall()
+        return [dict(r) for r in rows]
+
     # ------------------------------------------------------------- meta
     def get_meta(self, key: str) -> str | None:
         r = self.execute("SELECT value FROM meta WHERE key = ?", (key,)).fetchone()

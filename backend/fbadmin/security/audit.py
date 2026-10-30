@@ -38,6 +38,7 @@ class AuditLog:
     def __init__(self, db, enabled: bool):
         self.db = db
         self.enabled = enabled
+        self.on_record = None  # audit forwarding: wakes the forwarder
 
     def _where(self, server_id: str | None, db_id: str | None) -> dict[str, Any]:
         from ..api.deps import get_state
@@ -76,6 +77,8 @@ class AuditLog:
         }
         try:
             self.db.add_audit(entry)
+            if self.on_record:
+                self.on_record()
         except Exception:  # noqa: BLE001 - auditing must never break the request
             pass
 

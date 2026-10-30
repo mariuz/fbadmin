@@ -4,6 +4,7 @@ import { errMsg, useApp } from "../../context";
 import { Modal } from "../../components/Modal";
 import { IconPlus, IconRefresh } from "../../components/Icons";
 import { secApi, type AppUser, type AuditRow } from "./api";
+import { AuditForwarding } from "./AuditForwarding";
 import { useAuth } from "./state";
 import { t } from "../../i18n";
 
@@ -125,6 +126,7 @@ export function AuditLog(props: { visible: boolean }) {
   const [page, setPage] = useState(0);
   const [open, setOpen] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [forwarding, setForwarding] = useState(false);
   const size = 100;
   const load = () =>
     secApi.audit({ limit: size, offset: page * size, q: filter.q, username: filter.username, success: filter.success,
@@ -140,10 +142,10 @@ export function AuditLog(props: { visible: boolean }) {
           onChange={(e) => setFilter({ ...filter, q: e.target.value })} onKeyDown={(e) => e.key === "Enter" && (setPage(0), load())} />
         <input className="text" placeholder={t("User")} style={{ width: 120 }} value={filter.username}
           onChange={(e) => setFilter({ ...filter, username: e.target.value })} onKeyDown={(e) => e.key === "Enter" && load()} />
-        <select className="text" value={filter.success} onChange={(e) => setFilter({ ...filter, success: e.target.value })}>
+        <select className="text" aria-label={t("Result")} value={filter.success} onChange={(e) => setFilter({ ...filter, success: e.target.value })}>
           <option value="">{t("all results")}</option><option value="true">{t("succeeded")}</option><option value="false">{t("failed")}</option>
         </select>
-        <select className="text" value={filter.category} onChange={(e) => setFilter({ ...filter, category: e.target.value })}>
+        <select className="text" aria-label={t("Kind")} value={filter.category} onChange={(e) => setFilter({ ...filter, category: e.target.value })}>
           {CATS.map((c) => <option key={c} value={c}>{c || t("all kinds")}</option>)}
         </select>
         <button className="btn" onClick={() => { setPage(0); load(); }}><IconRefresh /> {t("Apply")}</button>
@@ -153,7 +155,9 @@ export function AuditLog(props: { visible: boolean }) {
         <span className="muted">{t("page {page} / {pages}", { page: page + 1, pages: Math.max(1, Math.ceil(total / size)) })}</span>
         <button className="btn small" disabled={(page + 1) * size >= total} onClick={() => setPage(page + 1)}>›</button>
         {error && <span className="err">{error}</span>}
+        <button className="btn small" aria-expanded={forwarding} onClick={() => setForwarding(!forwarding)}>{t("Forwarding…")}</button>
       </div>
+      {forwarding && <AuditForwarding visible={props.visible} />}
       {!enabled && <div className="pad warn">{t("Auditing is off. Start fbadmin with FBADMIN_AUDIT=1 (it is on by default in server mode).")}</div>}
       <div style={{ flex: 1, overflow: "auto" }}>
         <table className="grid audit-grid">

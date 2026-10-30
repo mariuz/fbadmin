@@ -213,6 +213,45 @@ replaced by `***`. Admins can browse and filter the log under user menu → *Aud
 
 ![Audit log](screenshots/security-audit.png)
 
+### Forwarding to syslog or a webhook
+
+**Forwarding…** on the audit log sends every entry to a central log as well: a syslog server or a
+webhook (a SIEM, a log collector, a chat bot). The audit log stays the source. Each destination
+remembers the last entry it accepted, and a background thread sends what comes after, in order and
+within seconds. A destination that is down gets the entries later, with a growing pause between
+attempts (up to 5 minutes). Nothing is lost while it is down or while fbadmin is stopped. The table
+shows per destination how many entries were sent, how many are waiting, and the last result or error.
+**Test** sends one test entry, **Resend…** sends again from any entry number, and **Pause** stops a
+destination without losing its place.
+
+* **syslog**: RFC 5424 messages over UDP (default port 514), TCP or TLS (6514). TCP and TLS use
+  octet-counting framing (RFC 6587), and TLS verifies the server's certificate (with the system's CAs or
+  a CA file). The facility is configurable (`local0` by default), the severity is *notice* for
+  successful statements and *warning* for failed ones. The structured data `[fbadmin@32473 id= user=
+  category= success= server= database= client_ip= token=]` carries who, what and where; the message is
+  the whole entry as JSON. Over UDP a very long statement is shortened so the entry fits one datagram
+  (`"truncated": true`).
+* **webhook**: `POST` of `{"source": "fbadmin", "host": ..., "entries": [...]}`, up to 200 entries per
+  request. With a signing secret, `X-Fbadmin-Signature: sha256=<HMAC-SHA256 of the body>` (as for alert
+  webhooks). A bearer token is sent as `Authorization: Bearer ...`. Secrets can be `env:NAME`, and the
+  API never returns them.
+
+A destination can take only some kinds of entries (DDL, DML, TX, ACTION, SECURITY, OTHER), or only failed
+statements, and starts with new entries or with the whole log.
+
+For deployments, destinations can come from the environment (shown as *from the environment*, read-only):
+
+| Variable | |
+|---|---|
+| `FBADMIN_AUDIT_SYSLOG` | `udp://host:514`, `tcp://host:514` or `tls://host:6514`, optional `?facility=auth&verify=0` |
+| `FBADMIN_AUDIT_WEBHOOK` | the webhook URL; `FBADMIN_AUDIT_WEBHOOK_SECRET` and `FBADMIN_AUDIT_WEBHOOK_TOKEN` for the signature and the token |
+| `FBADMIN_AUDIT_FORWARD_INTERVAL` | seconds between checks when idle (default 5; new entries are sent at once) |
+
+Several fbadmin processes on one data directory forward once: a file lock picks one of them. The state
+of each destination is kept in `<data dir>/audit_forwarding.json`. Adding, changing and removing
+destinations is audited (kind SECURITY). The API is `/api/admin/audit/forwarding` (`GET`, `POST`,
+`PUT/DELETE /{id}`, `POST /{id}/test`, `POST /{id}/resend {"after_id": n}`), for administrators.
+
 ## Firebird connection options
 
 The server dialog has these per-server options:

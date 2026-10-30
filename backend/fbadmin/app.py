@@ -46,7 +46,11 @@ async def lifespan(app: FastAPI):
     scheduler.startup()
     alert_engine.startup()
     sampler = start_sampler()
+    sec = get_state().security
+    if sec.audit.enabled:
+        sec.forwarder.start()  # audit log forwarding to syslog / webhooks
     yield
+    sec.forwarder.stop()
     sampler.stop()
     scheduler.shutdown()
     alert_engine.shutdown()

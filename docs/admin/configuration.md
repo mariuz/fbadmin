@@ -32,6 +32,7 @@ fbadmin-desktop [--port PORT] [--browser] [--log-level LEVEL]
 | `FBADMIN_KUBERNETES` | auto | `off` turns off the [Kubernetes page](../KUBERNETES.md); `on` also uses `$KUBECONFIG` / `~/.kube/config`. Auto: the pod's service account |
 | `FBADMIN_KUBECONFIG` / `FBADMIN_KUBE_CONTEXT` | unset | Kubeconfig file (and context) for the Kubernetes page |
 | `FBADMIN_K8S_NAMESPACES` | own namespace | Namespaces with Firebird clusters, comma-separated; `*` for all |
+| `FBADMIN_AUDIT_SYSLOG` / `FBADMIN_AUDIT_WEBHOOK` | unset | Forward the [audit log](../SECURITY.md#forwarding-to-syslog-or-a-webhook) to syslog (`udp://`, `tcp://`, `tls://host:port`) or a webhook |
 | `FBADMIN_BACKUP_KEY` | unset | Backup encryption keys (`fbk1:…`, comma-separated; the first encrypts), see [Backup encryption](../BACKUP_ENCRYPTION_DRILLS.md#keys) |
 | `FBADMIN_REPLICATION_CONF` | unset | Server mode: the `replication.conf` files the [replica setup](../REPLICATION.md#writing-replicationconf) may write |
 | `FBADMIN_MIGRATIONS_ROOT` | unset | Server mode: [migration](../MIGRATIONS.md#sources) directories on the fbadmin host must be inside it |

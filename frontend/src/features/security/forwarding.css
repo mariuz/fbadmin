@@ -1,0 +1,7 @@
+/* audit log forwarding */
+.fwd { border-bottom: 1px solid var(--border); max-height: 55vh; overflow: auto; }
+.fwd h3 { margin: 0 0 4px; }
+.fwd .fwd-btns { white-space: nowrap; }
+.fwd .fwd-form { margin-top: 10px; }
+.fwd .fwd-cats { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.fwd .fwd-radios { display: flex; flex-direction: column; gap: 4px; }

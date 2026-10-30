@@ -36,6 +36,7 @@ from . import kubernetes
 from . import replication_setup
 from . import backup_keys
 from . import migrations
+from . import audit_forwarding
 
 ROUTERS: list[APIRouter] = [
     servers.router,
@@ -74,4 +75,5 @@ ROUTERS: list[APIRouter] = [
     replication_setup.router,
     backup_keys.router,
     migrations.router,
+    audit_forwarding.router,
 ]

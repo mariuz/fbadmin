@@ -38,6 +38,11 @@ class Security:
         self.login_limiter = RateLimiter(*settings.login_rate)
         self.api_limiter = RateLimiter(*settings.api_rate)
         self.audit = AuditLog(self.db, settings.audit)
+        from .forward import Forwarder, Store as ForwardStore  # audit log forwarding (syslog, webhook)
+
+        self.forwarder = Forwarder(self.db, ForwardStore(),
+                                   float(os.environ.get("FBADMIN_AUDIT_FORWARD_INTERVAL", "5") or 5))
+        self.audit.on_record = self.forwarder.notify
         self.oidc = OidcClient()
         from .access import AccessControl  # finer permissions, 2FA and API tokens (milestone 2.0)
         from .mfa import MfaService

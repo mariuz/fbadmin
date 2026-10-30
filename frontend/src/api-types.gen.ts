@@ -205,6 +205,79 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/audit/forwarding": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Destinations */
+        get: operations["list_destinations_api_admin_audit_forwarding_get"];
+        put?: never;
+        /** Create */
+        post: operations["create_api_admin_audit_forwarding_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/audit/forwarding/{dest_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update */
+        put: operations["update_api_admin_audit_forwarding__dest_id__put"];
+        post?: never;
+        /** Delete */
+        delete: operations["delete_api_admin_audit_forwarding__dest_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/audit/forwarding/{dest_id}/resend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resend */
+        post: operations["resend_api_admin_audit_forwarding__dest_id__resend_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/audit/forwarding/{dest_id}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Test
+         * @description Send one test entry now (not from the log), and report what the destination answered.
+         */
+        post: operations["test_api_admin_audit_forwarding__dest_id__test_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/tokens": {
         parameters: {
             query?: never;
@@ -5658,6 +5731,94 @@ export interface components {
             /** Path */
             path: string;
         };
+        /** DestinationIn */
+        DestinationIn: {
+            /** Ca File */
+            ca_file?: string | null;
+            /**
+             * Categories
+             * @default []
+             */
+            categories?: string[];
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled?: boolean;
+            /**
+             * Facility
+             * @default local0
+             */
+            facility?: string;
+            /**
+             * Failures Only
+             * @default false
+             */
+            failures_only?: boolean;
+            /** Host */
+            host?: string | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "syslog" | "webhook";
+            /** Name */
+            name: string;
+            /** Port */
+            port?: number | null;
+            /**
+             * Protocol
+             * @default udp
+             * @enum {string}
+             */
+            protocol?: "udp" | "tcp" | "tls";
+            /** Secret */
+            secret?: string | null;
+            /**
+             * Start
+             * @default now
+             * @enum {string}
+             */
+            start?: "now" | "all";
+            /**
+             * Tls Verify
+             * @default true
+             */
+            tls_verify?: boolean;
+            /** Token */
+            token?: string | null;
+            /** Url */
+            url?: string | null;
+        };
+        /** DestinationUpdate */
+        DestinationUpdate: {
+            /** Ca File */
+            ca_file?: string | null;
+            /** Categories */
+            categories?: string[] | null;
+            /** Enabled */
+            enabled?: boolean | null;
+            /** Facility */
+            facility?: string | null;
+            /** Failures Only */
+            failures_only?: boolean | null;
+            /** Host */
+            host?: string | null;
+            /** Name */
+            name?: string | null;
+            /** Port */
+            port?: number | null;
+            /** Protocol */
+            protocol?: ("udp" | "tcp" | "tls") | null;
+            /** Secret */
+            secret?: string | null;
+            /** Tls Verify */
+            tls_verify?: boolean | null;
+            /** Token */
+            token?: string | null;
+            /** Url */
+            url?: string | null;
+        };
         /** DiffIn */
         DiffIn: {
             /**
@@ -6304,6 +6465,11 @@ export interface components {
         ReplicaModeIn: {
             /** Mode */
             mode: string;
+        };
+        /** ResendIn */
+        ResendIn: {
+            /** After Id */
+            after_id: number;
         };
         /** RestartIn */
         RestartIn: {
@@ -7869,6 +8035,189 @@ export interface operations {
             };
             header?: never;
             path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_destinations_api_admin_audit_forwarding_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    create_api_admin_audit_forwarding_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DestinationIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_api_admin_audit_forwarding__dest_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dest_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DestinationUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_api_admin_audit_forwarding__dest_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dest_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resend_api_admin_audit_forwarding__dest_id__resend_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dest_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResendIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    test_api_admin_audit_forwarding__dest_id__test_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dest_id: string;
+            };
             cookie?: never;
         };
         requestBody?: never;
