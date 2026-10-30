@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 from ..config import settings
 from .. import schemahistory as schema_history
+from ..monitoring import regressions
 from ..query import ISOLATIONS, TxOptions, end_transaction, explain, fetch_more, run_script
 from ..sqlsplit import script_params
 from .deps import get_state
@@ -101,6 +102,7 @@ def execute(sid: str, body: ExecuteIn):
                          with_plan=body.with_plan, state=sess, params=body.params, stats=stats,
                          keep_cursor=body.keep_cursor)
     schema_history.after_sql(sess.server_id, sess.db_id, body.sql, res["transaction_open"])
+    regressions.after_sql(sess.server_id, sess.db_id, res)  # query regression tracking (tracked databases)
     return res
 
 

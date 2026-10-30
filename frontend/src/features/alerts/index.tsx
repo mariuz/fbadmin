@@ -23,6 +23,7 @@ const EVENT_LABELS: Record<string, string> = {
   "upload.failed": N_("A backup upload to cloud storage failed"),
   "schema.drift": N_("Schema drift found by a scheduled check (and when it is gone)"),
   "restore.drill_failed": N_("A restore drill failed (and when a drill works again)"),
+  "query.regression": N_("A statement got slower or changed its plan for the worse (and when it is back to normal)"),
   oat_gap: N_("Transaction gap (next - OAT) above threshold"),
   long_transaction: N_("Transaction running longer than threshold"),
   replication_lag: N_("Replica behind the primary"),

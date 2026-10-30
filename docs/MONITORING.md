@@ -68,6 +68,59 @@ the defaults:
 | `slow_seconds` (0 = off) | `FBADMIN_HISTORY_SLOW_SECONDS` | 5 |
 | `metrics_enabled` | `FBADMIN_METRICS` | off |
 
+## Query regressions
+
+**Query regressions…** (database context menu) shows statements that got slower, or changed their plan
+and got slower, over time. It needs the history to be recorded for the database.
+
+**What is tracked.** Two sources feed it:
+
+* **The history sampler.** Statements it sees running for longer than *slow_seconds*, with their
+  `MON$EXPLAINED_PLAN`. One execution seen by several samples is one run, with the longest duration
+  seen.
+* **The Query Tool.** Statements (SELECT, INSERT, UPDATE, DELETE, MERGE, EXECUTE PROCEDURE) slower than
+  *regression_query_ms*. Their plan is explained in the background after they ran.
+
+Statements are grouped by their shape: literals and parameters become `?`, comments and spacing go,
+case is folded outside quoted names, and `IN (1, 2, 3)` is `IN (?)`. So `WHERE ID = 7` and
+`where id=8` are one statement.
+
+**When a statement regressed.** Its **recent** runs (the last *regression_recent_hours*) are compared
+with its **baseline** (the *regression_baseline_days* before them, and after it was last accepted). It
+regressed when either holds:
+
+* **slower**: the recent median is at least *regression_factor* times the baseline median, and at least
+  *regression_min_seconds* more, with *regression_min_runs* runs on each side;
+* **plan changed and slower**: the latest plan differs from the baseline's usual plan, and the median
+  is more than 20 % and *regression_min_seconds* higher.
+
+A changed plan that isn't slower is shown (**Regressions and changed plans**), not flagged.
+
+**The screen.** The list shows each statement's baseline and recent medians, the change (×), the runs
+and the flags; regressions come first. A statement's detail shows:
+
+* a chart of every run's duration over time, one colour per plan;
+* the plans with their runs and medians;
+* a side-by-side diff of the baseline plan and the recent plan;
+* **Open in Query Tool**, and **Accept as the new baseline…**, which makes the current plan and duration
+  normal (the comparison starts again).
+
+**Alerts.** The `query.regression` alert (see [Alerts](ALERTS.md)) is sent when a statement regresses,
+again when its regression changes (another plan, or newly slower), and once when it is back to normal.
+The check runs after each sample.
+
+Settings (the screen's **Settings…**, or `PUT /api/monitoring/settings`):
+
+| Setting | Default | |
+|---|---|---|
+| `regression_factor` | 2 | slower when the recent median is at least this many times the baseline median |
+| `regression_min_seconds` | 0.5 | ... and at least this many seconds more |
+| `regression_recent_hours` | 24 | the recent runs |
+| `regression_baseline_days` | 14 | the baseline, before the recent runs |
+| `regression_min_runs` | 3 | runs needed on each side |
+| `regression_query_ms` | 200 | Query Tool statements slower than this are tracked |
+| `regression_keep_days` | 30 | runs are kept this long (at most 2000 per statement) |
+
 ## Table statistics
 
 Top tables by reads, sequential/indexed reads, inserts, updates, deletes, backouts, purges,
@@ -214,6 +267,9 @@ All under `/api/servers/{sid}/databases/{dbid}/monitoring` unless noted.
 | POST | `/history/sample` | sample now |
 | DELETE | `/history` | delete stored samples |
 | GET | `/history/slow` | slow statement log |
+| GET | `/regressions?only=all\|flagged\|regressions` | tracked statements, their medians, plans and flags |
+| GET | `/regressions/{sql_hash}` | a statement's runs and plans |
+| POST | `/regressions/{sql_hash}/accept` | its current behaviour is the new baseline |
 | GET/PUT | `/api/monitoring/settings` | sampler/exporter settings |
 | GET | `/profiler` | availability, sessions, attachments |
 | POST | `/profiler/run` `{sql, description}` | profile statements |

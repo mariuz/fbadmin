@@ -5,7 +5,7 @@ from __future__ import annotations
 import time
 
 from fastapi import APIRouter, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from ..metadata import Catalog
 from ..monitoring import advisor, history, probes, profiler
@@ -130,6 +130,14 @@ class SettingsIn(BaseModel):
     retention_hours: int | None = None
     slow_seconds: int | None = None
     metrics_enabled: bool | None = None
+    # query regression tracking (monitoring/regressions.py)
+    regression_factor: float | None = Field(default=None, ge=1.1, le=100)
+    regression_recent_hours: float | None = Field(default=None, gt=0, le=24 * 30)
+    regression_baseline_days: float | None = Field(default=None, gt=0, le=365)
+    regression_min_runs: int | None = Field(default=None, ge=1, le=1000)
+    regression_min_seconds: float | None = Field(default=None, ge=0, le=3600)
+    regression_query_ms: int | None = Field(default=None, ge=0, le=3_600_000)
+    regression_keep_days: float | None = Field(default=None, gt=0, le=3650)
 
 
 @settings_router.get("/settings")

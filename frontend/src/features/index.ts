@@ -25,3 +25,4 @@ import "./driver";
 import "./kubernetes";
 import "./replication-setup";
 import "./migrations";
+import "./regressions";

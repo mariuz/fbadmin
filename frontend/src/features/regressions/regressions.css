@@ -1,0 +1,14 @@
+/* query regressions */
+.reg .reg-sql { max-width: 520px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.reg .reg-chart { margin: 10px 0; max-width: 720px; }
+.reg .reg-axis { stroke: var(--border); }
+.reg .reg-label { fill: var(--muted); font-size: 11px; }
+.reg .reg-dot { stroke: var(--panel); stroke-width: 1; }
+.reg .reg-dot.noplan { opacity: .55; }
+.reg .p0 { fill: var(--accent); background: var(--accent); }
+.reg .p1 { fill: var(--danger); background: var(--danger); }
+.reg .p2 { fill: var(--ok); background: var(--ok); }
+.reg .p3 { fill: var(--warn); background: var(--warn); }
+.reg .reg-legend { margin-right: 12px; }
+.reg .reg-sw { display: inline-block; width: 10px; height: 10px; border-radius: 50%; vertical-align: middle; }
+.reg .pill + .pill { margin-left: 4px; }

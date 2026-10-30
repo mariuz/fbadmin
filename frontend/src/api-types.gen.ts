@@ -3678,6 +3678,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/servers/{server_id}/databases/{db_id}/monitoring/regressions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Statements
+         * @description Every tracked statement with its baseline and recent medians, plans and flags; regressions first.
+         */
+        get: operations["list_statements_api_servers__server_id__databases__db_id__monitoring_regressions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/servers/{server_id}/databases/{db_id}/monitoring/regressions/{sql_hash}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Statement
+         * @description One statement: its runs over time (duration, plan, source) and its plans with their medians.
+         */
+        get: operations["statement_api_servers__server_id__databases__db_id__monitoring_regressions__sql_hash__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/servers/{server_id}/databases/{db_id}/monitoring/regressions/{sql_hash}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Accept
+         * @description The statement's current behaviour (its plan and its duration) is the new normal: the baseline restarts.
+         */
+        post: operations["accept_api_servers__server_id__databases__db_id__monitoring_regressions__sql_hash__accept_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/servers/{server_id}/databases/{db_id}/monitoring/snapshot": {
         parameters: {
             query?: never;
@@ -6850,6 +6910,20 @@ export interface components {
             interval?: number | null;
             /** Metrics Enabled */
             metrics_enabled?: boolean | null;
+            /** Regression Baseline Days */
+            regression_baseline_days?: number | null;
+            /** Regression Factor */
+            regression_factor?: number | null;
+            /** Regression Keep Days */
+            regression_keep_days?: number | null;
+            /** Regression Min Runs */
+            regression_min_runs?: number | null;
+            /** Regression Min Seconds */
+            regression_min_seconds?: number | null;
+            /** Regression Query Ms */
+            regression_query_ms?: number | null;
+            /** Regression Recent Hours */
+            regression_recent_hours?: number | null;
             /** Retention Hours */
             retention_hours?: number | null;
             /** Slow Seconds */
@@ -15189,6 +15263,107 @@ export interface operations {
                 server_id: string;
                 db_id: string;
                 profile_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_statements_api_servers__server_id__databases__db_id__monitoring_regressions_get: {
+        parameters: {
+            query?: {
+                only?: "all" | "flagged" | "regressions";
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                server_id: string;
+                db_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    statement_api_servers__server_id__databases__db_id__monitoring_regressions__sql_hash__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                server_id: string;
+                db_id: string;
+                sql_hash: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    accept_api_servers__server_id__databases__db_id__monitoring_regressions__sql_hash__accept_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                server_id: string;
+                db_id: string;
+                sql_hash: string;
             };
             cookie?: never;
         };

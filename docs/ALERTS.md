@@ -80,6 +80,7 @@ database.
 | `backup.verify_failed` | A scheduled backup could not be restored in its [test restore](MAINTENANCE.md#test-restores). |
 | `validation.errors` | A scheduled online validation reported errors. |
 | `upload.failed` | A backup could not be uploaded to its [cloud storage target](MAINTENANCE.md#cloud-storage-targets). |
+| `query.regression` | A statement got slower, or changed its plan and got slower ([Query regressions](MONITORING.md#query-regressions)). Sent again when the regression changes, and once (*resolved*) when it is back to normal. |
 | `restore.drill_failed` | A [restore drill](BACKUP_ENCRYPTION_DRILLS.md#restore-drills) failed: no backup or too old, missing key, the restore, the validation or reading a table failed. When a drill works again, one *resolved* message follows. |
 | `schema.drift` | A scheduled [drift check](SCHEMA_DRIFT.md) found differences from its baseline. A different drift is sent at once, even during the cool-down; when the drift is gone, one *resolved* message follows. |
 

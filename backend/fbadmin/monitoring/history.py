@@ -24,7 +24,8 @@ from pathlib import Path
 from typing import Any
 
 from ..config import settings
-from . import probes
+from . import probes, regressions
+from .regressions import DEFAULTS as _regression_defaults
 
 COLUMNS = ("ts",) + probes.COUNTERS + probes.GAUGES
 
@@ -34,6 +35,7 @@ DEFAULTS: dict[str, Any] = {
     "slow_seconds": int(os.environ.get("FBADMIN_HISTORY_SLOW_SECONDS", "5")),
     "metrics_enabled": os.environ.get("FBADMIN_METRICS", "").lower() in ("1", "true", "yes", "on"),
 }
+DEFAULTS.update(_regression_defaults)  # query regression tracking (regressions.py)
 
 
 class HistoryStore:
@@ -163,6 +165,7 @@ class HistoryStore:
         with self._lock:
             self._db.execute("DELETE FROM samples WHERE server_id = ? AND db_id = ?", (server_id, db_id))
             self._db.execute("DELETE FROM slow_statements WHERE server_id = ? AND db_id = ?", (server_id, db_id))
+        regressions.forget(self, server_id, db_id)
 
     # ---------------------------------------------------------------- slow statements
     def add_slow(self, server_id: str, db_id: str, sql_text: str, plan: str | None, seconds: float) -> None:
@@ -225,6 +228,9 @@ def sample_database(server_id: str, db_id: str) -> dict[str, Any]:
     for s in slow:
         try:
             store.add_slow(server_id, db_id, s["sql_text"], s["explained_plan"], s["seconds"])
+            # one observation per execution: the same statement seen by several samples only grows
+            regressions.record(store, server_id, db_id, s["sql_text"], s["seconds"], plan=s["explained_plan"],
+                               source="sampler", exec_key=f"{s['attachment_id']}:{s['statement_id']}:{s['started']}")
         except Exception as exc:  # noqa: BLE001 - the sample itself is stored
             error = f"slow statement log: {exc}"
     store.mark(server_id, db_id, error)
@@ -240,6 +246,7 @@ def _slow_running(conn, min_seconds: float) -> list[dict[str, Any]]:
 
     rows = Catalog(conn).rows(
         "SELECT s.MON$SQL_TEXT AS sql_text, s.MON$EXPLAINED_PLAN AS explained_plan, "
+        "s.MON$ATTACHMENT_ID AS attachment_id, s.MON$STATEMENT_ID AS statement_id, s.MON$TIMESTAMP AS started, "
         "DATEDIFF(MILLISECOND FROM s.MON$TIMESTAMP TO CURRENT_TIMESTAMP) / 1000.0 AS seconds "
         "FROM MON$STATEMENTS s WHERE s.MON$STATE = 1 AND s.MON$ATTACHMENT_ID <> CURRENT_CONNECTION "
         "AND s.MON$SQL_TEXT IS NOT NULL"
@@ -248,6 +255,7 @@ def _slow_running(conn, min_seconds: float) -> list[dict[str, Any]]:
     for r in rows:
         if r["seconds"] is not None and float(r["seconds"]) >= min_seconds:
             r["seconds"] = float(r["seconds"])  # Decimal cannot be bound by sqlite3
+            r["started"] = r["started"].isoformat() if hasattr(r.get("started"), "isoformat") else str(r.get("started"))
             out.append(r)
     return out
 
@@ -271,9 +279,15 @@ def sample_all() -> None:
                     sample_database(t["server_id"], t["db_id"])
                 except Exception:  # noqa: BLE001 - error is recorded in the tracked table
                     pass
+                try:
+                    name = st.store.get_database(t["server_id"], t["db_id"]).name
+                    regressions.check_alerts(store, t["server_id"], t["db_id"], store.get_settings(), name)
+                except Exception:  # noqa: BLE001
+                    pass
         except Unavailable as exc:
             store.mark(t["server_id"], t["db_id"], str(exc))
     store.prune(store.get_settings()["retention_hours"])
+    regressions.prune(store, store.get_settings()["regression_keep_days"])
 
 
 class Sampler:

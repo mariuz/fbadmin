@@ -46,6 +46,8 @@ EVENTS: list[dict[str, Any]] = [
      "label": "A backup could not be uploaded to cloud storage"},
     {"id": "restore.drill_failed", "kind": "event", "threshold": None,
      "label": "A restore drill failed (and when a drill works again)"},
+    {"id": "query.regression", "kind": "event", "threshold": None,
+     "label": "A statement got slower or changed its plan for the worse (and when it is back to normal)"},
     {"id": "schema.drift", "kind": "event", "threshold": None,
      "label": "A scheduled drift check found schema differences from the baseline (and when they are gone)"},
     {"id": "oat_gap", "kind": "condition", "threshold": 10000, "unit": "transactions",
