@@ -26,13 +26,5 @@
 .checkup .cu-sent { max-height: 320px; overflow: auto; white-space: pre-wrap; font-size: 11.5px; }
 .checkup .cu-ai { border-top: 1px solid var(--border); padding-top: 8px; margin-top: 8px; }
 .checkup .cu-q { margin-bottom: 6px; }
-.checkup .cu-md { line-height: 1.5; max-width: 980px; }
-.checkup .cu-md h5 { margin: 12px 0 4px; font-size: 13px; }
-.checkup .cu-md p { margin: 4px 0; }
-.checkup .cu-md ol, .checkup .cu-md ul { margin: 4px 0; padding-left: 22px; }
-.checkup .cu-md li { margin: 2px 0; }
-.checkup .cu-md code { background: var(--panel-2); border: 1px solid var(--border); border-radius: 3px; padding: 0 3px; font-size: 12px; }
-.checkup .cu-md .ai-code { margin: 6px 0 8px; }
-.checkup .cu-md .ai-code pre { margin: 0 0 4px; padding: 6px 8px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 4px; overflow: auto; max-height: 260px; white-space: pre; }
 .checkup .cu-meta { font-size: 11px; margin-top: 4px; }
 .checkup .cu-follow input { flex: 1; min-width: 240px; }

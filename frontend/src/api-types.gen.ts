@@ -1630,6 +1630,145 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/notebooks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Notebooks */
+        get: operations["list_notebooks_api_notebooks_get"];
+        put?: never;
+        /** Create Notebook */
+        post: operations["create_notebook_api_notebooks_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notebooks/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Import Notebook */
+        post: operations["import_notebook_api_notebooks_import_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notebooks/{nb_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Notebook */
+        get: operations["get_notebook_api_notebooks__nb_id__get"];
+        /** Update Notebook */
+        put: operations["update_notebook_api_notebooks__nb_id__put"];
+        post?: never;
+        /** Delete Notebook */
+        delete: operations["delete_notebook_api_notebooks__nb_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notebooks/{nb_id}/copy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Copy Notebook */
+        post: operations["copy_notebook_api_notebooks__nb_id__copy_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notebooks/{nb_id}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Export */
+        get: operations["export_api_notebooks__nb_id__export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notebooks/{nb_id}/revisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Revisions */
+        get: operations["revisions_api_notebooks__nb_id__revisions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notebooks/{nb_id}/revisions/{rev}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Revision */
+        get: operations["revision_api_notebooks__nb_id__revisions__rev__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notebooks/{nb_id}/revisions/{rev}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Restore */
+        post: operations["restore_api_notebooks__nb_id__revisions__rev__restore_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/object-types": {
         parameters: {
             query?: never;
@@ -5656,6 +5795,24 @@ export interface components {
             /** Run Id */
             run_id: string;
         };
+        /** Cell */
+        Cell: {
+            chart?: components["schemas"]["Chart"] | null;
+            /** Id */
+            id?: string;
+            output?: components["schemas"]["Output"] | null;
+            /**
+             * Source
+             * @default
+             */
+            source?: string;
+            /**
+             * Type
+             * @default sql
+             * @enum {string}
+             */
+            type?: "sql" | "markdown";
+        };
         /** ChannelIn */
         ChannelIn: {
             /**
@@ -5691,6 +5848,39 @@ export interface components {
                 [key: string]: unknown;
             } | null;
         };
+        /**
+         * Chart
+         * @description The settings of the Query Tool's chart view (frontend ``features/charts/shape.ts`` ChartConfig);
+         *     columns are positions in the cell's last result.
+         */
+        Chart: {
+            /**
+             * Agg
+             * @default sum
+             * @enum {string}
+             */
+            agg?: "sum" | "avg" | "count" | "min" | "max" | "first";
+            /** Group */
+            group?: number | null;
+            /**
+             * Sort
+             * @default auto
+             * @enum {string}
+             */
+            sort?: "auto" | "label" | "value-desc" | "value-asc";
+            /** Topn */
+            topN?: number | null;
+            /**
+             * Type
+             * @default bar
+             * @enum {string}
+             */
+            type?: "bar" | "hbar" | "stacked" | "line" | "area" | "pie" | "donut" | "scatter";
+            /** X */
+            x: number;
+            /** Ys */
+            ys?: number[];
+        };
         /** CheckupIn */
         CheckupIn: {
             /**
@@ -5703,6 +5893,16 @@ export interface components {
         CodeIn: {
             /** Code */
             code: string;
+        };
+        /** Column */
+        Column: {
+            /** Name */
+            name: string;
+            /**
+             * Type
+             * @default
+             */
+            type?: string;
         };
         /** ColumnsIn */
         ColumnsIn: {
@@ -5810,28 +6010,6 @@ export interface components {
         ConnectIn: {
             /** Password */
             password?: string | null;
-        };
-        /** CopyIn */
-        CopyIn: {
-            /**
-             * Batch Size
-             * @default 1000
-             */
-            batch_size?: number;
-            /**
-             * Create Tables
-             * @default true
-             */
-            create_tables?: boolean;
-            source: components["schemas"]["Endpoint"];
-            /** Tables */
-            tables: string[];
-            target: components["schemas"]["Endpoint"];
-            /**
-             * Truncate
-             * @default false
-             */
-            truncate?: boolean;
         };
         /** CreateDatabaseIn */
         CreateDatabaseIn: {
@@ -6237,46 +6415,6 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
-        /** ImportIn */
-        ImportIn: {
-            /** Columns */
-            columns: {
-                [key: string]: unknown;
-            }[];
-            /**
-             * Create
-             * @default false
-             */
-            create?: boolean;
-            /**
-             * Delete Upload
-             * @default true
-             */
-            delete_upload?: boolean;
-            /** Format */
-            format?: string | null;
-            /**
-             * On Error
-             * @default abort
-             */
-            on_error?: string;
-            /**
-             * Options
-             * @default {}
-             */
-            options?: {
-                [key: string]: unknown;
-            };
-            /** Table */
-            table: string;
-            /**
-             * Truncate
-             * @default false
-             */
-            truncate?: boolean;
-            /** Upload Id */
-            upload_id: string;
-        };
         /** IndexRef */
         IndexRef: {
             /** Name */
@@ -6475,6 +6613,45 @@ export interface components {
              */
             no_triggers?: boolean;
         };
+        /** NotebookIn */
+        NotebookIn: {
+            /** Cells */
+            cells?: components["schemas"]["Cell"][] | null;
+            /** Database Id */
+            database_id?: string | null;
+            /**
+             * Description
+             * @default
+             */
+            description?: string;
+            /** Name */
+            name: string;
+            /** Server Id */
+            server_id?: string | null;
+            /**
+             * Visibility
+             * @default private
+             * @enum {string}
+             */
+            visibility?: "private" | "shared";
+        };
+        /** NotebookUpdate */
+        NotebookUpdate: {
+            /** Base Rev */
+            base_rev?: number | null;
+            /** Cells */
+            cells?: components["schemas"]["Cell"][] | null;
+            /** Database Id */
+            database_id?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Name */
+            name?: string | null;
+            /** Server Id */
+            server_id?: string | null;
+            /** Visibility */
+            visibility?: ("private" | "shared") | null;
+        };
         /** NrestoreIn */
         NrestoreIn: {
             /** Database Path */
@@ -6525,6 +6702,19 @@ export interface components {
              * @default true
              */
             wait?: boolean;
+        };
+        /** Output */
+        Output: {
+            /** Elapsed Ms */
+            elapsed_ms?: number | null;
+            /** Error */
+            error?: string | null;
+            /** Ran At */
+            ran_at?: number;
+            /** Ran By */
+            ran_by?: string | null;
+            /** Results */
+            results?: components["schemas"]["ResultOut"][];
         };
         /** PairIn */
         PairIn: {
@@ -6707,6 +6897,33 @@ export interface components {
              * @default false
              */
             use_all_space?: boolean;
+        };
+        /** ResultOut */
+        ResultOut: {
+            /** Columns */
+            columns?: components["schemas"]["Column"][];
+            /** Elapsed Ms */
+            elapsed_ms?: number | null;
+            /**
+             * Kind
+             * @default command
+             * @enum {string}
+             */
+            kind?: "select" | "command" | "ignored" | "error";
+            /**
+             * Message
+             * @default
+             */
+            message?: string;
+            /** Row Count */
+            row_count?: number | null;
+            /** Rows */
+            rows?: unknown[][];
+            /**
+             * Truncated
+             * @default false
+             */
+            truncated?: boolean;
         };
         /** RoleIn */
         RoleIn: {
@@ -7576,6 +7793,22 @@ export interface components {
             /** Target */
             target?: string | null;
         };
+        /** CopyIn */
+        fbadmin__api__notebooks__CopyIn: {
+            /** Name */
+            name?: string | null;
+        };
+        /** ImportIn */
+        fbadmin__api__notebooks__ImportIn: {
+            /** Database Id */
+            database_id?: string | null;
+            /** Notebook */
+            notebook: {
+                [key: string]: unknown;
+            };
+            /** Server Id */
+            server_id?: string | null;
+        };
         /** ExecuteIn */
         fbadmin__api__query__ExecuteIn: {
             /**
@@ -7659,6 +7892,68 @@ export interface components {
              * @enum {string}
              */
             transfer?: "shared" | "manual";
+        };
+        /** CopyIn */
+        fbadmin__api__schema__CopyIn: {
+            /**
+             * Batch Size
+             * @default 1000
+             */
+            batch_size?: number;
+            /**
+             * Create Tables
+             * @default true
+             */
+            create_tables?: boolean;
+            source: components["schemas"]["Endpoint"];
+            /** Tables */
+            tables: string[];
+            target: components["schemas"]["Endpoint"];
+            /**
+             * Truncate
+             * @default false
+             */
+            truncate?: boolean;
+        };
+        /** ImportIn */
+        fbadmin__api__schema__ImportIn: {
+            /** Columns */
+            columns: {
+                [key: string]: unknown;
+            }[];
+            /**
+             * Create
+             * @default false
+             */
+            create?: boolean;
+            /**
+             * Delete Upload
+             * @default true
+             */
+            delete_upload?: boolean;
+            /** Format */
+            format?: string | null;
+            /**
+             * On Error
+             * @default abort
+             */
+            on_error?: string;
+            /**
+             * Options
+             * @default {}
+             */
+            options?: {
+                [key: string]: unknown;
+            };
+            /** Table */
+            table: string;
+            /**
+             * Truncate
+             * @default false
+             */
+            truncate?: boolean;
+            /** Upload Id */
+            upload_id: string;
         };
         /** PreviewIn */
         fbadmin__api__schema__PreviewIn: {
@@ -11059,6 +11354,365 @@ export interface operations {
             };
         };
     };
+    list_notebooks_api_notebooks_get: {
+        parameters: {
+            query?: {
+                q?: string | null;
+                scope?: "all" | "mine" | "shared";
+                server_id?: string | null;
+                database_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_notebook_api_notebooks_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NotebookIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    import_notebook_api_notebooks_import_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["fbadmin__api__notebooks__ImportIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_notebook_api_notebooks__nb_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                nb_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_notebook_api_notebooks__nb_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                nb_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NotebookUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_notebook_api_notebooks__nb_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                nb_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    copy_notebook_api_notebooks__nb_id__copy_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                nb_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["fbadmin__api__notebooks__CopyIn"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_api_notebooks__nb_id__export_get: {
+        parameters: {
+            query?: {
+                format?: "json" | "md";
+                results?: boolean;
+            };
+            header?: never;
+            path: {
+                nb_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revisions_api_notebooks__nb_id__revisions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                nb_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revision_api_notebooks__nb_id__revisions__rev__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                nb_id: string;
+                rev: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restore_api_notebooks__nb_id__revisions__rev__restore_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                nb_id: string;
+                rev: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     object_types_api_object_types_get: {
         parameters: {
             query?: never;
@@ -11989,7 +12643,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["CopyIn"];
+                "application/json": components["schemas"]["fbadmin__api__schema__CopyIn"];
             };
         };
         responses: {
@@ -17162,7 +17816,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ImportIn"];
+                "application/json": components["schemas"]["fbadmin__api__schema__ImportIn"];
             };
         };
         responses: {

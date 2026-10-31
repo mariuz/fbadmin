@@ -4,6 +4,8 @@ The Query Tool can show a result set as a chart. Run a query, then click **Chart
 **Grid** above the results. The chart uses the rows the grid has fetched; nothing is queried
 again.
 
+The same chart view is available in [SQL notebooks](NOTEBOOKS.md), where the chart is saved with the cell.
+
 ## Chart types
 
 | Type | Good for |

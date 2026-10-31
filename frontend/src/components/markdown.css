@@ -1,0 +1,9 @@
+/* components/Markdown.tsx */
+.md { line-height: 1.5; max-width: 980px; }
+.md h5 { margin: 12px 0 4px; font-size: 13px; }
+.md p { margin: 4px 0; }
+.md ol, .md ul { margin: 4px 0; padding-left: 22px; }
+.md li { margin: 2px 0; }
+.md code { background: var(--panel-2); border: 1px solid var(--border); border-radius: 3px; padding: 0 3px; font-size: 12px; }
+.md .ai-code { margin: 6px 0 8px; }
+.md .ai-code pre { margin: 0 0 4px; padding: 6px 8px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 4px; overflow: auto; max-height: 260px; white-space: pre; }

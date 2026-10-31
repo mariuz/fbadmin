@@ -351,19 +351,22 @@ function pie(sh: Shaped, cfg: ChartConfig, W: number, H: number, active: number 
 }
 
 // ------------------------------------------------------------------ component
-export function ChartView({ ctx }: { ctx: ResultViewContext }) {
+/** ``config`` / ``onConfig``: a chart whose settings are kept by the caller (SQL notebooks save them). */
+export function ChartView({ ctx, config, onConfig }: { ctx: ResultViewContext; config?: ChartConfig; onConfig?: (c: ChartConfig) => void }) {
   const app = useApp();
   const { columns, rows } = ctx;
   const signature = columns.map((c) => `${c.name}:${c.type}`).join("|");
   const [cfg, setCfgState] = useState<ChartConfig>(() => {
+    if (config && config.x < columns.length) return config;
     const r = remembered.get(signature);
     return r && r.x < columns.length ? r : defaultConfig(columns, rows);
   });
-  const setCfg = (p: Partial<ChartConfig>) => setCfgState((c) => {
-    const next = { ...c, ...p };
+  const setCfg = (p: Partial<ChartConfig>) => {
+    const next = { ...cfg, ...p };
+    setCfgState(next);
     remembered.set(signature, next);
-    return next;
-  });
+    onConfig?.(next);
+  };
   const [showTable, setShowTable] = useState(false);
   const [active, setActive] = useState<number | null>(null);
   const [tipPos, setTipPos] = useState<{ x: number; y: number } | null>(null);

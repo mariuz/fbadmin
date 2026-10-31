@@ -27,3 +27,4 @@ import "./replication-setup";
 import "./migrations";
 import "./regressions";
 import "./checkup";
+import "./notebooks";
