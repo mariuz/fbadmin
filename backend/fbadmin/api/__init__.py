@@ -38,6 +38,7 @@ from . import backup_keys
 from . import migrations
 from . import audit_forwarding
 from . import regressions
+from . import checkup
 
 ROUTERS: list[APIRouter] = [
     servers.router,
@@ -78,4 +79,5 @@ ROUTERS: list[APIRouter] = [
     migrations.router,
     audit_forwarding.router,
     regressions.router,
+    checkup.router,
 ]

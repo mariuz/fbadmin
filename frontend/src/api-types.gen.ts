@@ -3471,6 +3471,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/servers/{server_id}/databases/{db_id}/monitoring/checkup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Last Report
+         * @description The last check-up of this database (kept in memory) and the running or last check-up job.
+         */
+        get: operations["last_report_api_servers__server_id__databases__db_id__monitoring_checkup_get"];
+        put?: never;
+        /**
+         * Run Checkup
+         * @description Start a check-up job; poll ``GET .../checkup`` (or the job) for the report.
+         */
+        post: operations["run_checkup_api_servers__server_id__databases__db_id__monitoring_checkup_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/servers/{server_id}/databases/{db_id}/monitoring/checkup/statistics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Recompute Statistics
+         * @description Fix action: SET STATISTICS INDEX for the given indices, as a job.
+         */
+        post: operations["recompute_statistics_api_servers__server_id__databases__db_id__monitoring_checkup_statistics_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/servers/{server_id}/databases/{db_id}/monitoring/compiled": {
         parameters: {
             query?: never;
@@ -5602,6 +5646,14 @@ export interface components {
                 [key: string]: unknown;
             } | null;
         };
+        /** CheckupIn */
+        CheckupIn: {
+            /**
+             * Gstat
+             * @default true
+             */
+            gstat?: boolean;
+        };
         /** CodeIn */
         CodeIn: {
             /** Code */
@@ -6180,6 +6232,13 @@ export interface components {
             /** Upload Id */
             upload_id: string;
         };
+        /** IndexRef */
+        IndexRef: {
+            /** Name */
+            name: string;
+            /** Schema */
+            schema?: string | null;
+        };
         /** KeyIn */
         KeyIn: {
             /**
@@ -6486,6 +6545,11 @@ export interface components {
         PublicationIn: {
             /** Enabled */
             enabled: boolean;
+        };
+        /** RecomputeIn */
+        RecomputeIn: {
+            /** Indices */
+            indices: components["schemas"]["IndexRef"][];
         };
         /** RegisterIn */
         RegisterIn: {
@@ -14764,6 +14828,110 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    last_report_api_servers__server_id__databases__db_id__monitoring_checkup_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                server_id: string;
+                db_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_checkup_api_servers__server_id__databases__db_id__monitoring_checkup_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                server_id: string;
+                db_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["CheckupIn"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    recompute_statistics_api_servers__server_id__databases__db_id__monitoring_checkup_statistics_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                server_id: string;
+                db_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecomputeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
                 headers: {
                     [name: string]: unknown;
                 };

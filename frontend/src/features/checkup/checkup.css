@@ -1,0 +1,24 @@
+/* performance check-up */
+.checkup .cu-facts { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 4px 0 10px; }
+.checkup .cu-facts div { display: flex; flex-direction: column; }
+.checkup .cu-facts .k { font-size: 11px; color: var(--muted); }
+.checkup .cu-facts .v { font-variant-numeric: tabular-nums; }
+.checkup .cu-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.checkup .cu-item { border: 1px solid var(--border); border-left-width: 3px; border-radius: 6px; padding: 8px 12px; background: var(--panel-2); }
+.checkup .cu-item.critical { border-left-color: var(--st-critical); }
+.checkup .cu-item.warning { border-left-color: var(--st-warning); }
+.checkup .cu-item.info { border-left-color: var(--border); }
+.checkup .cu-item h5 { margin: 0 0 4px; font-size: 13px; display: flex; gap: 8px; align-items: baseline; }
+.checkup .cu-rank { color: var(--muted); font-variant-numeric: tabular-nums; min-width: 1.6em; }
+.checkup .cu-sev { font-size: 11px; font-weight: 650; text-transform: uppercase; letter-spacing: .4px; }
+.checkup .cu-item.critical .cu-sev::before { content: "● "; color: var(--st-critical); }
+.checkup .cu-item.warning .cu-sev::before { content: "▲ "; color: var(--st-warning); }
+.checkup .cu-item.info .cu-sev::before { content: "○ "; color: var(--muted); }
+.checkup .cu-advice { margin: 0 0 6px; line-height: 1.45; }
+.checkup .cu-ev { margin: 4px 0 6px; padding: 0; list-style: none; font-size: 12px; }
+.checkup .cu-ev li { padding: 1px 0; }
+.checkup .cu-ev .lbl { font-weight: 600; margin-right: 6px; }
+.checkup .cu-ev pre { margin: 2px 0 4px; white-space: pre-wrap; max-height: 120px; overflow: auto; }
+.checkup .cu-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.checkup .cu-summary .pill + .pill { margin-left: 4px; }
+.checkup h4 .check { font-weight: 400; font-size: 12px; margin-right: 8px; }

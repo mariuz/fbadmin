@@ -3,7 +3,7 @@
 Milestone 0.7. Everything here reads the `MON$` monitoring tables (or the Firebird 5 profiler
 tables) over a normal attachment. Nothing needs to be installed on the server.
 
-Open it from a database's context menu (**Performance dashboard**, **Transactions & OAT**,
+Open it from a database's context menu (**Performance check-up**, **Performance dashboard**, **Transactions & OAT**,
 **Index advisor**, **Profiler**) or from the **Health** section of the database dashboard.
 
 ![Live dashboard](screenshots/monitoring-live.png)
@@ -20,6 +20,7 @@ Open it from a database's context menu (**Performance dashboard**, **Transaction
 | Compiled statement cache (`MON$COMPILED_STATEMENTS`) | – | – | ✓ |
 | Profiler (`RDB$PROFILER`, `PLG$PROF_*`) | – | – | ✓ |
 | Index advisor | ✓ | ✓ | ✓ (plus the statement cache as a workload) |
+| Performance check-up | ✓ | ✓ | ✓ (server mode from `RDB$CONFIG` on 4 and 5) |
 
 Features are detected at runtime (by looking for the system tables or packages), not by version.
 Where a feature is missing the UI says so instead of failing.
@@ -67,6 +68,46 @@ the defaults:
 | `retention_hours` | `FBADMIN_HISTORY_RETENTION_HOURS` | 168 |
 | `slow_seconds` (0 = off) | `FBADMIN_HISTORY_SLOW_SECONDS` | 5 |
 | `metrics_enabled` | `FBADMIN_METRICS` | off |
+
+## Performance check-up
+
+**Performance check-up…** (database context menu) answers "why is it slow?" with one ranked report.
+It reads what fbadmin already collects and turns it into findings, most important first. Each finding
+says what was found, the numbers behind it, what to do, and has buttons that do it.
+
+The check-up runs as a job. With **Include gstat** (the default) it also reads the whole database with
+gstat. That finds record versions and the real index selectivity, and takes as long as a gstat run.
+Without it the check-up takes a second or two. The last report of each database is kept until fbadmin
+restarts.
+
+| Finding | From | Fix actions |
+|---|---|---|
+| **The oldest active transaction is stuck** (next − OAT ≥ 10,000; critical at 100,000) | `MON$DATABASE`, `MON$TRANSACTIONS`; who holds it | Show transactions; disconnect the holder's attachment |
+| **Statements waiting for a record lock** right now, and who blocks them | `MON$STATEMENTS`, `MON$RECORD_STATS`, `MON$TABLE_STATS` | Show locks; disconnect a blocker |
+| **The database is locked by nbackup** (or the delta is being merged) | `MON$BACKUP_STATE` | Open incremental backup |
+| **Indices without selectivity although their table has rows**: created on an empty table, then loaded | `RDB$INDICES.RDB$STATISTICS` = 0, one row read | Recompute selectivity (`SET STATISTICS INDEX`) |
+| **Outdated selectivity**: stored and actual differ by 3× or more (indices with ≥ 100 entries) | gstat: actual = 1 / (nodes − total dup) | Recompute selectivity |
+| **Statements that got slower** | [query regressions](#query-regressions) | Open query regressions |
+| **Tables with many old record versions** or long version chains | gstat | Sweep now; open statistics |
+| **Page fetches that miss the cache** (≥ 5 % of ≥ 20,000 fetches) while the cache is smaller than the database | `MON$IO_STATS`: the history's last hour when recorded, else since the database was opened | Set the page buffers in the header (up to 2 GB; 128 MB in Classic and SuperClassic, where every connection has its own cache) |
+| **The oldest interesting transaction is stuck** (OAT − OIT ≥ 10,000) | `MON$DATABASE`, sweep interval | Sweep now; turn on automatic sweep |
+| **Frequent lock waits and update conflicts** | `MON$RECORD_STATS`: the last hour, else since opened | Show locks |
+| **Long transactions** (≥ 30 min) other than the OAT holder | `MON$TRANSACTIONS` | Show transactions |
+| **Inactive indices** | `RDB$INDICES.RDB$INDEX_INACTIVE` | `ALTER INDEX ... ACTIVE` in the Query Tool |
+| **Missing indices** for slow statements | the [index advisor](#index-advisor) over the slow statement log and the statement cache | Open the index advisor; `CREATE INDEX` in the Query Tool |
+| **Automatic sweep is off and no sweep is scheduled** | sweep interval, schedules | Schedule a sweep; turn on automatic sweep (20,000) |
+| **Fragmented, sparse or deep** tables and indices | gstat | Open backup and restore |
+| **Indices with very few distinct values** | gstat | — |
+| **History isn't recorded** (cache, lock and regression checks are less precise without it) | | Record history for this database |
+
+Findings are ranked by severity (critical, warning, note), then by how directly they slow queries
+down. A stuck OAT always ranks at least as high as the record versions it causes. Actions that change
+something ask first where it matters (disconnecting, sweeping, writing the page buffers) and the
+check-up runs again when they finish. New page buffers take effect when the database is next opened.
+
+The thresholds can be changed with `FBADMIN_CHECKUP_GAP_WARN` (transactions, default
+`FBADMIN_OVERVIEW_GAP_WARN` or 10000) and `FBADMIN_CHECKUP_LONG_TX` (seconds, default 1800). Running a
+check-up needs the admin level on the database; reading the last report needs read access.
 
 ## Query regressions
 
@@ -270,6 +311,9 @@ All under `/api/servers/{sid}/databases/{dbid}/monitoring` unless noted.
 | GET | `/regressions?only=all\|flagged\|regressions` | tracked statements, their medians, plans and flags |
 | GET | `/regressions/{sql_hash}` | a statement's runs and plans |
 | POST | `/regressions/{sql_hash}/accept` | its current behaviour is the new baseline |
+| POST | `/checkup` `{gstat}` | run a performance check-up (a job) |
+| GET | `/checkup` | the last check-up report and its job |
+| POST | `/checkup/statistics` `{indices: [{name, schema}]}` | recompute selectivity (a job) |
 | GET/PUT | `/api/monitoring/settings` | sampler/exporter settings |
 | GET | `/profiler` | availability, sessions, attachments |
 | POST | `/profiler/run` `{sql, description}` | profile statements |

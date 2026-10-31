@@ -26,3 +26,4 @@ import "./kubernetes";
 import "./replication-setup";
 import "./migrations";
 import "./regressions";
+import "./checkup";
