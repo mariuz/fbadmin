@@ -61,6 +61,9 @@ class Job:
 
 _current: contextvars.ContextVar[Job | None] = contextvars.ContextVar("fbadmin_job", default=None)
 
+# called with each job when it ends (the database timeline records the outcome of the jobs it saw start)
+finish_hooks: list[Callable[[Job], None]] = []
+
 
 def current() -> Job | None:
     """The job the calling code runs in, or None outside jobs."""
@@ -180,6 +183,11 @@ class JobManager:
                     job.log.extend(traceback.format_exc().splitlines()[-3:])
             finally:
                 job.finished_at = time.time()
+                for hook in list(finish_hooks):
+                    try:
+                        hook(job)
+                    except Exception:  # noqa: BLE001 - a listener must not break the job manager
+                        log_.exception("job finish hook failed")
 
         ctx = contextvars.copy_context()  # keeps the request's fbadmin user (server mode)
         threading.Thread(target=ctx.run, args=(run,), name=f"job-{job.id}", daemon=True).start()

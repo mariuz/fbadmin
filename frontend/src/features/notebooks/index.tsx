@@ -5,7 +5,7 @@ import type { AppApi } from "../../context";
 import type { MenuItem } from "../../components/ContextMenu";
 import type { Selection } from "../../types";
 import { t } from "../../i18n";
-import { registerMenu, registerTabKind, registerTopbar } from "../../registry";
+import { registerMenu, registerTabKind } from "../../registry";
 import { fmtTime } from "../maintenance/api";
 import { nbApi, type NotebookMeta } from "./api";
 import { NotebookTab, openNotebook } from "./Notebook";
@@ -104,13 +104,13 @@ registerTabKind("notebook", {
   same: (a, b) => a.kind === b.kind && a.props?.id === b.props?.id,
 });
 
-registerTopbar({
-  id: "notebooks",
-  render: (app) => <button className="tb" onClick={() => app.openTab({ kind: "notebooks", title: t("Notebooks") })}>📓 {t("Notebooks")}</button>,
-});
+// No top-bar button (the top bar is full): the Notebooks list opens from the Library and the database menu.
 
 registerMenu((app: AppApi, sel: Selection): MenuItem[] => {
   if (sel.kind !== "database" || !sel.dbId) return [];
   const sid = sel.serverId, dbid = sel.dbId;
-  return [{ label: t("New notebook…"), onClick: () => newNotebook(app, sid, dbid) }];
+  return [
+    { label: t("New notebook…"), onClick: () => newNotebook(app, sid, dbid) },
+    { label: t("Notebooks…"), onClick: () => app.openTab({ kind: "notebooks", title: t("Notebooks") }) },
+  ];
 });

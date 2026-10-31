@@ -79,6 +79,7 @@ nav:
       - Schema tools: SCHEMA_TOOLS.md
       - Schema history in git: SCHEMA_HISTORY.md
       - Schema drift detection: SCHEMA_DRIFT.md
+      - Database timeline: TIMELINE.md
       - Versioned migrations: MIGRATIONS.md
       - Data compare: DATA_COMPARE.md
       - Firebird 6 and SQL schemas: FIREBIRD6.md

@@ -124,14 +124,19 @@ def collect(conn) -> dict[str, Any]:
 def _probe_database(mgr, srv, db, password: str) -> dict[str, Any]:
     from ..connections import _close_quietly, connect
 
+    from .. import timeline
+
     if mgr.is_connected(srv.id, db.id):  # reuse the Object Explorer's connection
         with mgr.meta(srv.id, db.id) as conn:
-            return collect(conn)
-    conn = connect(srv, db.path, password)  # a short-lived attachment: the tree stays "disconnected"
-    try:
-        return collect(conn)
-    finally:
-        _close_quietly(conn)
+            out = collect(conn)
+    else:
+        conn = connect(srv, db.path, password)  # a short-lived attachment: the tree stays "disconnected"
+        try:
+            out = collect(conn)
+        finally:
+            _close_quietly(conn)
+    timeline.observe(srv.id, db.id, out.get("engine_version"), out.get("ods"))  # engine upgrades on the timeline
+    return out
 
 
 def _probe_server(mgr, srv) -> dict[str, Any]:

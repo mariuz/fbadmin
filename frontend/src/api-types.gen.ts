@@ -4958,6 +4958,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/servers/{server_id}/databases/{db_id}/timeline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Database Timeline
+         * @description Events newest first. ``since`` / ``until``: unix seconds; ``category``: comma-separated
+         *     (schema, data, backup, maintenance, upgrade, alert, audit). Audit entries are only included for fbadmin
+         *     administrators (``audit_queries`` adds SELECTs and transaction statements).
+         */
+        get: operations["database_timeline_api_servers__server_id__databases__db_id__timeline_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/servers/{server_id}/databases/{db_id}/upgrade/check": {
         parameters: {
             query?: never;
@@ -18532,6 +18554,45 @@ export interface operations {
                 "application/json": components["schemas"]["DataChanges"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    database_timeline_api_servers__server_id__databases__db_id__timeline_get: {
+        parameters: {
+            query?: {
+                since?: number | null;
+                until?: number | null;
+                category?: string | null;
+                q?: string | null;
+                limit?: number;
+                audit_queries?: boolean;
+            };
+            header?: never;
+            path: {
+                server_id: string;
+                db_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {

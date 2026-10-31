@@ -59,9 +59,12 @@ async def lifespan(app: FastAPI):
 
 
 def create_app() -> FastAPI:
+    from .timeline import install as install_timeline
+
     app = FastAPI(title="fbadmin", version=__version__, lifespan=lifespan)
     # Request logging, rate limiting and request-size limits (see middleware.py; all configurable).
     install_middleware(app)
+    install_timeline(app)  # inside the security middleware (added later, so outer): sees the signed-in user
 
     @app.middleware("http")
     async def _schema_context(request: Request, call_next):

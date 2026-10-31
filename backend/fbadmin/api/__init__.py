@@ -40,6 +40,7 @@ from . import audit_forwarding
 from . import regressions
 from . import checkup
 from . import notebooks
+from . import timeline
 
 ROUTERS: list[APIRouter] = [
     servers.router,
@@ -82,4 +83,5 @@ ROUTERS: list[APIRouter] = [
     regressions.router,
     checkup.router,
     notebooks.router,
+    timeline.router,
 ]

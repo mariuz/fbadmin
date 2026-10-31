@@ -207,6 +207,7 @@ export function LibraryPanel(props: { visible: boolean }) {
           <span className="muted">{t("{count} item(s)", { count: items.length })}</span>
           <span className="grow" />
           <button className="btn small" onClick={() => reloadAll()} aria-label={t("Refresh")} title={t("Refresh")}><IconRefresh size={12} /></button>
+          <button className="btn small" onClick={() => app.openTab({ kind: "notebooks", title: t("Notebooks") })}>📓 {t("Notebooks")}</button>
           <button className="btn small primary" onClick={() => { setSelId(null); setForm({ ...toForm({ folder: folder ?? "" }) }); }}>
             <IconPlus size={12} /> {t("New query")}
           </button>

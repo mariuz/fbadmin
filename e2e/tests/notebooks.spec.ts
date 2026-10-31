@@ -118,7 +118,8 @@ test("write, run, chart, note and reopen a notebook", async () => {
 
   // after a reload, reopen it from the Notebooks list: results and chart were saved
   await page.reload();
-  await page.locator(".topbar button", { hasText: "Notebooks" }).click();
+  await page.locator(".topbar button", { hasText: "Library" }).click();
+  await pane().getByRole("button", { name: "📓 Notebooks" }).click();
   const list = pane().getByRole("region", { name: "Notebooks" });
   await expect(list).toContainText("Sales by region");
   await audit("notebook list");

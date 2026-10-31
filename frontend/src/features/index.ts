@@ -28,3 +28,4 @@ import "./migrations";
 import "./regressions";
 import "./checkup";
 import "./notebooks";
+import "./timeline";
