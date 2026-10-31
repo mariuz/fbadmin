@@ -241,7 +241,7 @@ def test_history_and_alert_checks_run_as_their_owner(env):
     history.sample_all()
     t = store.is_tracked(sid, main)
     assert t is not None and t["last_error"] is None, t  # not switched off, no "Login required"
-    assert len(store.samples(sid, main)) == n0 + 1
+    assert len(store.samples(sid, main)) >= n0 + 1  # the background sampler may have taken one as well
 
     get_engine().check_all()
     st = get_engine().status[rule["id"]]
