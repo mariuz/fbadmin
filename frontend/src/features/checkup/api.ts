@@ -19,7 +19,9 @@ export interface CheckupReport {
   };
   checks: { name: string; status: "done" | "error"; error?: string }[];
   findings: CheckupFinding[];
+  ai?: AiItem[];
 }
+export interface AiItem { question: string | null; answer: string; at: number; provider?: string; model?: string }
 export interface CheckupState { report: CheckupReport | null; job: { id: string; status: string; error: string | null; log: string[] } | null }
 
 export const checkupApi = {
@@ -27,4 +29,7 @@ export const checkupApi = {
   run: (sid: string, dbid: string, gstat: boolean) => request<Job>("POST", base(sid, dbid), { gstat }),
   recompute: (sid: string, dbid: string, indices: { name: string; schema: string | null }[]) =>
     request<Job>("POST", base(sid, dbid) + "/statistics", { indices }),
+  inspect: (sid: string, dbid: string, question?: string) => request<Job>("POST", base(sid, dbid) + "/ai", { question: question || null }),
+  preview: (sid: string, dbid: string, question?: string) =>
+    request<{ system: string; prompt: string }>("POST", base(sid, dbid) + "/ai/preview", { question: question || null }),
 };

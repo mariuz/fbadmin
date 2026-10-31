@@ -631,11 +631,24 @@ def run(server_id: str, db_id: str, *, with_gstat: bool = True, log=lambda _line
         },
         "checks": checks,
         "findings": findings,
+        "gstat_tables": gstat_summary(facts.get("gstat")),
     }
     with _lock:
         _reports[(server_id, db_id)] = report
     log(f"Done: {len(findings)} finding(s)")
     return report
+
+
+def gstat_summary(stats: dict | None, limit: int = 20) -> list[dict[str, Any]]:
+    """The largest tables from gstat, with their versions, fill and indices (for the AI inspection)."""
+    if not stats:
+        return []
+    keys = ("total_records", "total_versions", "max_versions", "total_fragments", "data_pages", "average_fill")
+    ix_keys = ("depth", "nodes", "total_dup", "max_dup")
+    tables = sorted(stats.get("tables", []), key=lambda t: -(t.get("total_records") or 0))[:limit]
+    return [{"name": t["name"], **{k: t.get(k) for k in keys},
+             "indices": [{"name": i["name"], **{k: i.get(k) for k in ix_keys}} for i in t.get("indices", [])]}
+            for t in tables]
 
 
 def start(server_id: str, db_id: str, *, with_gstat: bool = True) -> dict[str, Any]:

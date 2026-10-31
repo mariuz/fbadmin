@@ -17,6 +17,7 @@ import "../maintenance/maintenance.css";
 import "../monitoring/monitoring.css";
 import "./checkup.css";
 import "./messages";
+import { AiInspection } from "./AiInspection";
 import { checkupApi, type CheckupAction, type CheckupFinding, type CheckupReport, type CheckupState, type Severity } from "./api";
 
 const SEV: Record<Severity, string> = { critical: "critical", warning: "warning", info: "info" };
@@ -195,6 +196,7 @@ function CheckupTab(props: { serverId: string; dbId: string; visible: boolean })
             {r.findings.map((f) => <Finding key={f.code} f={f} busy={busy || !!running} onAction={doAction} />)}
           </ol>}
       </Section>}
+      {r && <AiInspection serverId={sid} dbId={dbid} report={r} onDone={load} />}
     </div>
   );
 }

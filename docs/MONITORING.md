@@ -109,6 +109,34 @@ The thresholds can be changed with `FBADMIN_CHECKUP_GAP_WARN` (transactions, def
 `FBADMIN_OVERVIEW_GAP_WARN` or 10000) and `FBADMIN_CHECKUP_LONG_TX` (seconds, default 1800). Running a
 check-up needs the admin level on the database; reading the last report needs read access.
 
+### AI inspection
+
+When the AI assistant is on (`FBADMIN_AI_PROVIDER=anthropic`, see the [AI assistant](QUERY_TOOL.md#ai-assistant-opt-in)),
+the check-up has an **AI inspection** panel. **Inspect with AI** sends the last report to the assistant.
+It answers in three parts:
+
+* **Diagnosis**: the likely reasons the database is slow, connecting the findings. For example, a stuck
+  transaction explains the record versions, and outdated selectivity explains a regressed statement.
+* **Recommendations**: ranked by impact. Each one names the findings it addresses, the SQL or setting
+  to apply, and its risk or cost.
+* **What to check next**: measurements that would confirm or rule out the diagnosis.
+
+SQL blocks in the answer can be opened in the Query Tool or copied. **Ask a follow-up question** keeps
+the conversation going; the assistant sees its earlier answers. The answers are kept with the report and
+are dropped when the check-up runs again.
+
+What is sent:
+
+* the findings with their evidence and the fixes offered;
+* the key numbers and database properties;
+* the performance settings from `RDB$CONFIG` (Firebird 4 and later);
+* the largest tables from gstat;
+* the ten slowest statements from the history, with their plans;
+* the definitions of the tables they involve (at most eight).
+
+Table data is never sent, and IP addresses are masked. **What is sent…** shows the exact prompt. The
+inspection runs as a job and needs the admin level on the database.
+
 ## Query regressions
 
 **Query regressions…** (database context menu) shows statements that got slower, or changed their plan
@@ -314,6 +342,8 @@ All under `/api/servers/{sid}/databases/{dbid}/monitoring` unless noted.
 | POST | `/checkup` `{gstat}` | run a performance check-up (a job) |
 | GET | `/checkup` | the last check-up report and its job |
 | POST | `/checkup/statistics` `{indices: [{name, schema}]}` | recompute selectivity (a job) |
+| POST | `/checkup/ai` `{question}` | AI inspection of the last report, or a follow-up question (a job) |
+| POST | `/checkup/ai/preview` `{question}` | the exact prompt the AI inspection would send |
 | GET/PUT | `/api/monitoring/settings` | sampler/exporter settings |
 | GET | `/profiler` | availability, sessions, attachments |
 | POST | `/profiler/run` `{sql, description}` | profile statements |

@@ -52,3 +52,36 @@ def recompute_statistics(server_id: str, db_id: str, body: RecomputeIn):
         log(f"Done: {len(done)} index(es)")
 
     return st.jobs.start("selectivity", f"Recompute index statistics {db.name}", server_id, run).summary()
+
+
+# ------------------------------------------------------------------ AI inspection
+class AiIn(BaseModel):
+    question: str | None = Field(default=None, max_length=4000)  # a follow-up question about the report
+
+
+def _ai_errors(fn):
+    from fastapi.responses import JSONResponse
+
+    from ..ai import AIUnavailable
+
+    try:
+        return fn()
+    except AIUnavailable as exc:
+        return JSONResponse(status_code=503, content={"detail": str(exc)})
+
+
+@router.post(DB + "/ai", status_code=202)
+def ai_inspect(server_id: str, db_id: str, body: AiIn | None = None):
+    """Ask the AI assistant to inspect the last check-up (a job); the answer is added to the report's ``ai``."""
+    from ..monitoring import checkup_ai
+
+    q = (body or AiIn()).question
+    return _ai_errors(lambda: checkup_ai.start(server_id, db_id, q))
+
+
+@router.post(DB + "/ai/preview")
+def ai_preview(server_id: str, db_id: str, body: AiIn | None = None):
+    """Exactly what the AI inspection would send (system prompt and prompt)."""
+    from ..monitoring import checkup_ai
+
+    return checkup_ai.preview(server_id, db_id, (body or AiIn()).question)
