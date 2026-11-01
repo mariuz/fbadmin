@@ -82,6 +82,7 @@ nav:
       - Database timeline: TIMELINE.md
       - Versioned migrations: MIGRATIONS.md
       - Data compare: DATA_COMPARE.md
+      - Anonymised copies: ANONYMISED_COPIES.md
       - Firebird 6 and SQL schemas: FIREBIRD6.md
       - Upgrade assistant: UPGRADE.md
       - Monitoring and maintenance: user-guide/monitoring.md

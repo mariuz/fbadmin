@@ -29,3 +29,4 @@ import "./regressions";
 import "./checkup";
 import "./notebooks";
 import "./timeline";
+import "./anonymise";

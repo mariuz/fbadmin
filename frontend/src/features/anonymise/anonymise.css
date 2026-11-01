@@ -1,0 +1,12 @@
+/* anonymised copies */
+.anon .an-pick { display: inline-flex; gap: 6px; align-items: center; font-weight: 400; font-size: 12.5px; }
+.anon .an-table { border: 1px solid var(--border); border-radius: 6px; margin: 6px 0; background: var(--panel); }
+.anon .an-thead { display: flex; justify-content: space-between; width: 100%; padding: 6px 10px; border: 0; background: transparent;
+  color: var(--text); font: inherit; font-weight: 600; cursor: pointer; text-align: left; }
+.anon .an-table .grid-wrap { max-height: 360px; border-top: 1px solid var(--border); }
+.anon .an-table > .mt-row { padding: 4px 10px; }
+.anon .an-rule { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.anon .an-param { width: 110px; }
+.anon .an-via { font-size: 12px; }
+.anon .an-pill { margin-left: 6px; font-size: 10.5px; }
+.anon td.an-masked { font-style: italic; }

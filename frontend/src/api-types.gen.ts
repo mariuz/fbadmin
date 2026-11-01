@@ -2468,6 +2468,141 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/servers/{server_id}/databases/{db_id}/anonymise": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Overview
+         * @description The profiles of this database (without their secret).
+         */
+        get: operations["overview_api_servers__server_id__databases__db_id__anonymise_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/servers/{server_id}/databases/{db_id}/anonymise/columns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Columns
+         * @description Tables and columns with their kind, keys, the strategies that fit, suggestions and foreign-key links.
+         */
+        get: operations["columns_api_servers__server_id__databases__db_id__anonymise_columns_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/servers/{server_id}/databases/{db_id}/anonymise/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview
+         * @description The first rows of a table, original and masked (nothing is written).
+         */
+        post: operations["preview_api_servers__server_id__databases__db_id__anonymise_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/servers/{server_id}/databases/{db_id}/anonymise/profiles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Profile */
+        post: operations["create_profile_api_servers__server_id__databases__db_id__anonymise_profiles_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/servers/{server_id}/databases/{db_id}/anonymise/profiles/{pid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Profile */
+        put: operations["update_profile_api_servers__server_id__databases__db_id__anonymise_profiles__pid__put"];
+        post?: never;
+        /** Delete Profile */
+        delete: operations["delete_profile_api_servers__server_id__databases__db_id__anonymise_profiles__pid__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/servers/{server_id}/databases/{db_id}/anonymise/profiles/{pid}/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check Profile
+         * @description The columns that will be masked, rules copied along foreign keys included; 400 for invalid rules.
+         */
+        post: operations["check_profile_api_servers__server_id__databases__db_id__anonymise_profiles__pid__check_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/servers/{server_id}/databases/{db_id}/anonymise/profiles/{pid}/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Profile
+         * @description Make the anonymised copy (a job).
+         */
+        post: operations["run_profile_api_servers__server_id__databases__db_id__anonymise_profiles__pid__run_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/servers/{server_id}/databases/{db_id}/completion": {
         parameters: {
             query?: never;
@@ -6772,6 +6907,20 @@ export interface components {
             /** Description */
             description?: string | null;
         };
+        /** ProfileIn */
+        ProfileIn: {
+            /** Name */
+            name: string;
+            /** Rules */
+            rules?: {
+                [key: string]: {
+                    [key: string]: components["schemas"]["Rule"];
+                };
+            };
+            /** Scratch Path */
+            scratch_path?: string | null;
+            target?: components["schemas"]["Target"] | null;
+        };
         /** ProfileRunIn */
         ProfileRunIn: {
             /** Description */
@@ -6969,6 +7118,32 @@ export interface components {
             values?: {
                 [key: string]: unknown;
             } | null;
+        };
+        /** Rule */
+        Rule: {
+            /**
+             * Days
+             * @default 30
+             */
+            days?: number;
+            /**
+             * Keep
+             * @default 4
+             */
+            keep?: number;
+            /**
+             * Percent
+             * @default 10
+             */
+            percent?: number;
+            /**
+             * Strategy
+             * @default keep
+             * @enum {string}
+             */
+            strategy?: "keep" | "null" | "fixed" | "hash" | "email" | "name" | "first_name" | "last_name" | "city" | "phone" | "words" | "redact" | "number_noise" | "date_shift" | "shuffle";
+            /** Value */
+            value?: unknown;
         };
         /** RuleIn */
         RuleIn: {
@@ -7411,6 +7586,20 @@ export interface components {
              */
             tables?: string[];
         };
+        /** Target */
+        Target: {
+            /** Path */
+            path: string;
+            /** Register As */
+            register_as?: string | null;
+            /**
+             * Replace
+             * @default false
+             */
+            replace?: boolean;
+            /** Server Id */
+            server_id: string;
+        };
         /** TargetIn */
         TargetIn: {
             /**
@@ -7668,6 +7857,24 @@ export interface components {
             role?: string;
             /** Username */
             username: string;
+        };
+        /** PreviewIn */
+        fbadmin__api__anonymise__PreviewIn: {
+            /**
+             * Limit
+             * @default 10
+             */
+            limit?: number;
+            /** Profile Id */
+            profile_id?: string | null;
+            /** Rules */
+            rules?: {
+                [key: string]: {
+                    [key: string]: components["schemas"]["Rule"];
+                };
+            };
+            /** Table */
+            table: string;
         };
         /** SetupIn */
         fbadmin__api__auth__SetupIn: {
@@ -13190,6 +13397,276 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    overview_api_servers__server_id__databases__db_id__anonymise_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                server_id: string;
+                db_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    columns_api_servers__server_id__databases__db_id__anonymise_columns_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                server_id: string;
+                db_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_api_servers__server_id__databases__db_id__anonymise_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                server_id: string;
+                db_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["fbadmin__api__anonymise__PreviewIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_profile_api_servers__server_id__databases__db_id__anonymise_profiles_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                server_id: string;
+                db_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProfileIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_profile_api_servers__server_id__databases__db_id__anonymise_profiles__pid__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                server_id: string;
+                db_id: string;
+                pid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProfileIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_profile_api_servers__server_id__databases__db_id__anonymise_profiles__pid__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                server_id: string;
+                db_id: string;
+                pid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    check_profile_api_servers__server_id__databases__db_id__anonymise_profiles__pid__check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                server_id: string;
+                db_id: string;
+                pid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_profile_api_servers__server_id__databases__db_id__anonymise_profiles__pid__run_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                server_id: string;
+                db_id: string;
+                pid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
             };
             /** @description Validation Error */
             422: {

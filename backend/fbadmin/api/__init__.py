@@ -41,6 +41,7 @@ from . import regressions
 from . import checkup
 from . import notebooks
 from . import timeline
+from . import anonymise
 
 ROUTERS: list[APIRouter] = [
     servers.router,
@@ -84,4 +85,5 @@ ROUTERS: list[APIRouter] = [
     checkup.router,
     notebooks.router,
     timeline.router,
+    anonymise.router,
 ]
