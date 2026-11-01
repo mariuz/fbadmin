@@ -363,9 +363,30 @@ def _sample(cur, table: str, col: str, n: int = LEAK_SAMPLE) -> list[Any]:
     return [r[0] for r in cur.fetchall() if not isinstance(r[0], (bytes, bytearray)) or len(r[0]) < 256]
 
 
-def mask_database(conn, rules: dict[str, dict[str, Rule]], secret: bytes, log: Callable[[str], None],
-                  check: Callable[[], None] = lambda: None) -> dict[str, Any]:
-    """Mask the database ``conn`` in place (it must be a copy!). Returns per-table counts and the leak check."""
+def mask_database(connect: Callable[[], Any], rules: dict[str, dict[str, Rule]], secret: bytes,
+                  log: Callable[[str], None], check: Callable[[], None] = lambda: None) -> dict[str, Any]:
+    """Mask the database ``connect()`` opens, in place (it must be a copy!). Returns per-table counts and the
+    leak check. Every connection opened here is closed again (the scratch copy is dropped right after)."""
+    opened: list[Any] = []
+
+    def fresh():
+        c = connect()
+        opened.append(c)
+        return c
+
+    try:
+        return _mask(fresh, rules, secret, log, check)
+    finally:
+        for c in opened:
+            try:
+                c.close()
+            except Exception:  # noqa: BLE001 - already closed
+                pass
+
+
+def _mask(fresh: Callable[[], Any], rules: dict[str, dict[str, Rule]], secret: bytes, log: Callable[[str], None],
+          check: Callable[[], None]) -> dict[str, Any]:
+    conn = fresh()
     schema = analyze(conn)
     meta = {t["name"]: {c["name"]: c for c in t["columns"]} for t in schema["tables"]}
     cat = Catalog(conn)
@@ -404,6 +425,10 @@ def mask_database(conn, rules: dict[str, dict[str, Rule]], secret: bytes, log: C
     conn.commit()
     if dropped:
         log(f"Dropped {len(dropped)} foreign key(s) on masked columns")
+    # a new attachment: Firebird 6 keeps enforcing a dropped constraint in the attachment that dropped it
+    conn.close()
+    conn = fresh()
+    cur = conn.cursor()
 
     try:
         for t, cr in rules.items():
@@ -641,12 +666,13 @@ def run_copy(profile_id: str, log: Callable[[str], None]) -> dict[str, Any]:
         conn = connect(src_srv, scratch, src_pw)
         try:
             schema = analyze(conn)
-            rules = effective_rules({t: {c: r.model_dump() for c, r in cr.items()} for t, cr in p.rules.items()}, schema)
-            if not rules:
-                log("No masking rules: the copy is not anonymised")
-            masked = mask_database(conn, rules, bytes.fromhex(p.secret), log, jobs.check)
         finally:
             conn.close()
+        rules = effective_rules({t: {c: r.model_dump() for c, r in cr.items()} for t, cr in p.rules.items()}, schema)
+        if not rules:
+            log("No masking rules: the copy is not anonymised")
+        masked = mask_database(lambda: connect(src_srv, scratch, src_pw), rules, bytes.fromhex(p.secret), log,
+                               jobs.check)
         result.update(masked)
         jobs.check()
         with st.manager.service(p.server_id) as svc:

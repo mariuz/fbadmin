@@ -74,6 +74,10 @@ These are engine behaviours fbadmin works around. They may change before the 6.0
   be dropped. fbadmin hides it.
 - `MON$COMPILED_STATEMENTS` lists only statements cached by attachments that are still open.
 - The server reports versions as `LI-T6.0.0.…` (`T` for test builds).
+- A dropped foreign key is still enforced after the drop is committed, even in new attachments
+  ("violation of FOREIGN KEY constraint \"***unknown***\""), until the database is closed by every
+  attachment. [Anonymised copies](ANONYMISED_COPIES.md) that mask a key column referenced by a
+  foreign key fail on Firebird 6 snapshots for now; copies without masked key columns work.
 
 No new data types have shipped in the snapshots yet. The type list (`RDB$TYPES`) matches
 Firebird 5.

@@ -178,6 +178,8 @@ def test_anonymised_copy(client, database):
     job = client.post(base + f"/anonymise/profiles/{prof['id']}/run").json()
     j = _wait(client, job["id"])
     log = "\n".join(client.get(f"/api/jobs/{job['id']}", params={"log": "true"}).json().get("log") or [])
+    if j["status"] == "failed" and "***unknown***" in (j.get("error") or "") and cols["engine_version"].startswith("6"):
+        pytest.xfail("Firebird 6 snapshot: a dropped foreign key is still enforced (docs/FIREBIRD6.md)")
     assert j["status"] == "finished", (j, log)
     last = client.get(base + "/anonymise").json()["profiles"][0]["last_run"]
     assert last["ok"] and last["leaks"] == [] and last["foreign_keys"] == 1, last
