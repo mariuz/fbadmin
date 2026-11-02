@@ -71,6 +71,7 @@ from .. import jobs
 from ..config import settings
 from ..metadata import Catalog
 from ..metadata.types import quote_ident
+from ..prepared import StatementCache
 from ..query import TxOptions, apply_tpb
 from ..schema.model import topo_sort
 from ..serialize import to_json
@@ -1103,7 +1104,7 @@ def compare_tables(src, dst, log: Callable[[str], None], run: Run, *, tables: li
 
 def apply_script(run: Run, conn, log: Callable[[str], None]) -> int:
     """Execute the sync script on the target in one transaction; roll back on any error."""
-    cur = conn.cursor()
+    stmts = StatementCache(conn.cursor())  # one prepare per statement shape, not per row
     n = 0
     total = run.statement_count()
     log(f"Applying {total} statement(s) to the target in one transaction")
@@ -1112,10 +1113,10 @@ def apply_script(run: Run, conn, log: Callable[[str], None]) -> int:
             jobs.check()
             sql = st.param_sql
             try:
-                cur.execute(sql, st.params)
+                stmts.execute(sql, st.params)
             except Exception as e:
                 raise RuntimeError(f"Statement {n + 1} ({kind} {table}) failed: {str(e).strip()}\n{sql[:500]}") from e
-            if kind in ("UPDATE", "DELETE") and cur.rowcount == 0:
+            if kind in ("UPDATE", "DELETE") and stmts.rowcount == 0:
                 raise RuntimeError(f"Statement {n + 1} ({kind} {table}) changed no row: the target was changed "
                                    f"after the comparison. Compare again.\n{sql[:500]}")
             n += 1
@@ -1129,5 +1130,7 @@ def apply_script(run: Run, conn, log: Callable[[str], None]) -> int:
             pass
         log("Rolled back: the target is unchanged")
         raise
-    log(f"Committed {n} statement(s)")
+    finally:
+        stmts.close()
+    log(f"Committed {n} statement(s) ({stmts.prepared} prepared)")
     return n

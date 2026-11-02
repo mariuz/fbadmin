@@ -12,6 +12,7 @@ from ..config import settings
 from ..metadata import OBJECT_TYPES, Catalog
 from ..metadata.catalog import drop_statement
 from ..metadata.types import quote_ident
+from ..prepared import StatementCache
 from ..query import run_script
 from ..serialize import to_json, type_name
 from .deps import get_state
@@ -290,13 +291,13 @@ def save_table_data(server_id: str, db_id: str, name: str, body: DataChanges):
             else:
                 statements.append((f"INSERT INTO {qn} DEFAULT VALUES", []))
 
-        cur = conn.cursor()
-        for sql, params in statements:
-            cur.execute(sql, params)
-            rc = cur.rowcount
-            if rc == 0 and not sql.startswith("INSERT"):
-                raise ValueError(f"Row not found (it may have been changed by another user): {sql}")
-            affected += max(rc, 0)
+        # the same few statement shapes repeat (one UPDATE per set of changed columns): prepare each once
+        with StatementCache(conn.cursor()) as stmts:
+            for sql, params in statements:
+                rc = stmts.execute(sql, params).rowcount
+                if rc == 0 and not sql.startswith("INSERT"):
+                    raise ValueError(f"Row not found (it may have been changed by another user): {sql}")
+                affected += max(rc, 0)
     return {"statements": len(statements), "affected": affected}
 
 

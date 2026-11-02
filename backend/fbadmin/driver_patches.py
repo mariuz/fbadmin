@@ -35,6 +35,12 @@
    wrong reply prefix (``0x08 0x07`` instead of ``isc_info_sql_bind`` = 5, ``isc_info_sql_describe_vars``
    = 7) and every such statement fails with ``AssertionError``. Check for the right prefix.
 
+7. ``cursor.rowcount`` after executing a prepared statement (``cursor.execute(cursor.prep(sql), params)``)
+   asks the server about the cursor's own, last *text* statement instead of the prepared one, so it
+   reports a stale count (e.g. 3 for an UPDATE that matched no row). fbadmin checks that UPDATE and
+   DELETE statements of grid edits and data compare scripts changed a row, and runs them prepared:
+   ask about the statement that was executed.
+
 Each patch only applies if the driver source still looks the way we expect.
 """
 
@@ -60,6 +66,7 @@ def apply() -> None:
     _patch_calc_blr()
     _patch_service_process_name()
     _patch_bind_describe()
+    _patch_prepared_rowcount()
     try:
         from firebirdsql import wireprotocol
 
@@ -105,6 +112,40 @@ def apply() -> None:
         wireprotocol.WireProtocol.params_to_blr = ns["params_to_blr"]
     except Exception:  # noqa: BLE001 - never break startup because of a patch
         log.exception("could not patch firebirdsql params_to_blr")
+
+
+def _patch_prepared_rowcount() -> None:
+    try:
+        from firebirdsql import fbcore
+
+        cur = fbcore.Cursor
+        if getattr(cur._rowcount, "_fbadmin", False):
+            return
+        if "self.stmt.handle" not in inspect.getsource(cur._rowcount) or not hasattr(cur, "_get_stmt"):
+            log.info("firebirdsql Cursor._rowcount changed upstream; prepared rowcount patch skipped")
+            return
+        get_stmt, rowcount = cur._get_stmt, cur._rowcount
+
+        def _get_stmt(self, query):
+            stmt = get_stmt(self, query)
+            self._fbadmin_executed = stmt
+            return stmt
+
+        def _rowcount(self):
+            executed = getattr(self, "_fbadmin_executed", None)
+            if executed is None or executed is self.stmt:
+                return rowcount(self)
+            own = self.stmt
+            self.stmt = executed  # the prepared statement that was just executed
+            try:
+                return rowcount(self)
+            finally:
+                self.stmt = own
+
+        _rowcount._fbadmin = True
+        cur._get_stmt, cur._rowcount = _get_stmt, _rowcount
+    except Exception:  # noqa: BLE001
+        log.exception("could not patch firebirdsql Cursor._rowcount")
 
 
 def _patch_bind_describe() -> None:

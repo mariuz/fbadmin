@@ -357,6 +357,46 @@ keeps working:
   while decompressed bytes are already buffered (otherwise wire compression with a
   connection timeout stalled).
 
+### Prepared statements in fbadmin's loops
+
+Most of fbadmin's loops run one statement shape many times:
+
+* data import, copy data, the test data generator and anonymised copies prepare their statement once
+  per table (`cursor.prep()`);
+* grid edits and data compare scripts use a small cache (`fbadmin/prepared.py`): each distinct SQL
+  text is prepared once and executed as often as needed. A grid save of 200 updates prepares one
+  UPDATE per set of changed columns. A data compare script prepares one INSERT, UPDATE or DELETE per
+  table and column set.
+
+Measured with 2,000 parameterized `UPDATE … WHERE ID = ?` statements in one transaction, each
+followed by its row count, as grid edits and data compare check them. The client went through a
+TCP proxy that adds 0.5 ms in each direction, to stand for a network. Times are per statement; the
+proxy's own overhead makes them higher than on a real network, but the ratio holds.
+
+| Driver | Firebird 3 | Firebird 4 | Firebird 5 |
+|---|---|---|---|
+| firebirdsql, SQL text | 11.0 ms | 12.0 ms | 11.9 ms |
+| firebirdsql, prepared | 6.8 ms (**1.6×**) | 7.3 ms (**1.65×**) | 7.1 ms (**1.67×**) |
+| native, SQL text | 6.8 ms | 6.7 ms | 6.6 ms |
+| native, prepared | 6.7 ms (1.0×) | 6.7 ms (1.0×) | 6.7 ms (1.0×) |
+
+* **firebirdsql** prepares SQL text again on every execute. A prepared statement saves that round
+  trip.
+* **The native driver** already reuses the last statement when the same SQL text comes again. In a
+  plain loop it gains nothing, but the cache keeps several shapes prepared at once, so mixed
+  statements (several tables, several column sets) gain there too.
+* What remains with firebirdsql is the execute plus a row-count request (`isc_info_sql_records`),
+  which the driver makes after every statement.
+
+firebirdsql 1.5.0 reported a stale `rowcount` after a prepared execute: the count of the cursor's
+last *text* statement. fbadmin patches that (`driver_patches.py`, patch 7), because grid edits and
+data compare scripts rely on the count to notice rows changed by someone else.
+
+`executemany` (the Firebird 4+ batch API in firebirdsql 1.5) is not used, for two reasons:
+
+* one failing row fails the whole batch, so an import couldn't report and skip single rows;
+* its parameter encoding bypasses fbadmin's driver fixes for binary values, INT128 and time zones.
+
 ### Caveats
 
 - **One machine, loopback.** Everything ran in one container (4 CPUs) with the servers in
