@@ -242,7 +242,10 @@ def test_ctrl_c_cancels_the_job_on_the_server(web):
         p.send_signal(signal.SIGINT)
         _, err = p.communicate(timeout=120)
         err = (seen + err).decode()
-        assert "Cancelling the job on the server" in err, err[-2000:]
+        if "Cancelling the job on the server" not in err:
+            # the backup was over before Ctrl+C arrived (a fast server): try again with a bigger table
+            assert "Backup completed" in err, err[-2000:]
+            continue
         # the backup can still win: the job ended before the request, or gbak finished before it was stopped
         if p.returncode != 0 or "already ended" not in err and "Backup completed" not in err:
             break
