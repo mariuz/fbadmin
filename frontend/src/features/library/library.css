@@ -32,3 +32,4 @@
 .lib-preview { max-height: 200px; overflow: auto; margin: 0 0 8px; padding: 8px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--panel-2); white-space: pre-wrap; }
 .lib table.grid tr.sel td { background: var(--select); }
 .lib .hint { font-size: 12px; margin: 4px 0 8px; }
+.lib-titlebar { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }

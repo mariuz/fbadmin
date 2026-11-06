@@ -8,6 +8,7 @@ import { ResultGrid } from "../../components/ResultGrid";
 import { Markdown } from "../../components/Markdown";
 import { Modal } from "../../components/Modal";
 import { fmtTime } from "../maintenance/api";
+import { shareLink } from "../links";
 import { ChartView } from "../charts/ChartView";
 import { defaultConfig, type ChartConfig } from "../charts/shape";
 import "../charts/charts.css";
@@ -254,6 +255,7 @@ export function NotebookTab(props: { id: string; visible: boolean; user: string 
         <button className="btn small primary" disabled={!!running} onClick={runAll}>{t("Run all")}</button>
         {!ro && <button className="btn small" onClick={() => { if (confirm(t("Clear the results of every cell?"))) changeCells((cs) => cs.map((c) => ({ ...c, output: null }))); }}>{t("Clear results")}</button>}
         <button className="btn small" onClick={() => setHistory(true)}>{t("History…")}</button>
+        <button className="btn small" onClick={() => shareLink(app, { kind: "notebook", item_id: nb.id, title: meta.name })}>🔗 {t("Copy link")}</button>
         <a className="btn small" href={nbApi.exportUrl(nb.id, "md")} download>{t("Export Markdown")}</a>
         <a className="btn small" href={nbApi.exportUrl(nb.id, "json")} download>{t("Export notebook")}</a>
         <button className="btn small" onClick={async () => {

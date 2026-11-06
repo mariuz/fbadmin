@@ -1612,6 +1612,45 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Links */
+        get: operations["list_links_api_links_get"];
+        put?: never;
+        /** Create Link */
+        post: operations["create_link_api_links_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/links/{link_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Open Link
+         * @description What the link opens, checked with the permissions of the current user.
+         */
+        get: operations["open_link_api_links__link_id__get"];
+        put?: never;
+        post?: never;
+        /** Revoke Link */
+        delete: operations["revoke_link_api_links__link_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/monitoring/settings": {
         parameters: {
             query?: never;
@@ -6665,6 +6704,34 @@ export interface components {
             /** Tags */
             tags?: string[] | null;
         };
+        /** LinkIn */
+        LinkIn: {
+            /** Database Id */
+            database_id?: string | null;
+            /** Expires Days */
+            expires_days?: number | null;
+            /** Item Id */
+            item_id?: string | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "object" | "query" | "notebook" | "snapshot";
+            /** Name */
+            name?: string | null;
+            /** Otype */
+            otype?: string | null;
+            /** Schema */
+            schema?: string | null;
+            /** Server Id */
+            server_id?: string | null;
+            snapshot?: components["schemas"]["SnapshotIn"] | null;
+            /**
+             * Title
+             * @default
+             */
+            title?: string;
+        };
         /** LocalDatabaseIn */
         LocalDatabaseIn: {
             /**
@@ -7480,6 +7547,27 @@ export interface components {
             sql?: string | null;
             /** Temp Dir */
             temp_dir?: string | null;
+        };
+        /** SnapshotIn */
+        SnapshotIn: {
+            /** Columns */
+            columns?: {
+                [key: string]: unknown;
+            }[];
+            /** Row Count */
+            row_count?: number | null;
+            /** Rows */
+            rows?: unknown[][];
+            /**
+             * Sql
+             * @default
+             */
+            sql?: string;
+            /**
+             * Truncated
+             * @default false
+             */
+            truncated?: boolean;
         };
         /** Source */
         Source: {
@@ -11518,6 +11606,130 @@ export interface operations {
                 content: {
                     "application/json": unknown;
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_links_api_links_get: {
+        parameters: {
+            query?: {
+                all?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_link_api_links_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LinkIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    open_link_api_links__link_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                link_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_link_api_links__link_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                link_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

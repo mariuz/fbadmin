@@ -73,6 +73,7 @@ nav:
       - Query builder: QUERY_BUILDER.md
       - Charts from query results: CHARTS.md
       - SQL notebooks: NOTEBOOKS.md
+      - Shareable links: SHAREABLE_LINKS.md
       - Data grid: user-guide/data-grid.md
       - Object dialogs: OBJECT_DIALOGS.md
       - PSQL debugging and tests: PSQL_DEBUGGING.md

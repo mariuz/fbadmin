@@ -42,6 +42,7 @@ from . import checkup
 from . import notebooks
 from . import timeline
 from . import anonymise
+from . import links
 
 ROUTERS: list[APIRouter] = [
     servers.router,
@@ -86,4 +87,5 @@ ROUTERS: list[APIRouter] = [
     notebooks.router,
     timeline.router,
     anonymise.router,
+    links.router,
 ]

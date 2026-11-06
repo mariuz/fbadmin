@@ -11,7 +11,7 @@ const DataView = lazy(() => import("./components/DataView").then((m) => ({ defau
 const Monitor = lazy(() => import("./components/Monitor").then((m) => ({ default: m.Monitor })));
 const JobsPanel = lazy(() => import("./components/Jobs").then((m) => ({ default: m.JobsPanel })));
 const ServerLog = lazy(() => import("./components/Jobs").then((m) => ({ default: m.ServerLog })));
-import { getObjectTabs, getTabKind, getTopbarItems } from "./registry";
+import { getAppEffects, getObjectTabs, getTabKind, getTopbarItems } from "./registry";
 import { setPrefs, usePrefs } from "./prefs";
 import { currentLanguage, N_, t } from "./i18n";
 import { PreferencesDialog } from "./components/Preferences";
@@ -136,6 +136,11 @@ export default function App() {
   // password prompt for servers without a saved password
   const appRef = useRef(app);
   appRef.current = app;
+  // features' app-wide effects (e.g. opening a shared link from the address bar)
+  useEffect(() => {
+    const cleanups = getAppEffects().map((fn) => fn(() => appRef.current));
+    return () => cleanups.forEach((c) => typeof c === "function" && c());
+  }, []);
   useEffect(() => {
     setPasswordHandler((serverId) => new Promise<boolean>((resolve) => {
       const srv = serversRef.current.find((s) => s.id === serverId);

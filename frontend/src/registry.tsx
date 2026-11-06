@@ -141,6 +141,10 @@ export interface ResultViewContext {
   loadingMore: boolean;
   /** fetch up to ``rows`` more rows from the open cursor */
   loadMore: (rows?: number) => Promise<{ fetched: number; hasMore: boolean }>;
+  /** where the result came from (the Query Tool sets them) */
+  serverId?: string;
+  dbId?: string;
+  sql?: string;
 }
 export interface ResultView {
   id: string;
@@ -155,4 +159,15 @@ export function registerResultView(v: ResultView) {
 }
 export function getResultViews() {
   return resultViews;
+}
+
+// --- app-wide effects (run once when the main window is shown) ------------------
+/** ``getApp`` returns the current AppApi (servers, tabs...) when called; return a cleanup if needed. */
+export type AppEffect = (getApp: () => AppApi) => void | (() => void);
+const appEffects: AppEffect[] = [];
+export function registerAppEffect(fn: AppEffect) {
+  appEffects.push(fn);
+}
+export function getAppEffects() {
+  return appEffects;
 }

@@ -30,3 +30,4 @@ import "./checkup";
 import "./notebooks";
 import "./timeline";
 import "./anonymise";
+import "./links";

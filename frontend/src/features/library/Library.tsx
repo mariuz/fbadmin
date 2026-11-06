@@ -6,6 +6,7 @@ import { SqlEditor } from "../../components/SqlEditor";
 import { IconCopy, IconFolder, IconPlay, IconPlus, IconRefresh, IconTerminal, IconTrash } from "../../components/Icons";
 import { fmtTime } from "../maintenance/api";
 import { lapi, migrateBrowserSnippets, type LibraryInfo, type LibraryItem, type LibraryRevision, type Visibility } from "./api";
+import { shareLink } from "../links";
 
 // ------------------------------------------------------------------ helpers
 /** Server/database the item opens on: its default when registered here, else the selected database. */
@@ -208,6 +209,7 @@ export function LibraryPanel(props: { visible: boolean }) {
           <span className="grow" />
           <button className="btn small" onClick={() => reloadAll()} aria-label={t("Refresh")} title={t("Refresh")}><IconRefresh size={12} /></button>
           <button className="btn small" onClick={() => app.openTab({ kind: "notebooks", title: t("Notebooks") })}>📓 {t("Notebooks")}</button>
+          <button className="btn small" onClick={() => app.openTab({ kind: "links", title: t("Shared links") })}>🔗 {t("Links")}</button>
           <button className="btn small primary" onClick={() => { setSelId(null); setForm({ ...toForm({ folder: folder ?? "" }) }); }}>
             <IconPlus size={12} /> {t("New query")}
           </button>
@@ -256,7 +258,9 @@ export function LibraryPanel(props: { visible: boolean }) {
               : t("Saved queries and snippets. Pick one on the left.")}</div></div>
         ) : (
           <div>
-            <h3>{sel.name}</h3>
+            <div className="lib-titlebar"><h3>{sel.name}</h3>
+              <button className="btn small" onClick={() => shareLink(app, { kind: "query", item_id: sel.id, title: sel.name })}>🔗 {t("Copy link")}</button>
+            </div>
             <div className="lib-meta">
               {info?.server_mode && <span className={"pill " + (sel.visibility === "shared" ? "lib-shared" : "")}>{sel.visibility === "shared" ? t("shared") : t("private")}</span>}
               {info?.server_mode && sel.owner && <span>{t("Owner: {user}", { user: sel.owner })}</span>}

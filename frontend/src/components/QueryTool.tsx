@@ -626,6 +626,7 @@ export function QueryTool(props: { serverId: string; dbId: string; schema?: stri
                     {rv.render({
                       columns: current.columns!, rows: current.rows!, hasMore: !!(isLastSelect && result?.cursor_open), loadingMore,
                       loadMore: (n) => (isLastSelect ? loadMore(n) : Promise.resolve({ fetched: 0, hasMore: false })),
+                      serverId: props.serverId, dbId: props.dbId, sql: current.sql,
                     })}
                   </div>
                 ))}
