@@ -144,7 +144,8 @@ the right to delete those attachments: the same user, or SYSDBA/`RDB$ADMIN`.
 pgAgent-like schedules for **backups** (streamed into `<data dir>/backups/<schedule id>/`
 with **retention**: keep the last N files), **sweeps**, **online validations**, **schema snapshots**
 ([Schema history](SCHEMA_HISTORY.md)), **schema drift checks** ([Schema drift detection](SCHEMA_DRIFT.md)) and
-**restore drills** ([Backup encryption and restore drills](BACKUP_ENCRYPTION_DRILLS.md)).
+**restore drills** ([Backup encryption and restore drills](BACKUP_ENCRYPTION_DRILLS.md)) and
+**notebook reports** ([Scheduled notebooks](NOTEBOOKS.md#scheduled-notebooks-and-reports)).
 
 * Standard 5-field cron expressions (`minute hour day-of-month month day-of-week`) with
   lists, ranges, steps, month/day names and `@hourly`/`@daily`/`@weekly`/`@monthly`/`@yearly`

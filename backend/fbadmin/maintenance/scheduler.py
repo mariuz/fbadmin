@@ -26,6 +26,7 @@ from ..config import settings
 from . import archive, backupcrypt, drift, drill, ops, verify
 from .drift import DriftOptions
 from .drill import DrillOptions
+from ..notebook_runs import NotebookOptions
 from .cron import Cron
 
 HISTORY_KEEP = 500
@@ -41,7 +42,7 @@ class UploadOptions(BaseModel):
 class Schedule(BaseModel):
     id: str = Field(default_factory=lambda: uuid.uuid4().hex[:10])
     name: str
-    kind: Literal["backup", "sweep", "validate", "schema_snapshot", "schema_drift", "restore_drill"] = "backup"
+    kind: Literal["backup", "sweep", "validate", "schema_snapshot", "schema_drift", "restore_drill", "notebook"] = "backup"
     server_id: str
     database_id: str
     cron: str
@@ -54,6 +55,7 @@ class Schedule(BaseModel):
     encrypt: bool = False             # encrypt the backups with the active backup key (backupcrypt)
     drift: DriftOptions | None = None  # kind schema_drift
     drill: DrillOptions | None = None  # kind restore_drill
+    notebook: NotebookOptions | None = None  # kind notebook (fbadmin/notebook_runs.py)
     # server mode: run as the user who scheduled it (security/runas.py); never returned by the API
     run_as: dict | None = None
     created_at: float = Field(default_factory=time.time)
@@ -211,11 +213,15 @@ class Scheduler:
             failure: str | None = None
             try:
                 # no service connection to the schedule's server needed (a drill opens its own)
-                snap = s.kind in ("schema_snapshot", "schema_drift", "restore_drill")
+                snap = s.kind in ("schema_snapshot", "schema_drift", "restore_drill", "notebook")
                 with (nullcontext() if snap else st.manager.service(s.server_id)) as svc, \
                         (nullcontext() if snap else st.manager.detach_on_cancel(s.server_id, db.path)):
                     major = 0 if snap else ops.option_major(svc)
-                    if s.kind == "schema_drift":
+                    if s.kind == "notebook":
+                        from .. import notebook_runs
+
+                        extra, failure = notebook_runs.run(s, log)
+                    elif s.kind == "schema_drift":
                         extra = self._schema_drift(s, db, log)
                     elif s.kind == "restore_drill":
                         extra, failure = self._restore_drill(s, db, log)

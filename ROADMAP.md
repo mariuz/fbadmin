@@ -12,7 +12,7 @@ scope.
 
 **Status:** milestones 0.1 to 2.0, the engineering backlog and the phone and tablet layout are
 implemented and verified in CI against real services. Firebird 6.0 final support waits for the
-6.0 release; milestones 2.1, 2.2, 2.3 and 3.0 below are planned. The current release is **2.1.1** ([release notes](docs/release-notes/v2.1.1.md)): on
+6.0 release. Milestone 2.2 is done and 2.3 lacks only push notifications; milestones 2.1, 2.4 and 3.0 below are planned. The current release is **2.1.1** ([release notes](docs/release-notes/v2.1.1.md)): on
 [PyPI](https://pypi.org/project/firebird-admin/) (`pip install firebird-admin`), on
 [GitHub Releases](https://github.com/mariuz/fbadmin/releases) with desktop installers for Windows,
 macOS and Linux, as a Docker image, and documented at https://mariuz.github.io/fbadmin/.
@@ -264,6 +264,16 @@ Also fixed in this milestone:
 - ✅ **Database timeline:** one history per database, newest first: DDL and data changes made in fbadmin, schema history commits, migrations, drift checks, backups (manual, scheduled, nbackup), test restores and restore drills, maintenance and property changes, engine and ODS upgrades, alerts, and the audit log for administrators; jobs with their outcome and who did it; filter by category, period, "before" a time and text ([docs/TIMELINE.md](docs/TIMELINE.md))
 - ⬜ **Push notifications for alerts:** Web Push to the installed phone app, next to the e-mail, Slack and webhook channels
 - ✅ **Shareable links** to an object, a saved query, a notebook or a result snapshot (`/#/link/<id>`), opened with the viewer's own permissions (the link grants nothing; snapshots only for users who may read their whole database); copy from the object menu, the library, notebooks and the Query Tool's Share view; expiry, revocation, a list of your links with open counts ([docs/SHAREABLE_LINKS.md](docs/SHAREABLE_LINKS.md))
+
+## Milestone 2.4 — Automation and foresight ⬜
+
+- ✅ **Scheduled notebooks and reports:** a notebook runs on a cron schedule as the schedule's owner, with that user's fbadmin permissions (hidden tables stay hidden, audit log in server mode), read-only by default, stopping at the first error; results kept in the notebook; a report (the notebook as Markdown, the first rows, CSV attachments by e-mail) to e-mail, Slack or webhook channels after every run, only when a result has rows, or only on errors ([docs/NOTEBOOKS.md](docs/NOTEBOOKS.md#scheduled-notebooks-and-reports))
+- ⬜ **Capacity and transaction-ID forecasting:** project database growth and the rate transaction numbers are used from the history, and warn before the disk fills or the transaction counter reaches its limit
+- ⬜ **Scheduled performance check-up:** run the check-up on a schedule and alert only on new critical findings (a stuck OAT, selectivity outdated after a load)
+- ⬜ **Change requests with approval** in server mode: a developer proposes DDL or a migration for a database, an administrator reviews the diff and approves, fbadmin applies it with an audit trail and a timeline entry
+- ⬜ **Continuous trace capture:** an optional always-on trace session feeding the slow statement log and query regressions, so no slow statement is missed between samples
+- ⬜ **Comments** on objects and notebooks: short threads ("this index is needed by the nightly report") shown where the object is
+- ⬜ **Translation fixes:** the "Line" chart type and the token "Revoke" button in Czech, German and Russian share keys with other meanings
 
 ## Milestone 3.0 — Teams and distribution ⬜
 

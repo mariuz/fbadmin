@@ -53,6 +53,9 @@ def send_email(c: Channel, alert: dict) -> str:
     msg["Date"] = formatdate(localtime=True)
     msg["Message-ID"] = make_msgid(domain="fbadmin")
     msg.set_content(text_body(alert))
+    for name, mime, data in alert.get("attachments") or []:  # e.g. a scheduled notebook's report
+        maintype, _, subtype = mime.partition("/")
+        msg.add_attachment(data, maintype=maintype, subtype=subtype or "octet-stream", filename=name)
     ctx = ssl.create_default_context()
     smtp: smtplib.SMTP
     if security == "ssl":

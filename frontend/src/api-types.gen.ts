@@ -1687,6 +1687,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/notebooks/channels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Delivery Channels
+         * @description Alert channels a scheduled notebook can send its report to: names and kinds only (no settings).
+         */
+        get: operations["delivery_channels_api_notebooks_channels_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/notebooks/import": {
         parameters: {
             query?: never;
@@ -6859,6 +6879,34 @@ export interface components {
              */
             visibility?: "private" | "shared";
         };
+        /** NotebookOptions */
+        NotebookOptions: {
+            /**
+             * Attach Csv
+             * @default true
+             */
+            attach_csv?: boolean;
+            /** Channels */
+            channels?: string[];
+            /** Notebook Id */
+            notebook_id: string;
+            /**
+             * Read Only
+             * @default true
+             */
+            read_only?: boolean;
+            /**
+             * Save Results
+             * @default true
+             */
+            save_results?: boolean;
+            /**
+             * Send
+             * @default always
+             * @enum {string}
+             */
+            send?: "always" | "rows" | "error";
+        };
         /** NotebookUpdate */
         NotebookUpdate: {
             /** Base Rev */
@@ -7346,9 +7394,10 @@ export interface components {
              * @default backup
              * @enum {string}
              */
-            kind?: "backup" | "sweep" | "validate" | "schema_snapshot" | "schema_drift" | "restore_drill";
+            kind?: "backup" | "sweep" | "validate" | "schema_snapshot" | "schema_drift" | "restore_drill" | "notebook";
             /** Name */
             name: string;
+            notebook?: components["schemas"]["NotebookOptions"] | null;
             options?: components["schemas"]["BackupOptions"] | null;
             /** Server Id */
             server_id: string;
@@ -7376,9 +7425,10 @@ export interface components {
             /** Keep */
             keep?: number | null;
             /** Kind */
-            kind?: ("backup" | "sweep" | "validate" | "schema_snapshot" | "schema_drift" | "restore_drill") | null;
+            kind?: ("backup" | "sweep" | "validate" | "schema_snapshot" | "schema_drift" | "restore_drill" | "notebook") | null;
             /** Name */
             name?: string | null;
+            notebook?: components["schemas"]["NotebookOptions"] | null;
             options?: components["schemas"]["BackupOptions"] | null;
             /** Server Id */
             server_id?: string | null;
@@ -11858,6 +11908,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delivery_channels_api_notebooks_channels_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
         };

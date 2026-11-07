@@ -29,3 +29,4 @@
 .nb-head a.btn { text-decoration: none; color: var(--text); display: inline-flex; align-items: center; }
 
 .nb-chartbox { height: 400px; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+.nbs-channels { display: flex; flex-direction: column; gap: 2px; }

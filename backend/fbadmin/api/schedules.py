@@ -12,6 +12,7 @@ from pydantic import BaseModel
 from ..maintenance import archive, drift, drill, ops
 from ..maintenance.drift import DriftOptions
 from ..maintenance.drill import DrillOptions
+from ..notebook_runs import NotebookOptions
 from ..maintenance.cron import Cron
 from ..maintenance.scheduler import Schedule, UploadOptions, get_scheduler
 from ..security import runas
@@ -24,7 +25,7 @@ router = APIRouter(prefix="/api/schedules", tags=["schedules"])
 
 class ScheduleIn(BaseModel):
     name: str
-    kind: Literal["backup", "sweep", "validate", "schema_snapshot", "schema_drift", "restore_drill"] = "backup"
+    kind: Literal["backup", "sweep", "validate", "schema_snapshot", "schema_drift", "restore_drill", "notebook"] = "backup"
     server_id: str
     database_id: str
     cron: str
@@ -37,11 +38,12 @@ class ScheduleIn(BaseModel):
     encrypt: bool = False
     drift: DriftOptions | None = None
     drill: DrillOptions | None = None
+    notebook: NotebookOptions | None = None
 
 
 class ScheduleUpdate(BaseModel):
     name: str | None = None
-    kind: Literal["backup", "sweep", "validate", "schema_snapshot", "schema_drift", "restore_drill"] | None = None
+    kind: Literal["backup", "sweep", "validate", "schema_snapshot", "schema_drift", "restore_drill", "notebook"] | None = None
     cron: str | None = None
     enabled: bool | None = None
     keep: int | None = None
@@ -54,6 +56,7 @@ class ScheduleUpdate(BaseModel):
     encrypt: bool | None = None
     drift: DriftOptions | None = None
     drill: DrillOptions | None = None
+    notebook: NotebookOptions | None = None
 
 
 class VerifyIn(BaseModel):
@@ -126,6 +129,29 @@ def _drill_allowed(kind: str | None, opts: DrillOptions | None, server_id: str) 
         _allowed(b.server_id, b.database_id)
 
 
+def _notebook_allowed(kind: str | None, opts: NotebookOptions | None, server_id: str, database_id: str) -> None:
+    """The notebook must be visible to whoever schedules it and belong to the schedule's database; the channels
+    must exist."""
+    if kind != "notebook":
+        return
+    from .. import notebooks
+    from ..alerts.store import get_store as alert_store
+    from ..notebook_runs import actor
+
+    if opts is None:
+        raise ValueError("Choose the notebook to run")
+    try:
+        nb = notebooks.get_store().get(opts.notebook_id, actor())
+    except KeyError:
+        raise ValueError("Unknown notebook, or it is private to its owner") from None
+    if (nb.server_id, nb.database_id) != (server_id, database_id):
+        raise ValueError(f"The notebook {nb.name!r} runs on another database: schedule it on that one")
+    channels = alert_store().channels
+    missing = [c for c in opts.channels if c not in channels]
+    if missing:
+        raise ValueError("Unknown alert channel(s): " + ", ".join(missing))
+
+
 def _encrypt_allowed(encrypt: bool | None) -> None:
     from ..maintenance import backupcrypt
 
@@ -162,6 +188,7 @@ def create(body: ScheduleIn):
     _upload_allowed(body.upload)
     _drift_allowed(body.kind, body.drift, body.server_id, body.database_id)
     _drill_allowed(body.kind, body.drill, body.server_id)
+    _notebook_allowed(body.kind, body.notebook, body.server_id, body.database_id)
     _encrypt_allowed(body.kind == "backup" and body.encrypt)
     data = body.model_dump(exclude_none=True)
     data["run_as"] = runas.issue(body.server_id, f"schedule: {body.name}")  # server mode: runs as the current user
@@ -196,6 +223,8 @@ def update(schedule_id: str, body: ScheduleUpdate):
     _drift_allowed(kind, opts, changes.get("server_id") or cur.server_id, changes.get("database_id") or cur.database_id)
     dopts = DrillOptions(**changes["drill"]) if changes.get("drill") is not None else cur.drill
     _drill_allowed(kind, dopts, changes.get("server_id") or cur.server_id)
+    nopts = NotebookOptions(**changes["notebook"]) if changes.get("notebook") is not None else cur.notebook
+    _notebook_allowed(kind, nopts, changes.get("server_id") or cur.server_id, changes.get("database_id") or cur.database_id)
     if changes.get("encrypt"):
         _encrypt_allowed(kind == "backup")
     new_cred = runas.issue(changes.get("server_id") or cur.server_id, f"schedule: {changes.get('name') or cur.name}")

@@ -55,6 +55,53 @@ notebook then shows who saved it in the meantime, with two choices:
 * **Load their version**;
 * **Save mine as a new notebook**.
 
+## Scheduled notebooks and reports
+
+**⏱ Schedule…** in a notebook runs it on a schedule, a "monthly health check" or a "month-end close"
+for example, and sends a report. Such schedules also appear under [scheduled jobs](MAINTENANCE.md#scheduled-jobs)
+with the kind *notebook*, where they can be edited, paused or run now.
+
+**A run:**
+
+1. **As the owner.** It runs as the user who saved the schedule, with that user's fbadmin
+   permissions, exactly as their Query Tool would:
+   * the server and database must be visible to them;
+   * each statement needs its level;
+   * hidden tables stay hidden;
+   * a read-only server refuses changes;
+   * in server mode, the statements go to the audit log.
+2. **Read only by default.** Cells that change data or metadata are refused. Turn **Read only** off
+   for a runbook that must write; each statement is then committed, as in the notebook.
+3. **In order.** The SQL cells run from the top, and the run stops at the first error. Cells are
+   numbered as in the notebook, notes included.
+4. **Results kept.** The results are saved in the notebook (**Keep the results in the notebook**)
+   when the schedule's owner may change it, so the notebook shows the latest run.
+5. **Report sent.** It goes to the chosen [alert channels](ALERTS.md), with the notebook as Markdown
+   (notes, SQL, results as tables):
+
+   | Channel | Gets |
+   |---|---|
+   | e-mail | a summary and the first rows; the report as a `.md` attachment and, with **attach each result as CSV**, one CSV per result |
+   | Slack | the summary and the first rows |
+   | webhook | the `notebook.report` event with the report in `details.markdown` and a summary of the run |
+
+**When the report is sent:**
+
+| Send it | When |
+|---|---|
+| after every run | always |
+| only when a result has rows | a "tell me when this finds something" report: stuck orders, failed jobs, rows that break a rule |
+| only when a cell fails | a check that stays quiet while all is well |
+
+**A run fails** (and the `schedule.failed` alert fires) when a cell fails or no channel could take the
+report. A failed run still sends its report when the send setting allows it, marked as failed. It
+also fails when the notebook was deleted or made private by its owner. Runs appear in the schedule's
+history and on the database's [timeline](TIMELINE.md).
+
+**Who can schedule.** Scheduling needs the admin level on the database, as for any scheduled job,
+because a report sends data to channels other people may read. The channel picker lists the alert
+channels by name only; fbadmin administrators set them up under Alerts.
+
 ## Sharing (server mode)
 
 A notebook is **Private** (only its owner sees it) or **Shared with every fbadmin user**:
@@ -99,6 +146,8 @@ Each notebook is a JSON file in `<data dir>/notebooks/` (mode 0600, written atom
 | POST | `/api/notebooks/{id}/revisions/{rev}/restore` | restore a revision |
 | GET | `/api/notebooks/{id}/export?format=json\|md&results=` | export |
 | POST | `/api/notebooks/import` `{notebook, server_id, database_id}` | import an exported notebook |
+| GET | `/api/notebooks/channels` | the alert channels a report can go to (names and kinds) |
+| POST | `/api/schedules` `{kind: "notebook", notebook: {notebook_id, channels, send, read_only, save_results, attach_csv}, ...}` | schedule a notebook (see [scheduled jobs](MAINTENANCE.md#scheduled-jobs)) |
 
 A cell is `{id, type: "sql" | "markdown", source, chart, output}`. Cells are run by the client through
 `/api/query/sessions`; the API stores the document.

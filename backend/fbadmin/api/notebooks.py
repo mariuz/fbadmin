@@ -92,6 +92,16 @@ def import_notebook(body: ImportIn):
     return get_store().view(get_store().import_(body.notebook, who, body.server_id, body.database_id), who)
 
 
+@router.get("/channels")
+def delivery_channels():
+    """Alert channels a scheduled notebook can send its report to: names and kinds only (no settings)."""
+    from ..alerts.store import get_store as alert_store
+
+    actor()  # signed in
+    return {"channels": [{"id": c.id, "name": c.name, "kind": c.kind, "enabled": c.enabled}
+                         for c in alert_store().channels.values()]}
+
+
 @router.get("/{nb_id}")
 def get_notebook(nb_id: str):
     who = actor()

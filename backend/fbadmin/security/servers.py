@@ -385,7 +385,8 @@ class _PerUser:
             return self._items.pop(user_id, None)
 
     def __getattr__(self, name: str):
-        if name.startswith("_"):
+        # per-user helpers that features call to open their own attachments (see connections.ConnectionManager)
+        if name.startswith("_") and name not in ("_password", "_open"):
             raise AttributeError(name)
         p = current_principal.get()
         if p is None:

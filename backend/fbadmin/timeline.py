@@ -437,6 +437,7 @@ _SCHEDULE_KINDS = {
     "backup": ("backup", "Scheduled backup"), "sweep": ("maintenance", "Scheduled sweep"),
     "validate": ("maintenance", "Scheduled validation"), "restore_drill": ("backup", "Restore drill"),
     "schema_snapshot": ("schema", "Schema snapshot"), "schema_drift": ("schema", "Schema drift check"),
+    "notebook": ("data", "Scheduled notebook"),
 }
 
 

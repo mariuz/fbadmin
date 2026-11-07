@@ -645,7 +645,7 @@ def run_copy(profile_id: str, log: Callable[[str], None]) -> dict[str, Any]:
     work.mkdir(parents=True, exist_ok=True)
     os.chmod(work, 0o700)
     raw_fbk, masked_fbk = work / f"{run_id}-source.fbk", work / f"{run_id}-masked.fbk"
-    src_pw = st.manager._password(p.server_id)
+    src_pw = st.manager._password(p.server_id)  # the user's own saved password (server mode: per user)
     started = time.time()
     scratch_made = False
     result: dict[str, Any] = {"run_id": run_id, "target": tgt_path}
