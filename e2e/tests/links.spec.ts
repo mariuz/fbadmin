@@ -83,9 +83,10 @@ test("share a result as a snapshot", async () => {
   await qt.getByLabel("Expires").selectOption("7");
   await audit("share a result");
   await qt.getByRole("button", { name: "Create and copy the link" }).click();
-  await expect(page.locator(".toast").last()).toContainText("Link copied");
-  const url = await clipboard();
-  await expect(qt.getByLabel("Link")).toHaveValue(url);
+  // the field shows the new link; the clipboard gets the same one (an earlier toast may still be up)
+  await expect(qt.getByLabel("Link")).toHaveValue(/\/#\/link\/[A-Za-z0-9_-]{10,}$/);
+  const url = await qt.getByLabel("Link").inputValue();
+  await expect.poll(clipboard).toBe(url);
 
   await page.goto(url);
   const snap = pane().locator(".lk-snap");
