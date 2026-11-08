@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Any
 
 from ..config import settings
-from . import probes, regressions
+from . import forecast, probes, regressions
 from .regressions import DEFAULTS as _regression_defaults
 
 COLUMNS = ("ts",) + probes.COUNTERS + probes.GAUGES
@@ -166,6 +166,7 @@ class HistoryStore:
             self._db.execute("DELETE FROM samples WHERE server_id = ? AND db_id = ?", (server_id, db_id))
             self._db.execute("DELETE FROM slow_statements WHERE server_id = ? AND db_id = ?", (server_id, db_id))
         regressions.forget(self, server_id, db_id)
+        forecast.forget(server_id, db_id)
 
     # ---------------------------------------------------------------- slow statements
     def add_slow(self, server_id: str, db_id: str, sql_text: str, plan: str | None, seconds: float) -> None:
@@ -219,6 +220,7 @@ def sample_database(server_id: str, db_id: str) -> dict[str, Any]:
         with get_state().manager.meta(server_id, db_id) as conn:
             snap = probes.snapshot(conn)
             slow = _slow_running(conn, slow_after)
+            forecast.after_sample(conn, server_id, db_id)  # capacity forecast: an observation an hour
             end_transaction(conn, commit=True)
     except Exception as exc:  # noqa: BLE001
         store.mark(server_id, db_id, str(exc).strip()[:500])

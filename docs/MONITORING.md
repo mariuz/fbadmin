@@ -21,6 +21,7 @@ Open it from a database's context menu (**Performance check-up**, **Performance 
 | Profiler (`RDB$PROFILER`, `PLG$PROF_*`) | – | – | ✓ |
 | Index advisor | ✓ | ✓ | ✓ (plus the statement cache as a workload) |
 | Performance check-up | ✓ | ✓ | ✓ (server mode from `RDB$CONFIG` on 4 and 5) |
+| Capacity forecast (size, transactions, sequences, formats) | ✓ | ✓ | ✓ (and `INT128` columns on 4 and 5) |
 
 Features are detected at runtime (by looking for the system tables or packages), not by version.
 Where a feature is missing the UI says so instead of failing.
@@ -190,6 +191,36 @@ Settings (the screen's **Settings…**, or `PUT /api/monitoring/settings`):
 | `regression_query_ms` | 200 | Query Tool statements slower than this are tracked |
 | `regression_keep_days` | 30 | runs are kept this long (at most 2000 per statement) |
 
+## Capacity forecast
+
+**Capacity forecast…** (database context menu) projects the growth of a database to the limits it
+runs into, so they show up weeks or months before they stop the application:
+
+* **Database size** against a **space budget** you set (Firebird cannot tell how much of its disk is
+  free): the growth per day, the size in 30 days, 90 days and a year, and when the budget is reached.
+* **Transactions:** the next transaction number against the limit, 2^48−1 on Firebird 3 and later
+  (ODS 12+), 2^31−1 before.
+* **Sequences** against the column they fill. A sequence counts to 2^63, but an `INTEGER` column stops
+  at 2,147,483,647 and a `SMALLINT` at 32,767. Identity columns are matched exactly; for other
+  sequences, fbadmin takes the single-column integer primary key of a table whose triggers use the
+  sequence (`GEN_ID` or `NEXT VALUE FOR`), marked *probably (trigger)*. A sequence that feeds no known
+  column is measured against `BIGINT`.
+* **Table formats:** each `ALTER TABLE` that changes a table's columns adds a format; at 255 the table
+  cannot be changed until a backup and restore renumbers them.
+
+**Observations.** The forecast keeps one observation (pages, page size, next transaction, the value of
+every sequence) at most once an hour: the [history sampler](#history) records one for the databases
+whose history is recorded, and opening the page records one if the last is an hour old. **Record an
+observation now** records one at once. Observations are kept for two years and deleted with the
+database's history.
+
+**Trends** are least-squares slopes over the observations of the last 30 days, and need observations
+at least 6 hours apart. A limit is a *warning* when it is reached within 180 days or 80 % used, and
+*critical* within 30 days or 95 % used.
+
+**Alerts.** A rule on the `capacity.forecast` [alert event](ALERTS.md#events) sends a message when a
+finding appears or gets worse (once per finding and severity), checked after each history sample.
+
 ## Table statistics
 
 Top tables by reads, sequential/indexed reads, inserts, updates, deletes, backouts, purges,
@@ -344,6 +375,9 @@ All under `/api/servers/{sid}/databases/{dbid}/monitoring` unless noted.
 | POST | `/checkup/statistics` `{indices: [{name, schema}]}` | recompute selectivity (a job) |
 | POST | `/checkup/ai` `{question}` | AI inspection of the last report, or a follow-up question (a job) |
 | POST | `/checkup/ai/preview` `{question}` | the exact prompt the AI inspection would send |
+| GET | `/forecast` | the capacity forecast (records an observation if the last is an hour old) |
+| POST | `/forecast/observe` | record an observation now, then the forecast |
+| PUT | `/forecast/budget` `{budget_bytes}` | set (or clear, with `null`) the space budget |
 | GET/PUT | `/api/monitoring/settings` | sampler/exporter settings |
 | GET | `/profiler` | availability, sessions, attachments |
 | POST | `/profiler/run` `{sql, description}` | profile statements |

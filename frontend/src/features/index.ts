@@ -31,3 +31,4 @@ import "./notebooks";
 import "./timeline";
 import "./anonymise";
 import "./links";
+import "./forecast";

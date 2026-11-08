@@ -268,7 +268,7 @@ Also fixed in this milestone:
 ## Milestone 2.4 — Automation and foresight ⬜
 
 - ✅ **Scheduled notebooks and reports:** a notebook runs on a cron schedule as the schedule's owner, with that user's fbadmin permissions (hidden tables stay hidden, audit log in server mode), read-only by default, stopping at the first error; results kept in the notebook; a report (the notebook as Markdown, the first rows, CSV attachments by e-mail) to e-mail, Slack or webhook channels after every run, only when a result has rows, or only on errors ([docs/NOTEBOOKS.md](docs/NOTEBOOKS.md#scheduled-notebooks-and-reports))
-- ⬜ **Capacity and transaction-ID forecasting:** project database growth and the rate transaction numbers are used from the history, and warn before the disk fills or the transaction counter reaches its limit
+- ✅ **Capacity and transaction-ID forecasting:** project database growth, transaction numbers, sequences against the columns they feed and table formats from the history, and warn before a limit is reached ([docs/MONITORING.md](docs/MONITORING.md#capacity-forecast))
 - ⬜ **Scheduled performance check-up:** run the check-up on a schedule and alert only on new critical findings (a stuck OAT, selectivity outdated after a load)
 - ⬜ **Change requests with approval** in server mode: a developer proposes DDL or a migration for a database, an administrator reviews the diff and approves, fbadmin applies it with an audit trail and a timeline entry
 - ⬜ **Continuous trace capture:** an optional always-on trace session feeding the slow statement log and query regressions, so no slow statement is missed between samples

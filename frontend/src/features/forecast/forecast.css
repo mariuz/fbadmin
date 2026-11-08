@@ -1,0 +1,7 @@
+/* capacity forecast */
+.fc .fc-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; }
+.fc .fc-kv { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; margin: 0 0 8px; }
+.fc .fc-kv dt { color: var(--muted); }
+.fc .fc-kv dd { margin: 0; font-variant-numeric: tabular-nums; }
+.fc .fc-budget { flex-wrap: wrap; gap: 6px 8px; align-items: center; }
+.fc .fc-budget .muted { font-size: 12px; flex-basis: 100%; }
