@@ -27,6 +27,7 @@ from . import archive, backupcrypt, drift, drill, ops, verify
 from .drift import DriftOptions
 from .drill import DrillOptions
 from ..notebook_runs import NotebookOptions
+from ..monitoring.checkup_schedule import CheckupOptions
 from .cron import Cron
 
 HISTORY_KEEP = 500
@@ -42,7 +43,7 @@ class UploadOptions(BaseModel):
 class Schedule(BaseModel):
     id: str = Field(default_factory=lambda: uuid.uuid4().hex[:10])
     name: str
-    kind: Literal["backup", "sweep", "validate", "schema_snapshot", "schema_drift", "restore_drill", "notebook"] = "backup"
+    kind: Literal["backup", "sweep", "validate", "schema_snapshot", "schema_drift", "restore_drill", "notebook", "checkup"] = "backup"
     server_id: str
     database_id: str
     cron: str
@@ -56,6 +57,7 @@ class Schedule(BaseModel):
     drift: DriftOptions | None = None  # kind schema_drift
     drill: DrillOptions | None = None  # kind restore_drill
     notebook: NotebookOptions | None = None  # kind notebook (fbadmin/notebook_runs.py)
+    checkup: CheckupOptions | None = None  # kind checkup (fbadmin/monitoring/checkup_schedule.py)
     # server mode: run as the user who scheduled it (security/runas.py); never returned by the API
     run_as: dict | None = None
     created_at: float = Field(default_factory=time.time)
@@ -213,11 +215,18 @@ class Scheduler:
             failure: str | None = None
             try:
                 # no service connection to the schedule's server needed (a drill opens its own)
-                snap = s.kind in ("schema_snapshot", "schema_drift", "restore_drill", "notebook")
+                snap = s.kind in ("schema_snapshot", "schema_drift", "restore_drill", "notebook", "checkup")
                 with (nullcontext() if snap else st.manager.service(s.server_id)) as svc, \
                         (nullcontext() if snap else st.manager.detach_on_cancel(s.server_id, db.path)):
                     major = 0 if snap else ops.option_major(svc)
-                    if s.kind == "notebook":
+                    if s.kind == "checkup":
+                        from ..monitoring import checkup_schedule
+
+                        with self._lock:
+                            prev = next((h for h in reversed(self.history) if h["schedule_id"] == s.id
+                                         and h["status"] in ("findings", "finished")), None)
+                        extra = checkup_schedule.run(s, db, prev, log)
+                    elif s.kind == "notebook":
                         from .. import notebook_runs
 
                         extra, failure = notebook_runs.run(s, log)
@@ -255,8 +264,8 @@ class Scheduler:
             if failure:
                 self._record(s, job_ref.get("id"), started, "failed", failure, **extra)
                 raise RuntimeError(failure)
-            self._record(s, job_ref.get("id"), started, "drift" if extra.get("drift") else "finished", None,
-                         **extra)
+            status = extra.pop("status", None) or ("drift" if extra.get("drift") else "finished")
+            self._record(s, job_ref.get("id"), started, status, None, **extra)
 
         job = st.jobs.start(f"scheduled-{s.kind}", f"Scheduled {s.kind}: {s.name} ({db.name})", s.server_id, fn,
                             cancellable=True)

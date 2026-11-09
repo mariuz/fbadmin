@@ -73,7 +73,7 @@ table.grid tr.sel td { background: var(--select) !important; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --m-drift: #fbbf24; --m-missing: #ff8a80; } }
 :root[data-theme="dark"] { --m-drift: #fbbf24; --m-missing: #ff8a80; }
 :root[data-theme="contrast"] { --m-drift: #ffd400; --m-missing: #ff8a80; }
-.pill.drift { color: var(--m-drift); border-color: var(--m-drift); }
+.pill.drift, .pill.findings { color: var(--m-drift); border-color: var(--m-drift); }
 .drift-head { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 8px; }
 .drift-bar { flex-wrap: wrap; gap: 8px; padding: 6px 0; }
 .drift-status { font-size: 12px; padding: 1px 6px; border-radius: var(--radius); border: 1px solid currentColor; }

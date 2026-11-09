@@ -6170,6 +6170,27 @@ export interface components {
              */
             gstat?: boolean;
         };
+        /** CheckupOptions */
+        CheckupOptions: {
+            /**
+             * Fix Selectivity
+             * @default false
+             */
+            fix_selectivity?: boolean;
+            /**
+             * Gstat
+             * @default true
+             */
+            gstat?: boolean;
+            /** Ignore */
+            ignore?: string[];
+            /**
+             * Min Severity
+             * @default warning
+             * @enum {string}
+             */
+            min_severity?: "critical" | "warning";
+        };
         /** CodeIn */
         CodeIn: {
             /** Code */
@@ -7433,6 +7454,7 @@ export interface components {
         };
         /** ScheduleIn */
         ScheduleIn: {
+            checkup?: components["schemas"]["CheckupOptions"] | null;
             /** Cron */
             cron: string;
             /** Database Id */
@@ -7459,7 +7481,7 @@ export interface components {
              * @default backup
              * @enum {string}
              */
-            kind?: "backup" | "sweep" | "validate" | "schema_snapshot" | "schema_drift" | "restore_drill" | "notebook";
+            kind?: "backup" | "sweep" | "validate" | "schema_snapshot" | "schema_drift" | "restore_drill" | "notebook" | "checkup";
             /** Name */
             name: string;
             notebook?: components["schemas"]["NotebookOptions"] | null;
@@ -7477,6 +7499,7 @@ export interface components {
         };
         /** ScheduleUpdate */
         ScheduleUpdate: {
+            checkup?: components["schemas"]["CheckupOptions"] | null;
             /** Cron */
             cron?: string | null;
             /** Database Id */
@@ -7490,7 +7513,7 @@ export interface components {
             /** Keep */
             keep?: number | null;
             /** Kind */
-            kind?: ("backup" | "sweep" | "validate" | "schema_snapshot" | "schema_drift" | "restore_drill" | "notebook") | null;
+            kind?: ("backup" | "sweep" | "validate" | "schema_snapshot" | "schema_drift" | "restore_drill" | "notebook" | "checkup") | null;
             /** Name */
             name?: string | null;
             notebook?: components["schemas"]["NotebookOptions"] | null;

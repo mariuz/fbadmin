@@ -13,6 +13,7 @@ from ..maintenance import archive, drift, drill, ops
 from ..maintenance.drift import DriftOptions
 from ..maintenance.drill import DrillOptions
 from ..notebook_runs import NotebookOptions
+from ..monitoring.checkup_schedule import CheckupOptions
 from ..maintenance.cron import Cron
 from ..maintenance.scheduler import Schedule, UploadOptions, get_scheduler
 from ..security import runas
@@ -25,7 +26,7 @@ router = APIRouter(prefix="/api/schedules", tags=["schedules"])
 
 class ScheduleIn(BaseModel):
     name: str
-    kind: Literal["backup", "sweep", "validate", "schema_snapshot", "schema_drift", "restore_drill", "notebook"] = "backup"
+    kind: Literal["backup", "sweep", "validate", "schema_snapshot", "schema_drift", "restore_drill", "notebook", "checkup"] = "backup"
     server_id: str
     database_id: str
     cron: str
@@ -39,11 +40,12 @@ class ScheduleIn(BaseModel):
     drift: DriftOptions | None = None
     drill: DrillOptions | None = None
     notebook: NotebookOptions | None = None
+    checkup: CheckupOptions | None = None
 
 
 class ScheduleUpdate(BaseModel):
     name: str | None = None
-    kind: Literal["backup", "sweep", "validate", "schema_snapshot", "schema_drift", "restore_drill", "notebook"] | None = None
+    kind: Literal["backup", "sweep", "validate", "schema_snapshot", "schema_drift", "restore_drill", "notebook", "checkup"] | None = None
     cron: str | None = None
     enabled: bool | None = None
     keep: int | None = None
@@ -57,6 +59,7 @@ class ScheduleUpdate(BaseModel):
     drift: DriftOptions | None = None
     drill: DrillOptions | None = None
     notebook: NotebookOptions | None = None
+    checkup: CheckupOptions | None = None
 
 
 class VerifyIn(BaseModel):

@@ -18,6 +18,7 @@ import "../monitoring/monitoring.css";
 import "./checkup.css";
 import "./messages";
 import { AiInspection } from "./AiInspection";
+import { ScheduleCheckupDialog } from "./schedule";
 import { checkupApi, type CheckupAction, type CheckupFinding, type CheckupReport, type CheckupState, type Severity } from "./api";
 
 const SEV: Record<Severity, string> = { critical: "critical", warning: "warning", info: "info" };
@@ -73,6 +74,7 @@ function CheckupTab(props: { serverId: string; dbId: string; visible: boolean })
   const [running, setRunning] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [scheduling, setScheduling] = useState(false);
   const alive = useRef(true);
   useEffect(() => () => { alive.current = false; }, []);
 
@@ -172,7 +174,10 @@ function CheckupTab(props: { serverId: string; dbId: string; visible: boolean })
         right={<>
           <Check label={t("Include gstat (reads the whole database)")} checked={gstat} onChange={setGstat} disabled={!!running} />
           <button className="btn primary small" disabled={!!running || busy} onClick={() => run()}>{r ? t("Run again") : t("Run the check-up")}</button>
+          <button className="btn small" onClick={() => setScheduling(true)}>{t("Schedule…")}</button>
         </>}>
+        {scheduling && <ScheduleCheckupDialog serverId={sid} dbId={dbid} dbName={app.servers.find((s) => s.id === sid)?.databases.find((d) => d.id === dbid)?.name ?? t("database")}
+          onClose={() => setScheduling(false)} onRan={load} />}
         {running && <div className="muted" role="status">{t("Checking…")} {running}</div>}
         {error && <div className="err">{error}</div>}
         {!r && !running && state && <div className="muted">{t("No check-up has run for this database yet.")}</div>}
@@ -181,8 +186,9 @@ function CheckupTab(props: { serverId: string; dbId: string; visible: boolean })
             {r.summary.critical > 0 && <span className="pill failed">{t("{n} critical", { n: r.summary.critical })}</span>}
             {r.summary.warning > 0 && <span className="pill running">{t("{n} warning(s)", { n: r.summary.warning })}</span>}
             {r.summary.info > 0 && <span className="pill cancelled">{t("{n} note(s)", { n: r.summary.info })}</span>}
-            <span className="muted">{t("Checked {time} in {s} s", { time: fmtTime(r.generated_at), s: r.duration })}{r.gstat ? "" : ` · ${t("without gstat")}`}</span>
+            <span className="muted">{t("Checked {time} in {s} s", { time: fmtTime(r.generated_at), s: r.duration })}{r.gstat ? "" : ` · ${t("without gstat")}`}{r.schedule ? ` · ${t("by the scheduled check-up {name}", { name: r.schedule.name })}` : ""}</span>
           </div>
+          {r.fixed && r.fixed.length > 0 && <div className="muted">{t("Selectivity recomputed by the schedule: {names}", { names: r.fixed.join(", ") })}</div>}
           <Facts r={r} />
           {r.checks.filter((c) => c.status === "error").map((c) => (
             <div key={c.name} className="err">{t("Could not check {name}: {error}", { name: c.name, error: c.error ?? "" })}</div>

@@ -110,6 +110,32 @@ The thresholds can be changed with `FBADMIN_CHECKUP_GAP_WARN` (transactions, def
 `FBADMIN_OVERVIEW_GAP_WARN` or 10000) and `FBADMIN_CHECKUP_LONG_TX` (seconds, default 1800). Running a
 check-up needs the admin level on the database; reading the last report needs read access.
 
+### Scheduled check-up
+
+**Schedule…** on the check-up page (or a *Performance check-up* job under
+[Scheduled jobs](MAINTENANCE.md#scheduled-jobs)) runs the check-up on a cron schedule. It alerts only
+on what is new since the previous run, so a database with a known, accepted note does not send the same
+message every night:
+
+* A finding is **new** when it was not there in the previous run, when it got more severe (a warning
+  that became critical), or when it names objects it did not name before. For example, another index
+  with outdated selectivity after a load, or another long transaction.
+* **Alert on**: new warnings and critical findings (the default), or new critical findings only. Notes
+  never alert.
+* **Never alert on**: finding types to leave out, such as a page cache you sized on purpose.
+* **Recompute missing or outdated selectivity at once**: the usual fix after a bulk load. The indices
+  are recomputed right after the check-up and their findings are not alerted on. The run's history and
+  the report list them.
+* **Include gstat** reads the whole database; turn it off for a large database checked often.
+  Outdated selectivity and record versions need gstat; missing selectivity does not.
+
+Messages go to the alert rules on the `checkup.findings` [event](ALERTS.md#events). There is one message
+per run with new findings (critical when one of them is), listing the new ones and how many earlier ones
+are still there. One *resolved* message follows when nothing is left to alert on. The scheduled run's
+report becomes the check-up page's report, marked *by the scheduled check-up …*. The run also appears
+in the database's [timeline](TIMELINE.md). A run whose findings are not all gone shows the status
+*findings*. Scheduling a check-up needs the admin level on the database, like any scheduled job.
+
 ### AI inspection
 
 When the AI assistant is on (`FBADMIN_AI_PROVIDER=anthropic`, see the [AI assistant](QUERY_TOOL.md#ai-assistant-opt-in)),

@@ -50,12 +50,16 @@ export interface TraceEvent { seq: number; time: string; pid: number; type: stri
 export interface TraceTemplate { id: string; label: string; description: string; params: Record<string, number> }
 
 export interface Schedule {
-  id: string; name: string; kind: "backup" | "sweep" | "validate" | "schema_snapshot" | "schema_drift" | "restore_drill" | "notebook"; server_id: string; database_id: string; cron: string;
+  id: string; name: string; kind: "backup" | "sweep" | "validate" | "schema_snapshot" | "schema_drift" | "restore_drill" | "notebook" | "checkup"; server_id: string; database_id: string; cron: string;
   enabled: boolean; keep: number; options: Record<string, any>; created_at: number; last_run: number | null;
   last_status: string | null; next_run: number | null;
   verify: boolean; verify_path: string | null; upload: { target_id: string; prefix: string; keep: number } | null;
   drift: DriftOptions | null; encrypt?: boolean; drill?: DrillOptions | null;
   notebook?: NotebookScheduleOptions | null;
+  checkup?: CheckupScheduleOptions | null;
+}
+export interface CheckupScheduleOptions {
+  gstat: boolean; min_severity: "critical" | "warning"; fix_selectivity: boolean; ignore: string[];
 }
 export interface NotebookScheduleOptions {
   notebook_id: string; channels: string[]; send: "always" | "rows" | "error"; read_only: boolean; save_results: boolean; attach_csv: boolean;
@@ -96,6 +100,7 @@ export interface HistoryItem {
   drift?: boolean; summary?: Record<DriftStatus, number>; ignored?: number; baseline?: string; encrypted?: string;
   drill_ok?: boolean; backup?: string | null; age_hours?: number | null; recovery_seconds?: number | null; rows?: number | null; failed_checks?: string[];
   notebook?: string; cells?: number; saved?: boolean; sent?: string[]; delivery_errors?: string[];
+  new?: string[]; fixed?: string[]; alerted?: Record<string, { severity: string; labels: string[]; title: string }>; check_errors?: string[];
 }
 
 export const mapi = {

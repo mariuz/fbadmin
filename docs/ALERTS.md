@@ -81,6 +81,7 @@ database.
 | `validation.errors` | A scheduled online validation reported errors. |
 | `upload.failed` | A backup could not be uploaded to its [cloud storage target](MAINTENANCE.md#cloud-storage-targets). |
 | `query.regression` | A statement got slower, or changed its plan and got slower ([Query regressions](MONITORING.md#query-regressions)). Sent again when the regression changes, and once (*resolved*) when it is back to normal. |
+| `checkup.findings` | A [scheduled check-up](MONITORING.md#scheduled-check-up) has new findings: a finding that appears, gets more severe or names new objects. One *resolved* message follows when they are gone. |
 | `capacity.forecast` | A [capacity forecast](MONITORING.md#capacity-forecast) finds a limit near: the space budget, the transaction counter, a sequence's column or a table's 255 formats. Sent once per finding and severity, when it appears or gets worse. |
 | `restore.drill_failed` | A [restore drill](BACKUP_ENCRYPTION_DRILLS.md#restore-drills) failed: no backup or too old, missing key, the restore, the validation or reading a table failed. When a drill works again, one *resolved* message follows. |
 | `schema.drift` | A scheduled [drift check](SCHEMA_DRIFT.md) found differences from its baseline. A different drift is sent at once, even during the cool-down; when the drift is gone, one *resolved* message follows. |

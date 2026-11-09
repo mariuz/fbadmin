@@ -438,6 +438,7 @@ _SCHEDULE_KINDS = {
     "validate": ("maintenance", "Scheduled validation"), "restore_drill": ("backup", "Restore drill"),
     "schema_snapshot": ("schema", "Schema snapshot"), "schema_drift": ("schema", "Schema drift check"),
     "notebook": ("data", "Scheduled notebook"),
+    "checkup": ("maintenance", "Scheduled check-up"),
 }
 
 
@@ -460,7 +461,7 @@ def _schedules(server_id: str, db_id: str, since, until) -> list[dict]:
         for k, v in extra.items():
             if v not in (None, "", [], {}):
                 lines.append(f"{k.replace('_', ' ')}: {v if not isinstance(v, (dict, list)) else json.dumps(v, default=str)[:600]}")
-        status = {"finished": "ok", "failed": "failed", "drift": "warning"}.get(h.get("status"), h.get("status") or "ok")
+        status = {"finished": "ok", "failed": "failed", "drift": "warning", "findings": "warning"}.get(h.get("status"), h.get("status") or "ok")
         out.append(_ev("schedule", f"{h.get('schedule_id')}:{i}", ts, cat, h.get("kind") or "job",
                        f"{label}: {h.get('schedule_name')}", detail="\n".join(lines) or None, status=status,
                        error=h.get("error"),

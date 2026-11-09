@@ -13,7 +13,7 @@ day, to answer "what changed before it broke?".
 | **Backups** | backups made in fbadmin, restores over the database, nbackup runs and locks | fbadmin's event log |
 | | scheduled backups (with their test restores and uploads), [restore drills](BACKUP_ENCRYPTION_DRILLS.md) | the scheduler |
 | | nbackup history | `RDB$BACKUP_HISTORY` |
-| **Maintenance** | sweeps, validation, shutdown and online, property changes (sweep interval, page buffers, forced writes…), encryption, limbo transactions, recomputed index selectivity, scheduled sweeps and validation | fbadmin's event log, the scheduler |
+| **Maintenance** | sweeps, validation, shutdown and online, property changes (sweep interval, page buffers, forced writes…), encryption, limbo transactions, recomputed index selectivity, scheduled sweeps and validation, [scheduled check-ups](MONITORING.md#scheduled-check-up) (a run with findings to alert on is a warning) | fbadmin's event log, the scheduler |
 | **Upgrades** | the server's Firebird version or the database's on-disk structure (ODS) changed since fbadmin last looked; upgrade trials | fbadmin's event log |
 | **Alerts** | alerts sent for the database or its server | the [alert](ALERTS.md) history |
 | **Audit log** | SQL run on the database: DDL, DML and other statements, plus queries with **Include queries from the audit log**. Shown to fbadmin administrators only. | the [audit log](SECURITY.md) (server mode) |

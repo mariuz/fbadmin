@@ -20,6 +20,7 @@ export interface CheckupReport {
   checks: { name: string; status: "done" | "error"; error?: string }[];
   findings: CheckupFinding[];
   ai?: AiItem[];
+  schedule?: { id: string; name: string }; fixed?: string[];
 }
 export interface AiItem { question: string | null; answer: string; at: number; provider?: string; model?: string }
 export interface CheckupState { report: CheckupReport | null; job: { id: string; status: string; error: string | null; log: string[] } | null }
