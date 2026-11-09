@@ -121,9 +121,11 @@ def test_forecast_of_a_database(client, database, receiver, monkeypatch):  # noq
     F._last.clear()
     with F._store()._lock:
         F._store()._db.execute("UPDATE forecast_obs SET ts = ts - 7200 WHERE server_id = ? AND db_id = ?", (sid, dbid))
-    n = F.observations(sid, dbid)
+    assert F.observations(sid, dbid)[-1]["ts"] < time.time() - 3600
     client.post(base + "/monitoring/history/sample")
-    assert len(F.observations(sid, dbid)) == len(n) + 1
+    obs = F.observations(sid, dbid)
+    assert obs[-1]["ts"] > time.time() - 60  # recorded once (by this sample or the background sampler)
+    assert sum(1 for o in obs if o["ts"] > time.time() - 60) == 1
     client.put(base + "/monitoring/history/tracking", json={"enabled": False})
     client.delete(base + "/monitoring/history")
     assert F.observations(sid, dbid) == []

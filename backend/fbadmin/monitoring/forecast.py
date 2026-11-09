@@ -47,6 +47,7 @@ CRIT_PCT, WARN_PCT = 95.0, 80.0
 
 _init_lock = threading.Lock()
 _last: dict[tuple[str, str], float] = {}
+_due_lock = threading.Lock()
 
 
 # ===================================================================== storage (monitoring.sqlite)
@@ -171,12 +172,20 @@ def read(conn) -> dict[str, Any]:
 def observe(conn, server_id: str, db_id: str, force: bool = False) -> dict[str, Any] | None:
     """Record an observation unless one was recorded less than ``MIN_INTERVAL`` ago."""
     key = (server_id, db_id)
-    if key not in _last:
-        last = observations(server_id, db_id, since=time.time() - MIN_INTERVAL)
-        _last[key] = last[-1]["ts"] if last else 0
-    if not force and time.time() - _last[key] < MIN_INTERVAL:
-        return None
-    obs = read(conn)
+    with _due_lock:  # the history sampler and the page may ask at the same moment: only one records
+        if key not in _last:
+            last = observations(server_id, db_id, since=time.time() - MIN_INTERVAL)
+            _last[key] = last[-1]["ts"] if last else 0
+        if not force and time.time() - _last[key] < MIN_INTERVAL:
+            return None
+        before = _last[key]
+        _last[key] = time.time()  # reserved; reading the database happens outside the lock
+    try:
+        obs = read(conn)
+    except Exception:
+        with _due_lock:
+            _last[key] = before
+        raise
     add_observation(server_id, db_id, obs)
     return obs
 
