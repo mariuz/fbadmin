@@ -32,3 +32,4 @@ import "./timeline";
 import "./anonymise";
 import "./links";
 import "./forecast";
+import "./changes";

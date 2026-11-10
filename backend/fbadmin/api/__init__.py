@@ -44,6 +44,7 @@ from . import timeline
 from . import anonymise
 from . import links
 from . import forecast
+from . import changes
 
 ROUTERS: list[APIRouter] = [
     servers.router,
@@ -90,4 +91,5 @@ ROUTERS: list[APIRouter] = [
     anonymise.router,
     links.router,
     forecast.router,
+    changes.router,
 ]

@@ -1011,6 +1011,150 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Requests */
+        get: operations["list_requests_api_changes_get"];
+        put?: never;
+        /** Create */
+        post: operations["create_api_changes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/changes/{cid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get One */
+        get: operations["get_one_api_changes__cid__get"];
+        /** Edit */
+        put: operations["edit_api_changes__cid__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/changes/{cid}/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Apply
+         * @description Apply an approved change (as a job). Refused when the schema changed since the dry run.
+         */
+        post: operations["apply_api_changes__cid__apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/changes/{cid}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve */
+        post: operations["approve_api_changes__cid__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/changes/{cid}/comments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Comment */
+        post: operations["comment_api_changes__cid__comments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/changes/{cid}/dry-run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Dry Run
+         * @description Run the change on a scratch copy of the database and keep the report (schema changes) on the request.
+         */
+        post: operations["dry_run_api_changes__cid__dry_run_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/changes/{cid}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reject */
+        post: operations["reject_api_changes__cid__reject_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/changes/{cid}/withdraw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Withdraw */
+        post: operations["withdraw_api_changes__cid__withdraw_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/datacompare/compare": {
         parameters: {
             query?: never;
@@ -6094,6 +6238,44 @@ export interface components {
              */
             type?: "sql" | "markdown";
         };
+        /** ChangeEdit */
+        ChangeEdit: {
+            /** Description */
+            description?: string | null;
+            /** Scripts */
+            scripts?: components["schemas"]["ScriptItem"][] | null;
+            /** Sql */
+            sql?: string | null;
+            /** Title */
+            title?: string | null;
+        };
+        /** ChangeIn */
+        ChangeIn: {
+            /** Database Id */
+            database_id: string;
+            /**
+             * Description
+             * @default
+             */
+            description?: string;
+            /**
+             * Kind
+             * @default sql
+             * @enum {string}
+             */
+            kind?: "sql" | "migrations";
+            /** Scripts */
+            scripts?: components["schemas"]["ScriptItem"][];
+            /** Server Id */
+            server_id: string;
+            /**
+             * Sql
+             * @default
+             */
+            sql?: string;
+            /** Title */
+            title: string;
+        };
         /** ChannelIn */
         ChannelIn: {
             /**
@@ -6549,21 +6731,6 @@ export interface components {
             driver?: string | null;
             /** Fbclient */
             fbclient?: string | null;
-        };
-        /** DryRunIn */
-        DryRunIn: {
-            /** Copy Mode */
-            copy_mode?: ("metadata" | "full") | null;
-            /** Out Of Order */
-            out_of_order?: boolean | null;
-            /** Scratch */
-            scratch?: string | null;
-            /** Scripts */
-            scripts?: components["schemas"]["ScriptIn"][] | null;
-            /** Source Ref */
-            source_ref?: string | null;
-            /** Target */
-            target?: string | null;
         };
         /** EncryptIn */
         EncryptIn: {
@@ -7533,6 +7700,13 @@ export interface components {
             /** Sql */
             sql: string;
         };
+        /** ScriptItem */
+        ScriptItem: {
+            /** Name */
+            name: string;
+            /** Sql */
+            sql: string;
+        };
         /** ServerIn */
         ServerIn: {
             /** Auth Plugin */
@@ -7885,6 +8059,14 @@ export interface components {
             /** Name */
             name?: string | null;
         };
+        /** TextIn */
+        TextIn: {
+            /**
+             * Text
+             * @default
+             */
+            text?: string;
+        };
         /** TokenIn */
         TokenIn: {
             /**
@@ -8111,6 +8293,17 @@ export interface components {
             /** Username */
             username: string;
         };
+        /** DryRunIn */
+        fbadmin__api__changes__DryRunIn: {
+            /**
+             * Copy Mode
+             * @default metadata
+             * @enum {string}
+             */
+            copy_mode?: "metadata" | "full";
+            /** Scratch */
+            scratch?: string | null;
+        };
         /** ExecuteIn */
         fbadmin__api__databases__ExecuteIn: {
             /** Sql */
@@ -8243,6 +8436,21 @@ export interface components {
              * @default false
              */
             skip_dry_run?: boolean;
+            /** Source Ref */
+            source_ref?: string | null;
+            /** Target */
+            target?: string | null;
+        };
+        /** DryRunIn */
+        fbadmin__api__migrations__DryRunIn: {
+            /** Copy Mode */
+            copy_mode?: ("metadata" | "full") | null;
+            /** Out Of Order */
+            out_of_order?: boolean | null;
+            /** Scratch */
+            scratch?: string | null;
+            /** Scripts */
+            scripts?: components["schemas"]["ScriptIn"][] | null;
             /** Source Ref */
             source_ref?: string | null;
             /** Target */
@@ -10570,6 +10778,340 @@ export interface operations {
             header?: never;
             path: {
                 key_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_requests_api_changes_get: {
+        parameters: {
+            query?: {
+                server_id?: string | null;
+                database_id?: string | null;
+                status?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_api_changes_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_one_api_changes__cid__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    edit_api_changes__cid__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangeEdit"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    apply_api_changes__cid__apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_api_changes__cid__approve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["TextIn"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    comment_api_changes__cid__comments_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TextIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    dry_run_api_changes__cid__dry_run_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["fbadmin__api__changes__DryRunIn"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reject_api_changes__cid__reject_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TextIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    withdraw_api_changes__cid__withdraw_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cid: string;
             };
             cookie?: never;
         };
@@ -16053,7 +16595,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["DryRunIn"];
+                "application/json": components["schemas"]["fbadmin__api__migrations__DryRunIn"];
             };
         };
         responses: {

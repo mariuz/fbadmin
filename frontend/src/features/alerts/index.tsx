@@ -24,6 +24,7 @@ const EVENT_LABELS: Record<string, string> = {
   "schema.drift": N_("Schema drift found by a scheduled check (and when it is gone)"),
   "restore.drill_failed": N_("A restore drill failed (and when a drill works again)"),
   "query.regression": N_("A statement got slower or changed its plan for the worse (and when it is back to normal)"),
+  "change.request": N_("A change request is submitted, approved, rejected, applied or fails"),
   "checkup.findings": N_("A scheduled performance check-up has new findings (and when they are gone)"),
   "capacity.forecast": N_("A capacity forecast finds a limit near: the space budget, a sequence's column, table formats"),
   oat_gap: N_("Transaction gap (next - OAT) above threshold"),

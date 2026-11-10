@@ -5,7 +5,7 @@ day, to answer "what changed before it broke?".
 
 | Category | What | From |
 |---|---|---|
-| **Schema** | DDL run from the Query Tool and the object dialogs (failed statements too), dropped objects, schema imports | fbadmin's event log |
+| **Schema** | DDL run from the Query Tool and the object dialogs (failed statements too), dropped objects, schema imports, [change requests](CHANGE_REQUESTS.md) (proposed, reviewed, applied) | fbadmin's event log |
 | | commits of the [schema history](SCHEMA_HISTORY.md) repository, with the objects they added, changed or dropped | the schema history repository, when configured |
 | | [versioned migrations](MIGRATIONS.md) applied | `FBADMIN_MIGRATIONS` in the database |
 | | scheduled schema snapshots and [drift checks](SCHEMA_DRIFT.md) (drift is a warning) | the scheduler |

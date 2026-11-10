@@ -82,6 +82,7 @@ nav:
       - Schema drift detection: SCHEMA_DRIFT.md
       - Database timeline: TIMELINE.md
       - Versioned migrations: MIGRATIONS.md
+      - Change requests: CHANGE_REQUESTS.md
       - Data compare: DATA_COMPARE.md
       - Anonymised copies: ANONYMISED_COPIES.md
       - Firebird 6 and SQL schemas: FIREBIRD6.md

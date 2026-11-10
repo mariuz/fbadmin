@@ -1,0 +1,23 @@
+/* change requests */
+.cr { display: grid; grid-template-columns: minmax(220px, 300px) 1fr; gap: 12px; align-items: start; }
+@media (max-width: 760px) { .cr { grid-template-columns: 1fr; } }
+.cr .cr-side { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.cr .cr-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.cr .cr-item { width: 100%; text-align: left; display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: baseline; padding: 6px 8px;
+  border: 1px solid var(--border); border-radius: var(--radius); background: var(--panel-2); color: var(--text); cursor: pointer; font: inherit; }
+.cr .cr-item.sel { border-color: var(--accent); }
+.cr .cr-num { color: var(--muted); font-variant-numeric: tabular-nums; }
+.cr .cr-ttl { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.cr .cr-meta { width: 100%; font-size: 11px; }
+.cr .cr-main { min-width: 0; }
+.cr .cr-empty { padding: 20px 0; }
+.cr .cr-desc { white-space: pre-wrap; margin: 0 0 8px; }
+.cr .cr-actions { flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+.cr .cr-approvals { margin: 8px 0; display: flex; flex-direction: column; gap: 2px; }
+.cr .cr-review { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
+.cr .cr-editor { height: 220px; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.cr .cr-files ul { list-style: none; padding: 0; margin: 6px 0; }
+.cr .cr-changes { list-style: none; padding: 0; margin: 6px 0; display: flex; flex-direction: column; gap: 6px; }
+.cr .cr-chg { display: inline-block; min-width: 64px; font-weight: 600; }
+.cr .cr-history { list-style: none; padding: 0; margin: 0 0 8px; display: flex; flex-direction: column; gap: 6px; }
+.cr .cr-comment { white-space: pre-wrap; border-left: 3px solid var(--border); padding-left: 8px; margin-top: 2px; }

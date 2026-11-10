@@ -48,6 +48,8 @@ EVENTS: list[dict[str, Any]] = [
      "label": "A restore drill failed (and when a drill works again)"},
     {"id": "query.regression", "kind": "event", "threshold": None,
      "label": "A statement got slower or changed its plan for the worse (and when it is back to normal)"},
+    {"id": "change.request", "kind": "event", "threshold": None,
+     "label": "A change request is submitted, approved, rejected, applied or fails"},
     {"id": "checkup.findings", "kind": "event", "threshold": None,
      "label": "A scheduled performance check-up has new findings (and when they are gone)"},
     {"id": "capacity.forecast", "kind": "event", "threshold": None,
