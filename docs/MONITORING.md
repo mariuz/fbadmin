@@ -22,6 +22,7 @@ Open it from a database's context menu (**Performance check-up**, **Performance 
 | Index advisor | ✓ | ✓ | ✓ (plus the statement cache as a workload) |
 | Performance check-up | ✓ | ✓ | ✓ (server mode from `RDB$CONFIG` on 4 and 5) |
 | Capacity forecast (size, transactions, sequences, formats) | ✓ | ✓ | ✓ (and `INT128` columns on 4 and 5) |
+| Continuous trace (statements as they finish, with explained plans) | ✓ | ✓ | ✓ |
 
 Features are detected at runtime (by looking for the system tables or packages), not by version.
 Where a feature is missing the UI says so instead of failing.
@@ -58,7 +59,8 @@ Ranges: 1 h, 6 h, 24 h, 3 d, 7 d (down-sampled to 500 points).
 
 While sampling, statements that have been running for longer than *slow_seconds* are recorded
 (SQL text, explained plan, longest duration, how often seen). They are listed under the history
-charts and feed the index advisor.
+charts and feed the index advisor. With the [continuous trace](#continuous-trace) on, every slow
+statement is recorded when it finishes instead.
 
 Settings (**Settings** sub-tab, or `PUT /api/monitoring/settings`); environment variables give
 the defaults:
@@ -69,6 +71,32 @@ the defaults:
 | `retention_hours` | `FBADMIN_HISTORY_RETENTION_HOURS` | 168 |
 | `slow_seconds` (0 = off) | `FBADMIN_HISTORY_SLOW_SECONDS` | 5 |
 | `metrics_enabled` | `FBADMIN_METRICS` | off |
+
+### Continuous trace
+
+The sampler sees only the statements running at the moment it samples. A statement that takes three
+seconds between two samples a minute apart is never seen. **Continuous trace** (in the **History** tab,
+once the history is recorded) keeps a [trace session](MAINTENANCE.md#trace-api) running for the database.
+The session reports each statement when it finishes, with its exact duration and plan.
+
+* Statements slower than the threshold you set (200 ms by default) are recorded as runs for
+  [query regressions](#query-regressions). The ones slower than *slow_seconds* also go to the slow
+  statement list. Plans are captured with `explain_plan`, the same format as `MON$EXPLAINED_PLAN`, so
+  turning the trace on does not look like a plan change.
+* While the trace runs, the sampler and the Query Tool stop recording runs and slow statements of that
+  database: the trace sees them all, and counting them twice would skew the medians. A statement still
+  running shows in the live dashboard, and is recorded when it finishes.
+* fbadmin keeps the session running. It starts one when the trace is turned on and when fbadmin
+  starts, and a new one when the session ends (the server restarted, or someone stopped it). After a
+  failure it waits 30 s, doubling up to 10 minutes. The panel shows the session, the statements
+  recorded, the last error and the next try.
+* At most 6000 statements a minute are recorded per database (`FBADMIN_TRACE_CAPTURE_PER_MINUTE`); the
+  rest are counted as dropped. Raise the threshold on a busy database.
+* The session is named *fbadmin continuous capture: <database>*. It writes no log file, and it runs as
+  the Firebird user of the server registration. Without SYSDBA (or the `TRACE_ANY_ATTACHMENT`
+  privilege) it sees only that user's own connections.
+* Turning the history off (or deleting it) stops the trace. In server mode, turning it on needs the
+  *admin* level on the database; the session then runs as the user who turned it on.
 
 ## Performance check-up
 
@@ -390,6 +418,7 @@ All under `/api/servers/{sid}/databases/{dbid}/monitoring` unless noted.
 | GET | `/locks` | lock waits, blockers, config |
 | GET | `/history?hours=&max_points=` | stored samples with rates |
 | PUT | `/history/tracking` `{enabled}` | opt a database in/out |
+| GET/PUT | `/trace-capture` `{enabled, threshold_ms}` | the continuous trace: settings and state |
 | POST | `/history/sample` | sample now |
 | DELETE | `/history` | delete stored samples |
 | GET | `/history/slow` | slow statement log |

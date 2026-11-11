@@ -4396,6 +4396,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/servers/{server_id}/databases/{db_id}/monitoring/trace-capture": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Capture
+         * @description The settings and the state of the continuous trace session.
+         */
+        get: operations["get_capture_api_servers__server_id__databases__db_id__monitoring_trace_capture_get"];
+        /**
+         * Set Capture
+         * @description Turn the capture on or off (it needs the database's history to be recorded) and change its threshold.
+         */
+        put: operations["set_capture_api_servers__server_id__databases__db_id__monitoring_trace_capture_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/servers/{server_id}/databases/{db_id}/monitoring/transactions": {
         parameters: {
             query?: never;
@@ -6219,6 +6243,16 @@ export interface components {
         CancelIn: {
             /** Run Id */
             run_id: string;
+        };
+        /** CaptureIn */
+        CaptureIn: {
+            /** Enabled */
+            enabled: boolean;
+            /**
+             * Threshold Ms
+             * @default 200
+             */
+            threshold_ms?: number;
         };
         /** Cell */
         Cell: {
@@ -17886,6 +17920,74 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_capture_api_servers__server_id__databases__db_id__monitoring_trace_capture_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                server_id: string;
+                db_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_capture_api_servers__server_id__databases__db_id__monitoring_trace_capture_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                server_id: string;
+                db_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CaptureIn"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

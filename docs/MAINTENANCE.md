@@ -99,6 +99,9 @@ tail, inspect an event, **stop** the session, **save the full log** (written to
 `isc_action_svc_trace_list`) and can be stopped. Configuration errors are reported by the
 server per database when it is attached and show up as `TRACE_CONFIG_ERROR` events.
 
+An always-on session that feeds the slow statement log and query regressions is the
+[continuous trace](MONITORING.md#continuous-trace) of the History tab.
+
 ![trace](screenshots/maintenance-trace.png)
 
 ## Encryption

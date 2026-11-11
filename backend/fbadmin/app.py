@@ -23,6 +23,7 @@ from .metadata import OBJECT_TYPES
 from .plugins import load_plugins
 from .schema_ctx import current_schema, valid_schema
 from .monitoring.history import start_sampler
+from .monitoring.trace_capture import start_supervisor as start_trace_capture
 from .middleware import install_middleware
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -46,12 +47,14 @@ async def lifespan(app: FastAPI):
     scheduler.startup()
     alert_engine.startup()
     sampler = start_sampler()
+    capture = start_trace_capture()  # continuous trace sessions of the databases that opted in
     sec = get_state().security
     if sec.audit.enabled:
         sec.forwarder.start()  # audit log forwarding to syslog / webhooks
     yield
     sec.forwarder.stop()
     sampler.stop()
+    capture.stop()
     scheduler.shutdown()
     alert_engine.shutdown()
     stop.set()

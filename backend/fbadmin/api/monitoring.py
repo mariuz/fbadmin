@@ -101,6 +101,10 @@ def set_tracking(server_id: str, db_id: str, body: TrackingIn):
     db = get_state().store.get_database(server_id, db_id)
     cred = runas.issue(server_id, f"history: {db.name}") if body.enabled else None
     runas.revoke(store.set_tracked(server_id, db_id, body.enabled, run_as=cred))
+    if not body.enabled:
+        from ..monitoring import trace_capture
+
+        trace_capture.stop(server_id, db_id)  # it records into the history: it stops with it
     if body.enabled:
         try:
             history.sample_database(server_id, db_id)

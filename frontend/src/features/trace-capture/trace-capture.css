@@ -1,0 +1,3 @@
+.tcap { border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 10px; margin-bottom: 10px; display: flex; flex-direction: column; gap: 4px; }
+.tcap .tcap-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.tcap .tcap-stats .err { margin-top: 2px; }

@@ -167,6 +167,9 @@ class HistoryStore:
             self._db.execute("DELETE FROM slow_statements WHERE server_id = ? AND db_id = ?", (server_id, db_id))
         regressions.forget(self, server_id, db_id)
         forecast.forget(server_id, db_id)
+        from . import trace_capture
+
+        trace_capture.forget(server_id, db_id)
 
     # ---------------------------------------------------------------- slow statements
     def add_slow(self, server_id: str, db_id: str, sql_text: str, plan: str | None, seconds: float) -> None:
@@ -215,7 +218,10 @@ def sample_database(server_id: str, db_id: str) -> dict[str, Any]:
     from ..query import end_transaction
 
     store = get_store()
-    slow_after = store.get_settings()["slow_seconds"]
+    from . import trace_capture
+
+    # a continuous trace records every slow statement when it finishes: the sampler leaves them to it
+    slow_after = 0 if trace_capture.active(server_id, db_id) else store.get_settings()["slow_seconds"]
     try:
         with get_state().manager.meta(server_id, db_id) as conn:
             snap = probes.snapshot(conn)

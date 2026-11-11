@@ -45,6 +45,7 @@ from . import anonymise
 from . import links
 from . import forecast
 from . import changes
+from . import trace_capture
 
 ROUTERS: list[APIRouter] = [
     servers.router,
@@ -92,4 +93,5 @@ ROUTERS: list[APIRouter] = [
     links.router,
     forecast.router,
     changes.router,
+    trace_capture.router,
 ]

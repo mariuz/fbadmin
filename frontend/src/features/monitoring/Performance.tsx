@@ -6,6 +6,7 @@ import { SqlEditor } from "../../components/SqlEditor";
 import { LineChart, type Series } from "./LineChart";
 import { N_, t } from "../../i18n";
 import { fmtAge, fmtBytes, fmtNum, fmtTs, monApi, type Features, type MonSettings, type Sample, type Snapshot } from "./api";
+import { TraceCapturePanel } from "../trace-capture";
 
 type Props = { serverId: string; dbId: string; visible: boolean };
 
@@ -205,6 +206,7 @@ function HistoryPanel(props: Props) {
           {" "}{t("{n} samples in range.", { n: data.samples.length })}
         </div>
       )}
+      {data && <TraceCapturePanel serverId={props.serverId} dbId={props.dbId} tracked={!!tracking} />}
       <ChartGrid points={points} loading={loading} longRange={hours > 24} />
       <SlowStatements {...props} />
     </>
@@ -218,7 +220,7 @@ function SlowStatements(props: Props) {
   if (!rows.length) return null;
   return (
     <>
-      <h3>{t("Slow statements seen by the sampler")}</h3>
+      <h3>{t("Slow statements")}</h3>
       <div className="grid-wrap">
         <table className="grid">
           <thead><tr><th>{t("Max duration")}</th><th>{t("Seen")}</th><th>{t("Last seen")}</th><th>{t("SQL")}</th><th /></tr></thead>

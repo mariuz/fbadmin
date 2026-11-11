@@ -117,7 +117,7 @@ function RegressionsTab(props: { serverId: string; dbId: string; visible: boolea
   return (
     <div className="mt-body reg">
       <Section wide title={t("Query regressions")}
-        hint={t("Statements seen by the history sampler and slow Query Tool statements, with their plans over time. A statement regressed when its recent runs are much slower than its baseline, or its plan changed and it got slower.")}
+        hint={t("Statements seen by the history sampler (or the continuous trace, when it is on) and slow Query Tool statements, with their plans over time. A statement regressed when its recent runs are much slower than its baseline, or its plan changed and it got slower.")}
         right={<><button className="btn small" aria-expanded={settings} onClick={() => setSettings(!settings)}>{t("Settings…")}</button>
           <button className="btn small" onClick={load} aria-label={t("Refresh")}><IconRefresh size={12} /></button></>}>
         {data && !data.tracking && <div className="alerts"><div className="alert warning"><span className="lvl">{t("off")}</span><span>

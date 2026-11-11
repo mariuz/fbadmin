@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import collections
+import contextlib
 import re
 import threading
 import time
@@ -150,8 +151,20 @@ def parse_session_list(lines: list[str]) -> list[dict]:
     return out
 
 
+class _NoFile:
+    def write(self, _s: str) -> None:
+        pass
+
+    def flush(self) -> None:
+        pass
+
+
 class TraceSession:
-    def __init__(self, server_id: str, name: str, config: str, template: str, database: str | None):
+    """A trace session read in a background thread. ``keep_file`` False: no output file (continuous capture);
+    ``on_event``: called with each parsed event (in the reading thread; it must not raise)."""
+
+    def __init__(self, server_id: str, name: str, config: str, template: str, database: str | None, *,
+                 keep_file: bool = True, on_event=None):
         self.id = uuid.uuid4().hex[:12]
         self.server_id = server_id
         self.name = name
@@ -166,7 +179,8 @@ class TraceSession:
         self.events: collections.deque[dict] = collections.deque(maxlen=MAX_EVENTS)
         self.event_count = 0
         self.line_count = 0
-        self.file = settings.data_dir / "traces" / f"{self.id}.log"
+        self.file = settings.data_dir / "traces" / f"{self.id}.log" if keep_file else None
+        self.on_event = on_event
         self._lock = threading.Lock()
         self._pending: tuple[re.Match, list[str]] | None = None
         self._stop = threading.Event()
@@ -186,7 +200,13 @@ class TraceSession:
         self._pending = None
         with self._lock:
             self.event_count += 1
-            self.events.append(parse_event(self.event_count, header, body))
+            ev = parse_event(self.event_count, header, body)
+            self.events.append(ev)
+        if self.on_event is not None:
+            try:
+                self.on_event(ev)
+            except Exception:  # noqa: BLE001 - a consumer must not stop the session
+                pass
 
     def feed(self, line: str, out) -> None:
         self.line_count += 1
@@ -214,9 +234,11 @@ class TraceSession:
             self._pending[1].append(line.rstrip())
 
     def run(self, service_factory) -> None:
-        self.file.parent.mkdir(parents=True, exist_ok=True)
+        if self.file is not None:
+            self.file.parent.mkdir(parents=True, exist_ok=True)
         try:
-            with service_factory() as svc, open(self.file, "a", encoding="utf-8") as out:
+            with service_factory() as svc, (open(self.file, "a", encoding="utf-8") if self.file is not None
+                                            else contextlib.nullcontext(_NoFile())) as out:
                 S.start(svc, S.Spb(S.ACT_TRACE_START).str(S.TRC_NAME, self.name).str(S.TRC_CFG, self.config))
                 while True:
                     line, finished = S.read_line(svc, 1)
@@ -279,7 +301,7 @@ class TraceManager:
 
     def remove(self, local_id: str) -> None:
         sess = self.sessions.pop(local_id, None)
-        if sess:
+        if sess and sess.file is not None:
             Path(sess.file).unlink(missing_ok=True)
 
 

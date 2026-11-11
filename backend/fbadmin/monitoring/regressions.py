@@ -346,6 +346,10 @@ def after_sql(server_id: str, db_id: str, result: dict[str, Any]) -> None:
         store = history.get_store()
         if not store.is_tracked(server_id, db_id):
             return
+        from . import trace_capture
+
+        if trace_capture.active(server_id, db_id):
+            return  # the continuous trace records these runs (with their plans) when they finish
         s = store.get_settings()
         min_ms = float(s["regression_query_ms"])
         now = time.time()
