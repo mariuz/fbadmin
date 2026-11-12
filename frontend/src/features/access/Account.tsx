@@ -177,7 +177,7 @@ function TokensSection(props: { visible: boolean }) {
               <td><TokenStatus status={tk.status} /></td>
               <td>{tk.status === "active" && (
                 <button className="btn small danger" onClick={() => confirm(t("Revoke token \"{name}\"? Scripts using it stop working.", { name: tk.name }))
-                  && run(async () => { await accessApi.revokeToken(tk.id); await load(); }, t("Token revoked"))}>{t("Revoke")}</button>
+                  && run(async () => { await accessApi.revokeToken(tk.id); await load(); }, t("Token revoked"))}>{t("Revoke@@token")}</button>
               )}</td>
             </tr>
           ))}</tbody>

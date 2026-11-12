@@ -3,6 +3,7 @@
  * Catalogs live in src/locales/<code>.json (keys are the English strings).
  */
 import { getPrefs } from "./prefs";
+import { untranslated } from "./i18n-context";
 
 export const LANGUAGES: Array<[string, string]> = [["en", "English"]];
 const catalogs: Record<string, Record<string, string>> = {};
@@ -21,10 +22,11 @@ export function currentLanguage(): string {
   return catalogs[base] ? base : "en";
 }
 
-/** Translate, then substitute {name} placeholders. */
+/** Translate, then substitute {name} placeholders.
+ *  A key may end in a context, ``"Line@@chart"`` (see i18n-context.ts); untranslated, it is dropped. */
 export function t(text: string, vars?: Record<string, string | number>): string {
   const cat = catalogs[currentLanguage()];
-  let out = (cat && cat[text]) || text;
+  let out = (cat && cat[text]) || untranslated(text);
   if (vars) for (const [k, v] of Object.entries(vars)) out = out.split(`{${k}}`).join(String(v));
   return out;
 }

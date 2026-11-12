@@ -12,7 +12,7 @@ scope.
 
 **Status:** milestones 0.1 to 2.0, the engineering backlog and the phone and tablet layout are
 implemented and verified in CI against real services. Firebird 6.0 final support waits for the
-6.0 release. Milestone 2.2 is done and 2.3 lacks only push notifications; milestones 2.1, 2.4 (comments and translation fixes left), 2.5 and 3.0 below are planned. The current release is **2.1.1** ([release notes](docs/release-notes/v2.1.1.md)): on
+6.0 release. Milestone 2.2 is done and 2.3 lacks only push notifications; milestones 2.1, 2.4 (comments left), 2.5 and 3.0 below are planned. The current release is **2.1.1** ([release notes](docs/release-notes/v2.1.1.md)): on
 [PyPI](https://pypi.org/project/firebird-admin/) (`pip install firebird-admin`), on
 [GitHub Releases](https://github.com/mariuz/fbadmin/releases) with desktop installers for Windows,
 macOS and Linux, as a Docker image, and documented at https://mariuz.github.io/fbadmin/.
@@ -273,7 +273,7 @@ Also fixed in this milestone:
 - ✅ **Change requests with approval:** a developer with read access proposes a SQL change or migration scripts; an administrator of the database runs a dry run on a copy that shows the schema diff, approves or rejects it with a comment (not their own, in server mode), and fbadmin applies it, refusing when the schema changed since the dry run; the request's history, the audit log, the timeline and the `change.request` alert record each step ([docs/CHANGE_REQUESTS.md](docs/CHANGE_REQUESTS.md))
 - ✅ **Continuous trace capture:** an optional always-on trace session per database (kept running by fbadmin, restarted with a backoff) feeding the slow statement log and query regressions with every statement that finishes above a threshold, with its explained plan, so no slow statement is missed between samples ([docs/MONITORING.md](docs/MONITORING.md#continuous-trace))
 - ⬜ **Comments** on objects and notebooks: short threads ("this index is needed by the nightly report") shown where the object is
-- ⬜ **Translation fixes:** the "Line" chart type and the token "Revoke" button in Czech, German and Russian share keys with other meanings
+- ✅ **Translation fixes:** keys can carry a context (`t("Line@@chart")`, English shows "Line"), so one English word gets two translations: the "Line" chart type is no longer "line number" (cs, de, ru) and the token "Revoke" button no longer "remove the privilege" (cs, de) ([docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#translations))
 
 ## Milestone 2.5 — Fleet view and follow-ups ⬜
 

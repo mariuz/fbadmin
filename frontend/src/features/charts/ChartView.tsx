@@ -15,7 +15,7 @@ import {
 } from "./shape";
 
 const TYPE_LABELS: Record<ChartType, string> = {
-  bar: N_("Bar"), hbar: N_("Horizontal bar"), stacked: N_("Stacked bar"), line: N_("Line"), area: N_("Area"),
+  bar: N_("Bar"), hbar: N_("Horizontal bar"), stacked: N_("Stacked bar"), line: N_("Line@@chart"), area: N_("Area"),
   pie: N_("Pie"), donut: N_("Donut"), scatter: N_("Scatter"),
 };
 const AGG_LABELS: Record<AggFn, string> = {

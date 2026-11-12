@@ -166,6 +166,20 @@ dicts, so their response types are still written by hand in `types.ts`.
 After merging branches that touch the API, regenerate the file instead of resolving
 conflicts in it by hand.
 
+## Translations
+
+UI strings are English keys: `t("Add server")` where they are shown, `N_("…")` for module-level constants
+that are translated later with `t(value)`. The catalogs are `frontend/src/locales/<lang>.json` (cs, de, es,
+fr, pt-BR, ro, ru).
+
+* `node frontend/scripts-i18n.mjs` adds new keys to every catalog (with an empty value) and removes keys no
+  longer used; `--check` fails while a value is empty (CI runs it).
+* Placeholders such as `{n}` stay as they are; a translation must keep every one of its key.
+* **A word with two meanings gets a context:** `t("Line@@chart")` is the chart type, `t("Line")` a line
+  number; `t("Revoke@@token")` revokes an API token, `t("Revoke")` a privilege. English shows the key without
+  its context; catalogs translate each key on its own. Add a context when one English word needs two
+  translations in some language, not before. `frontend/tests/i18n.test.ts` checks the catalogs.
+
 ## Frontend bundle
 
 `vite.config.ts` splits vendor code into long-lived chunks (`react`, `codemirror`,

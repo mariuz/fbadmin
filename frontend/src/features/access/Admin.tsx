@@ -252,7 +252,7 @@ function AllTokens(props: { visible: boolean }) {
               <td>{fmtTime(tk.created_at)}</td><td>{tk.expires_at ? fmtTime(tk.expires_at) : t("never")}</td>
               <td>{tk.last_used_at ? fmtTime(tk.last_used_at) : "—"}</td><td><TokenStatus status={tk.status} /></td>
               <td>{tk.status === "active" && <button className="btn small danger"
-                onClick={() => run(async () => { await accessApi.adminRevokeToken(tk.id); await load(); }, t("Token revoked"))}>{t("Revoke")}</button>}</td>
+                onClick={() => run(async () => { await accessApi.adminRevokeToken(tk.id); await load(); }, t("Token revoked"))}>{t("Revoke@@token")}</button>}</td>
             </tr>
           ))}</tbody>
         </table></div>
