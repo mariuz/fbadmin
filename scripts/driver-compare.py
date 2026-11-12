@@ -517,9 +517,9 @@ def main() -> int:
     if not ok:
         print(f"native driver unavailable: {why} (use --fbclient)", file=sys.stderr)
         return 2
-    from fbadmin.security import wirecompat
+    from fbadmin import driver_patches
 
-    wirecompat.apply()  # the app's firebirdsql fixes, as in the server
+    driver_patches.apply()  # the app's firebirdsql fixes, as in the server
 
     env = environment(a)
     results = []
