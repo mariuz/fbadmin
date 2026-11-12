@@ -14,13 +14,11 @@ from typing import Any
 def attach(state: Any) -> None:
     from ..config import settings as app_settings
     from ..connections import ConnectionManager
-    from . import wirecompat
     from .core import Security
     from .access import AccessScopedManager, AccessScopedStore  # per-database/object rights, API tokens
     from .servers import EncryptedServerStore, UserScopedJobs
     from .settings import load
 
-    wirecompat.apply()
     s = load(app_settings.data_dir)
     if s.server_mode:
         state.store = AccessScopedStore(app_settings.data_dir)

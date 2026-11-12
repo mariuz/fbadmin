@@ -357,6 +357,25 @@ keeps working:
   while decompressed bytes are already buffered (otherwise wire compression with a
   connection timeout stalled).
 
+### firebirdsql 1.5.1
+
+fbadmin requires [firebirdsql 1.5.1](https://pypi.org/project/firebirdsql/1.5.1/) or later. It
+carries the fixes fbadmin sent upstream ([pyfirebirdsql#144](https://github.com/nakagami/pyfirebirdsql/pull/144),
+[#145](https://github.com/nakagami/pyfirebirdsql/pull/145)), so fbadmin no longer patches them:
+
+- the parameter description continued in a second info request (the wrong assert above);
+- `rowcount` after executing a prepared statement: 1.5.1 asks about the statement that was executed,
+  in the same round trip as the execute;
+- wire compression: compression starts once the whole accept packet is read, the packet reader reads
+  the read-ahead buffer first, and no read waits in `select()` while decompressed bytes are buffered.
+  `security/wirecompat.py` is gone.
+
+1.5.1 also sends the execute, the first fetch and the row count request of a statement together and
+reads the replies afterwards: one round trip instead of two or three.
+
+The patches for binary and OCTETS parameters, result descriptors on Firebird 6, the Firebird 4+ types
+and the service process name remain (`driver_patches.py`); see [upstream-firebirdsql-fb4-types.md](upstream-firebirdsql-fb4-types.md).
+
 ### Prepared statements in fbadmin's loops
 
 Most of fbadmin's loops run one statement shape many times:

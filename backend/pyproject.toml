@@ -26,7 +26,7 @@ dependencies = [
   "fastapi>=0.110",
   "uvicorn[standard]>=0.27",
   "pydantic>=2.5",
-  "firebirdsql>=1.4.5",
+  "firebirdsql>=1.5.1",
   # the native driver, used by default (driver setting "auto") when a Firebird 4+ client library
   # (libfbclient, not on PyPI) is installed; pure Python on top of ctypes. Tested with 2.0.3 and
   # 2.1.0. It needs Python 3.11+: on 3.10 fbadmin uses the pure Python driver. docs/DRIVERS.md.

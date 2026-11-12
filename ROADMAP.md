@@ -12,7 +12,7 @@ scope.
 
 **Status:** milestones 0.1 to 2.0, the engineering backlog and the phone and tablet layout are
 implemented and verified in CI against real services. Firebird 6.0 final support waits for the
-6.0 release. Milestone 2.2 is done and 2.3 lacks only push notifications; milestones 2.1, 2.4 and 3.0 below are planned. The current release is **2.1.1** ([release notes](docs/release-notes/v2.1.1.md)): on
+6.0 release. Milestone 2.2 is done and 2.3 lacks only push notifications; milestones 2.1, 2.4 (comments and translation fixes left), 2.5 and 3.0 below are planned. The current release is **2.1.1** ([release notes](docs/release-notes/v2.1.1.md)): on
 [PyPI](https://pypi.org/project/firebird-admin/) (`pip install firebird-admin`), on
 [GitHub Releases](https://github.com/mariuz/fbadmin/releases) with desktop installers for Windows,
 macOS and Linux, as a Docker image, and documented at https://mariuz.github.io/fbadmin/.
@@ -241,7 +241,7 @@ Also fixed in this milestone:
   - Folders with more than 400 objects render only the visible rows; expanded state and screen-reader positions are kept.
   - Autocompletion of very large schemas loads table names first (2.5 s instead of 14 s) and fetches the columns of the tables a query uses.
   - Load tests run in the backend and e2e suites ([docs/user-guide/object-explorer.md](docs/user-guide/object-explorer.md#very-large-schemas))
-- ⬜ **firebirdsql 1.5.1:** once it is on PyPI, require it (`firebirdsql>=1.5.1`), remove the three workarounds for 1.5.0 (bind-describe assert, read-ahead buffer, compressed fetch wait) and rerun the benchmarks in [docs/DRIVERS.md](docs/DRIVERS.md). 1.5.1 carries fbadmin's upstream fixes and the faster wire encryption ([nakagami/pyfirebirdsql#144](https://github.com/nakagami/pyfirebirdsql/pull/144), [#145](https://github.com/nakagami/pyfirebirdsql/pull/145))
+- ✅ **firebirdsql 1.5.1:** required (`firebirdsql>=1.5.1`); the workarounds for 1.5.0 (parameter description assert, prepared `rowcount`, the wire compression packet reader in `security/wirecompat.py`) are removed, as 1.5.1 carries the upstream fixes ([nakagami/pyfirebirdsql#144](https://github.com/nakagami/pyfirebirdsql/pull/144), [#145](https://github.com/nakagami/pyfirebirdsql/pull/145)) ([docs/DRIVERS.md](docs/DRIVERS.md#firebirdsql-151))
 - ⬜ **Revisit the *Automatic* driver choice with benchmarks:** with firebirdsql 1.5.1 the pure-Python driver fetches rows faster than the native one on Firebird 4+, while BLOBs and backups stay much faster natively; decide from measurements whether Automatic stays native everywhere
 - ✅ **Prepared statements in fbadmin's loops:** grid edits and data compare scripts prepare each statement shape once (`fbadmin/prepared.py`), like imports, copy data, the data generator and anonymised copies already did: 1.6× faster per statement with firebirdsql through a simulated network (the native driver already reused repeated SQL text); `rowcount` after a prepared execute is patched in firebirdsql 1.5.0, as grid edits and data compare rely on it ([docs/DRIVERS.md](docs/DRIVERS.md#prepared-statements-in-fbadmins-loops))
 - ⬜ **Supply-chain hardening:** an SBOM for each package, signed container images and build provenance (attestations), dependency scanning in CI, and a security policy (`SECURITY.md` for reporting vulnerabilities)
@@ -274,6 +274,19 @@ Also fixed in this milestone:
 - ✅ **Continuous trace capture:** an optional always-on trace session per database (kept running by fbadmin, restarted with a backoff) feeding the slow statement log and query regressions with every statement that finishes above a threshold, with its explained plan, so no slow statement is missed between samples ([docs/MONITORING.md](docs/MONITORING.md#continuous-trace))
 - ⬜ **Comments** on objects and notebooks: short threads ("this index is needed by the nightly report") shown where the object is
 - ⬜ **Translation fixes:** the "Line" chart type and the token "Revoke" button in Czech, German and Russian share keys with other meanings
+
+## Milestone 2.5 — Fleet view and follow-ups ⬜
+
+- ⬜ **Fleet health page:** one table of every database with its newest check-up result, nearest capacity limit, newest backup, open change requests, schema drift and continuous-trace state, sortable and filterable, linking to each view
+- ⬜ **Error log from the continuous trace:** failed statements grouped by error code, deadlocks and lock conflicts, with an alert when a new kind of error appears or one spikes
+- ⬜ **Unused index finder:** indices that appear in no recorded plan for N days (from the continuous trace and the sampler), with their size and write cost, as candidates to drop
+- ⬜ **Weekly digest per database:** the check-up, forecast, regressions, backups and change requests in one message to e-mail, Slack or webhook channels on a schedule
+- ⬜ **Maintenance windows:** alerts muted during a window, and an approved change request applied at the start of the next window instead of at once
+- ⬜ **Propose from the Query Tool:** when DDL is refused for lack of rights, offer *Propose as a change request…* with the SQL filled in
+- ⬜ **Change request follow-ups:** edit migration scripts in the page, required approvals per database, timeline entries that open their request
+- ⬜ **Check-up follow-ups:** *new since the last run* shown in the check-up page, and an opt-in AI inspection of scheduled runs
+- ⬜ **Forecast in the check-up:** a capacity limit that is near (space budget, a sequence's column, table formats) becomes a check-up finding, so scheduled check-ups alert on it
+- ⬜ **Continuous trace of PSQL:** optionally record procedure and function timings next to statements
 
 ## Milestone 3.0 — Teams and distribution ⬜
 

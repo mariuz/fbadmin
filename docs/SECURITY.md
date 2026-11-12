@@ -257,8 +257,8 @@ destinations is audited (kind SECURITY). The API is `/api/admin/audit/forwarding
 The server dialog has these per-server options:
 
 * **Wire encryption.** This was already available.
-* **Wire compression.** zlib, Firebird 3+. fbadmin ships a small fix for the pure-Python driver,
-  which otherwise fails on compressed connections. See `security/wirecompat.py`.
+* **Wire compression.** zlib, Firebird 3+. It needs firebirdsql 1.5.1 or later with the
+  pure-Python driver (earlier versions failed on compressed connections; fbadmin required it).
 * **Authentication plugin.** `Srp256` (the default), `Srp` or `Legacy_Auth`. `Legacy_Auth` needs
   `pip install 'firebird-admin[legacy-auth]'`.
 
