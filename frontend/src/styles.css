@@ -88,6 +88,8 @@ code, pre, .mono { font-family: var(--mono); font-size: 12px; }
 .tab-body { flex: 1; min-height: 0; position: relative; background: var(--panel); }
 .tab-pane { position: absolute; inset: 0; overflow: auto; }
 .tab-pane.hidden { display: none; }
+/* Feature tab panes clip (overflow: hidden) so that full-height layouts scroll their own parts. A tab whose root is plain page content has to scroll as a whole, or everything below the fold is unreachable. */
+.tab-pane > .mt-body:only-child, .tab-pane > .pad:only-child { height: 100%; margin: 0; overflow: auto; }
 .pad { padding: 14px 16px; }
 
 .btn { border: 1px solid var(--border); background: var(--panel); padding: 5px 10px; border-radius: var(--radius); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
