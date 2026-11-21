@@ -81,6 +81,7 @@ database.
 | `validation.errors` | A scheduled online validation reported errors. |
 | `upload.failed` | A backup could not be uploaded to its [cloud storage target](MAINTENANCE.md#cloud-storage-targets). |
 | `query.regression` | A statement got slower, or changed its plan and got slower ([Query regressions](MONITORING.md#query-regressions)). Sent again when the regression changes, and once (*resolved*) when it is back to normal. |
+| `trace.errors` | The [continuous trace](MONITORING.md#continuous-trace) sees a kind of error not seen in the previous 7 days, or a spike of one (deadlocks, lock conflicts, …). |
 | `comment.added` | Someone [comments](COMMENTS.md) on an object or a notebook. |
 | `change.request` | A [change request](CHANGE_REQUESTS.md) is proposed, approved, rejected, withdrawn, applied or fails. |
 | `checkup.findings` | A [scheduled check-up](MONITORING.md#scheduled-check-up) has new findings: a finding that appears, gets more severe or names new objects. One *resolved* message follows when they are gone. |

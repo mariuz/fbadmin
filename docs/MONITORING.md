@@ -95,6 +95,17 @@ The session reports each statement when it finishes, with its exact duration and
 * The session is named *fbadmin continuous capture: <database>*. It writes no log file, and it runs as
   the Firebird user of the server registration. Without SYSDBA (or the `TRACE_ANY_ATTACHMENT`
   privilege) it sees only that user's own connections.
+* **Errors.** The trace also logs the errors statements raise. **Errors seen by the trace** (below the
+  panel) groups them by error code over the last hour, day, week or month: the message, the kind
+  (*lock conflict* for deadlocks, update conflicts and lock timeouts; *constraint* for key, foreign key,
+  check and not-null violations; *error* otherwise), how often, when last, by how many users, and an
+  example of the failing statement to open in the Query Tool. An error is keyed by its most specific
+  code, so "Dynamic SQL Error / Table unknown" is grouped as *Table unknown*. Firebird reports the failing
+  statement only when it ran longer than the threshold, so quick failures show *not recorded*; a
+  threshold of 0 records every statement, at a higher cost. Errors are kept for 30 days.
+* The `trace.errors` [alert event](ALERTS.md#events) is raised when a kind of error appears that was not
+  seen in the previous 7 days, or spikes: an hour with at least 20 of it and five times its usual
+  hourly count. A spike of lock conflicts is critical. Each kind alerts once a day at most.
 * Turning the history off (or deleting it) stops the trace. In server mode, turning it on needs the
   *admin* level on the database; the session then runs as the user who turned it on.
 
@@ -428,6 +439,7 @@ All under `/api/servers/{sid}/databases/{dbid}/monitoring` unless noted.
 | GET | `/history?hours=&max_points=` | stored samples with rates |
 | PUT | `/history/tracking` `{enabled}` | opt a database in/out |
 | GET/PUT | `/trace-capture` `{enabled, threshold_ms}` | the continuous trace: settings and state |
+| GET | `/errors?hours=` | errors seen by the continuous trace, grouped by error code |
 | POST | `/history/sample` | sample now |
 | DELETE | `/history` | delete stored samples |
 | GET | `/history/slow` | slow statement log |

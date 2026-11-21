@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 from pydantic import BaseModel, Field
 
 from ..monitoring import history
@@ -17,7 +17,7 @@ router = APIRouter(tags=["monitoring"])
 
 class CaptureIn(BaseModel):
     enabled: bool
-    threshold_ms: int = Field(default=TC.DEFAULT_THRESHOLD_MS, ge=1, le=3_600_000)
+    threshold_ms: int = Field(default=TC.DEFAULT_THRESHOLD_MS, ge=0, le=3_600_000)
 
 
 def _view(server_id: str, db_id: str) -> dict:
@@ -47,3 +47,12 @@ def set_capture(server_id: str, db_id: str, body: CaptureIn):
     runas.revoke(TC.save(server_id, db_id, body.enabled, body.threshold_ms, cred))
     TC.sync(server_id, db_id)
     return _view(server_id, db_id)
+
+
+@router.get(DB.replace("/trace-capture", "/errors"))
+def errors(server_id: str, db_id: str, hours: float = Query(24, gt=0, le=24 * 30)):
+    """Errors seen by the continuous trace, grouped by error code (monitoring/trace_errors.py)."""
+    from ..monitoring import trace_errors
+
+    get_state().store.get_database(server_id, db_id)
+    return trace_errors.groups(server_id, db_id, hours)

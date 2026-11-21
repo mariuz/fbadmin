@@ -93,6 +93,9 @@ def enabled_all() -> list[dict[str, Any]]:
 def forget(server_id: str, db_id: str) -> None:
     """The database's history is deleted: stop the capture and drop its settings."""
     stop(server_id, db_id)
+    from . import trace_errors
+
+    trace_errors.forget(server_id, db_id)
     s = _store()
     with s._lock:
         s._db.execute("DELETE FROM trace_capture WHERE server_id = ? AND db_id = ?", (server_id, db_id))
@@ -113,7 +116,9 @@ class Capture:
         self.failures = 0
         self.retry_at = 0.0
         self.sessions = 0          # sessions started
+        self.errors = 0            # errors recorded (trace_errors.py)
         self._minute = (0, 0)      # (minute, count)
+        self._failed: dict[int, tuple[str, float]] = {}  # attachment -> (SQL of its last failed statement, when)
 
     def running(self) -> bool:
         return self.sess is not None and self.sess.status in ("starting", "running")
@@ -123,16 +128,12 @@ class Capture:
             "starting" if self.running() else "waiting" if self.error else "stopped"
         return {"state": state, "session_id": self.sess.session_id if self.sess else None,
                 "started_at": self.started_at, "captured": self.captured, "slow": self.slow, "dropped": self.dropped,
+                "errors": self.errors,
                 "last_event_at": self.last_event_at, "error": self.error, "sessions": self.sessions,
                 "retry_at": self.retry_at if self.error and not self.running() else None}
 
-    # called in the trace session's reading thread
-    def on_event(self, ev: dict[str, Any]) -> None:
-        if ev.get("type") != "EXECUTE_STATEMENT_FINISH" or not ev.get("sql") or ev.get("duration_ms") is None:
-            return
-        if ev["duration_ms"] < self.threshold_ms:
-            return
-        now = time.time()
+    def _take(self, now: float) -> bool:
+        """One more event this minute (False: over the limit, dropped)."""
         minute = int(now // 60)
         m, n = self._minute
         if m != minute:
@@ -140,8 +141,29 @@ class Capture:
         if n >= PER_MINUTE:
             self.dropped += 1
             self._minute = (m, n)
-            return
+            return False
         self._minute = (m, n + 1)
+        return True
+
+    # called in the trace session's reading thread
+    def on_event(self, ev: dict[str, Any]) -> None:
+        typ = ev.get("type") or ""
+        if typ == "FAILED EXECUTE_STATEMENT_FINISH":
+            if ev.get("attachment") is not None and ev.get("sql"):
+                self._failed[ev["attachment"]] = (ev["sql"], time.time())
+                if len(self._failed) > 1000:
+                    self._failed.pop(next(iter(self._failed)))
+            return
+        if typ.startswith("ERROR AT"):
+            self._error(ev)
+            return
+        if typ != "EXECUTE_STATEMENT_FINISH" or not ev.get("sql") or ev.get("duration_ms") is None:
+            return
+        if ev["duration_ms"] < self.threshold_ms:
+            return
+        now = time.time()
+        if not self._take(now):
+            return
         from . import history, regressions
 
         store = history.get_store()
@@ -154,11 +176,27 @@ class Capture:
         self.captured += 1
         self.last_event_at = now
 
+    def _error(self, ev: dict[str, Any]) -> None:
+        from . import trace_errors
+
+        err = trace_errors.parse(ev)
+        now = time.time()
+        if err is None or not self._take(now):
+            return
+        sql = None
+        att = ev.get("attachment")
+        if att is not None and att in self._failed:
+            text, at = self._failed.pop(att)
+            sql = text if now - at < 10 else None
+        trace_errors.record(self.server_id, self.db_id, err, sql=sql, user=ev.get("user"), attachment=att, ts=now)
+        self.errors += 1
+        self.last_event_at = now
+
 
 def trace_config(db_path: str, threshold_ms: int) -> str:
     from ..maintenance.trace import database_pattern
 
-    body = ["enabled = true", "log_statement_finish = true", "print_plan = true", "explain_plan = true",
+    body = ["enabled = true", "log_statement_finish = true", "log_errors = true", "print_plan = true", "explain_plan = true",
             f"time_threshold = {int(threshold_ms)}", "max_sql_length = 16000"]
     return f"database = {database_pattern(db_path)}\n{{\n" + "\n".join("  " + b for b in body) + "\n}\n"
 
@@ -289,6 +327,36 @@ def check_all(now: float | None = None) -> None:
                 _failed(cap, str(exc) or exc.__class__.__name__)
 
 
+_last_alert_check = 0.0
+_last_prune = 0.0
+
+
+def check_errors(now: float | None = None) -> None:
+    """Every minute: the trace.errors alerts of the running captures; prune once an hour."""
+    global _last_alert_check, _last_prune
+    from ..api.deps import get_state
+    from . import trace_errors
+
+    now = now or time.time()
+    if now - _last_alert_check < 60:
+        return
+    _last_alert_check = now
+    with _lock:
+        keys = [k for k, c in _caps.items() if c.running() or c.errors]
+    for sid, dbid in keys:
+        try:
+            name = get_state().store.get_database(sid, dbid).name
+        except Exception:  # noqa: BLE001 - removed, or not visible to the supervisor
+            name = dbid
+        try:
+            trace_errors.check_alerts(sid, dbid, name, now)
+        except Exception:  # noqa: BLE001
+            pass
+    if now - _last_prune > 3600:
+        _last_prune = now
+        trace_errors.prune(now)
+
+
 class Supervisor:
     def __init__(self) -> None:
         self._stop = threading.Event()
@@ -305,6 +373,7 @@ class Supervisor:
         while not self._stop.wait(CHECK_EVERY):
             try:
                 check_all()
+                check_errors()
             except Exception:  # noqa: BLE001
                 pass
 

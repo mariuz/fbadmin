@@ -278,7 +278,7 @@ Also fixed in this milestone:
 ## Milestone 2.5 — Fleet view and follow-ups ⬜
 
 - ✅ **Fleet health page:** one table of every database the user may read with its newest check-up, nearest capacity limit, newest backup, schema drift, change requests, history and continuous-trace state and alerts of the last day, from fbadmin's own records (no connection), worst first, filterable, each cell opening its view ([docs/FLEET.md](docs/FLEET.md))
-- ⬜ **Error log from the continuous trace:** failed statements grouped by error code, deadlocks and lock conflicts, with an alert when a new kind of error appears or one spikes
+- ✅ **Error log from the continuous trace:** the errors statements raise, grouped by their most specific error code, with lock conflicts (deadlocks, update conflicts, lock timeouts) and constraint violations called out, an example of the failing statement, and the `trace.errors` alert when a new kind of error appears or one spikes ([docs/MONITORING.md](docs/MONITORING.md#continuous-trace))
 - ⬜ **Unused index finder:** indices that appear in no recorded plan for N days (from the continuous trace and the sampler), with their size and write cost, as candidates to drop
 - ⬜ **Weekly digest per database:** the check-up, forecast, regressions, backups and change requests in one message to e-mail, Slack or webhook channels on a schedule
 - ⬜ **Maintenance windows:** alerts muted during a window, and an approved change request applied at the start of the next window instead of at once

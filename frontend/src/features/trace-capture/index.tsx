@@ -3,17 +3,24 @@
 import { useEffect, useState } from "react";
 import { request } from "../../api";
 import { errMsg, useApp } from "../../context";
-import { t } from "../../i18n";
+import { N_, t } from "../../i18n";
 import "./trace-capture.css";
 
 export interface CaptureState {
   enabled: boolean; threshold_ms: number; tracked: boolean; per_minute: number;
   state: "running" | "starting" | "waiting" | "stopped"; session_id: number | null; started_at: number | null;
-  captured: number; slow: number; dropped: number; last_event_at: number | null; error: string | null; sessions: number;
+  captured: number; slow: number; dropped: number; errors?: number; last_event_at: number | null; error: string | null; sessions: number;
   retry_at: number | null;
 }
 const url = (sid: string, dbid: string) => `/api/servers/${encodeURIComponent(sid)}/databases/${encodeURIComponent(dbid)}/monitoring/trace-capture`;
+export interface ErrorGroup {
+  code: number; message: string; category: "lock" | "constraint" | "error"; count: number; first: number; last: number;
+  users: number; statements: number; example_sql: string | null; example_user: string | null; detail: string | null; new: boolean;
+}
+export interface ErrorLog { hours: number; total: number; lock: number; groups: ErrorGroup[]; hourly: { ts: number; count: number; lock: number }[] }
 export const captureApi = {
+  errors: (sid: string, dbid: string, hours: number) =>
+    request<ErrorLog>("GET", `/api/servers/${encodeURIComponent(sid)}/databases/${encodeURIComponent(dbid)}/monitoring/errors?hours=${hours}`),
   get: (sid: string, dbid: string) => request<CaptureState>("GET", url(sid, dbid)),
   set: (sid: string, dbid: string, enabled: boolean, threshold_ms: number) => request<CaptureState>("PUT", url(sid, dbid), { enabled, threshold_ms }),
 };
@@ -48,7 +55,7 @@ export function TraceCapturePanel(props: { serverId: string; dbId: string; track
         </label>
         {st.enabled && <span className={"pill " + pill}>{label}</span>}
         <label htmlFor="tcap-ms">{t("Record statements slower than")}</label>
-        <input id="tcap-ms" className="text" type="number" min={1} style={{ width: 90 }} value={ms} onChange={(e) => setMs(e.target.value)} />
+        <input id="tcap-ms" className="text" type="number" min={0} style={{ width: 90 }} value={ms} onChange={(e) => setMs(e.target.value)} />
         <span>{t("ms")}</span>
         {st.enabled && String(st.threshold_ms) !== ms && <button className="btn small" disabled={busy} onClick={() => save(true)}>{t("Apply")}</button>}
       </div>
@@ -61,6 +68,49 @@ export function TraceCapturePanel(props: { serverId: string; dbId: string; track
         {st.dropped > 0 && " " + t("{n} statement(s) dropped (more than {max} a minute).", { n: st.dropped, max: st.per_minute })}
         {st.error && <div className="err">{t("Last error: {error}", { error: st.error })}{st.retry_at ? " " + t("Next try at {time}.", { time: when(st.retry_at) }) : ""}</div>}
       </div>}
+      {(st.enabled || !!st.errors) && <TraceErrors serverId={props.serverId} dbId={props.dbId} />}
+    </div>
+  );
+}
+
+const RANGES: [number, string][] = [[1, N_("1 h")], [24, N_("24 h")], [168, N_("7 d")], [720, N_("30 d")]];
+const CAT: Record<ErrorGroup["category"], string> = { lock: N_("lock conflict"), constraint: N_("constraint"), error: N_("error") };
+
+/** The errors the continuous trace saw, grouped by error code (monitoring/trace_errors.py). */
+function TraceErrors(props: { serverId: string; dbId: string }) {
+  const app = useApp();
+  const [hours, setHours] = useState(24);
+  const [log, setLog] = useState<ErrorLog | null>(null);
+  useEffect(() => {
+    const load = () => captureApi.errors(props.serverId, props.dbId, hours).then(setLog).catch(() => setLog(null));
+    load();
+    const h = setInterval(load, 30000);
+    return () => clearInterval(h);
+  }, [props.serverId, props.dbId, hours]);
+  if (!log) return null;
+  return (
+    <div className="tcap-errors" role="region" aria-label={t("Errors seen by the trace")}>
+      <div className="tcap-row">
+        <strong>{t("Errors seen by the trace")}</strong>
+        <span className="muted">{t("{n} error(s), {lock} lock conflict(s)", { n: log.total, lock: log.lock })}</span>
+        <div className="seg">{RANGES.map(([h, l]) => <button key={h} className={hours === h ? "on" : ""} onClick={() => setHours(h)}>{t(l)}</button>)}</div>
+      </div>
+      {log.groups.length === 0 ? <div className="muted">{t("No errors in this period.")}</div> : (
+        <div className="grid-wrap" tabIndex={0} role="region" aria-label={t("Errors by code")}><table className="grid">
+          <thead><tr><th>{t("Error")}</th><th>{t("Kind")}</th><th className="num">{t("Count")}</th><th>{t("Last seen")}</th><th>{t("Users")}</th><th>{t("Statement")}</th></tr></thead>
+          <tbody>{log.groups.map((g) => (
+            <tr key={g.code}>
+              <td title={g.detail ?? undefined}>{g.message} <span className="muted mono">{g.code}</span>{g.new && <> <span className="pill running">{t("new")}</span></>}</td>
+              <td><span className={"pill " + (g.category === "lock" ? "failed" : g.category === "constraint" ? "running" : "cancelled")}>{t(CAT[g.category])}</span></td>
+              <td className="num">{g.count}</td><td>{when(g.last)}</td>
+              <td>{g.users}{g.example_user ? ` · ${g.example_user}` : ""}</td>
+              <td>{g.example_sql ? <><span className="mono-cell tcap-sql" title={g.example_sql}>{g.example_sql}</span>{" "}
+                <button className="btn small" onClick={() => app.openQueryTool(props.serverId, props.dbId, g.example_sql!)}>{t("Open")}</button></>
+                : <span className="muted" title={t("Firebird reports the statement only when it ran longer than the trace's threshold")}>{t("not recorded")}</span>}</td>
+            </tr>
+          ))}</tbody>
+        </table></div>
+      )}
     </div>
   );
 }

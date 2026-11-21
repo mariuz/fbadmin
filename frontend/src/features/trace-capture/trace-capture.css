@@ -1,3 +1,5 @@
 .tcap { border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 10px; margin-bottom: 10px; display: flex; flex-direction: column; gap: 4px; }
 .tcap .tcap-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
 .tcap .tcap-stats .err { margin-top: 2px; }
+.tcap .tcap-errors { margin-top: 6px; display: flex; flex-direction: column; gap: 6px; }
+.tcap .tcap-sql { display: inline-block; max-width: 360px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }

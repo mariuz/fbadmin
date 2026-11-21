@@ -76,6 +76,9 @@ test("turn the continuous trace on and see it record", async ({ request }) => {
     await request.post(base() + "/execute", { data: { sql } });
     return (await (await request.get(base() + "/monitoring/trace-capture")).json()).captured;
   }, { timeout: 30_000 }).toBeGreaterThan(0);
+  // an error: recorded in the error log
+  await request.post(base() + "/execute", { data: { sql: "SELECT * FROM NO_SUCH_TABLE" } });
+  await expect.poll(async () => (await (await request.get(base() + "/monitoring/errors")).json()).total, { timeout: 30_000 }).toBeGreaterThan(0);
   await page.reload();
   await expand(page, SERVER);
   await treeRow(page, "tracedb").click({ button: "right" });
@@ -88,6 +91,8 @@ test("turn the continuous trace on and see it record", async ({ request }) => {
   await target.click();
   await pane().locator(".subtabs").getByRole("button", { name: "History", exact: true }).click();
   await expect(group).toContainText(/statement\(s\) recorded/);
+  const errors = group.getByRole("region", { name: "Errors by code" });
+  await expect(errors).toContainText("Table unknown");
   for (const theme of ["light", "dark", "contrast"]) {
     await page.evaluate((th) => { document.documentElement.dataset.theme = th; }, theme);
     await audit(`continuous trace (${theme} theme)`);
