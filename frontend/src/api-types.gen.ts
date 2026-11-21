@@ -4557,6 +4557,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/servers/{server_id}/databases/{db_id}/monitoring/unused-indices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Unused Indices
+         * @description Indices that appear in no recorded plan for ``days`` days (monitoring/unused_indices.py).
+         */
+        get: operations["unused_indices_api_servers__server_id__databases__db_id__monitoring_unused_indices_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/servers/{server_id}/databases/{db_id}/objects": {
         parameters: {
             query?: never;
@@ -18461,6 +18481,40 @@ export interface operations {
             query?: {
                 long_running?: number;
                 gap_warn?: number;
+            };
+            header?: never;
+            path: {
+                server_id: string;
+                db_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unused_indices_api_servers__server_id__databases__db_id__monitoring_unused_indices_get: {
+        parameters: {
+            query?: {
+                days?: number;
             };
             header?: never;
             path: {

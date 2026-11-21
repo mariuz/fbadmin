@@ -56,3 +56,16 @@ def errors(server_id: str, db_id: str, hours: float = Query(24, gt=0, le=24 * 30
 
     get_state().store.get_database(server_id, db_id)
     return trace_errors.groups(server_id, db_id, hours)
+
+
+@router.get(DB.replace("/trace-capture", "/unused-indices"))
+def unused_indices(server_id: str, db_id: str, days: float = Query(30, gt=0, le=365)):
+    """Indices that appear in no recorded plan for ``days`` days (monitoring/unused_indices.py)."""
+    from ..monitoring import unused_indices as U
+    from ..query import end_transaction
+
+    with get_state().manager.meta(server_id, db_id) as conn:
+        try:
+            return U.report(server_id, db_id, conn, days)
+        finally:
+            end_transaction(conn, commit=False)

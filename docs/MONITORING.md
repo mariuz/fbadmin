@@ -371,6 +371,33 @@ The report shows:
 Sessions can be deleted one by one or all at once. On Firebird 3/4 the tab explains that the
 profiler needs Firebird 5.
 
+## Unused indices
+
+**Unused indices…** (database context menu) lists the indices that appear in no plan fbadmin recorded
+in the last 7, 30, 90 or 180 days: candidates to drop. Every insert, update and delete of their table
+still maintains them, and they take space and backup time.
+
+* **The plans** are those of [query regressions](#query-regressions): the [continuous trace](#continuous-trace)
+  (every statement above its threshold), the history sampler (statements running long enough to be
+  sampled) and slow Query Tool statements. Both plan formats are read, the explained one
+  (`Index "IX_ORDERS_DAY" Range Scan`) and the legacy one (`PLAN (ORDERS INDEX (IX_ORDERS_DAY))`).
+* **Kept:** indices that enforce a primary key, unique or foreign key constraint (Firebird uses them to
+  check the constraint, whatever the plans), and inactive indices (the check-up reports those).
+* **The evidence** is only as good as what was recorded, and the page says how good it is:
+  * *none* when the history isn't recorded;
+  * *little* when there are few plans or a short period;
+  * *partial* without the continuous trace, because fast statements are then never seen and an index
+    used only by them shows as unused;
+  * *good* when the trace covered the period.
+
+  Before dropping, also think of reports and jobs that run rarely, such as month-end ones.
+* For each index: its table and columns, when a plan last used it, its table's writes since the
+  database was opened (`MON$TABLE_STATS`), and its entries when the last check-up read gstat.
+* **Open the DROP statements in the Query Tool**, or **Propose as a change request…**: a dry run then
+  shows exactly what is dropped, and an administrator approves it.
+
+`GET /api/servers/{sid}/databases/{dbid}/monitoring/unused-indices?days=30` returns the report.
+
 ## Index advisor
 
 ![Index advisor](screenshots/monitoring-index-advisor.png)
