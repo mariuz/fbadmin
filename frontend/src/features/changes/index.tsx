@@ -6,7 +6,7 @@ import type { AppApi } from "../../context";
 import type { MenuItem } from "../../components/ContextMenu";
 import type { Selection } from "../../types";
 import { N_, t } from "../../i18n";
-import { registerMenu, registerTabKind } from "../../registry";
+import { registerMenu, registerQueryToolAction, registerTabKind, type QueryToolContext } from "../../registry";
 import { SqlEditor } from "../../components/SqlEditor";
 import { IconPlus, IconRefresh } from "../../components/Icons";
 import { Section } from "../maintenance/common";
@@ -31,12 +31,15 @@ const ACTION_LABEL: Record<string, string> = {
 const CHANGE_LABEL: Record<string, string> = { created: N_("created"), altered: N_("altered"), dropped: N_("dropped") };
 export const statusPill = (s: ChangeStatus) => <span className={"pill " + STATUS_PILL[s]}>{t(STATUS_LABEL[s])}</span>;
 
-function NewRequest(props: { sid: string; dbid: string; onDone: (cr: ChangeRequest | null) => void }) {
+export interface Draft { sql: string; nonce: number }
+
+function NewRequest(props: { sid: string; dbid: string; draft?: Draft | null; onDone: (cr: ChangeRequest | null) => void }) {
   const app = useApp();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [kind, setKind] = useState<"sql" | "migrations">("sql");
-  const [sql, setSql] = useState("");
+  const [sql, setSql] = useState(props.draft?.sql ?? "");
+  useEffect(() => { if (props.draft) { setKind("sql"); setSql(props.draft.sql); } }, [props.draft?.nonce]);
   const [scripts, setScripts] = useState<ScriptItem[]>([]);
   const [busy, setBusy] = useState(false);
   const addFiles = async (files: FileList | null) => {
@@ -202,13 +205,14 @@ function CommentBox(props: { onSend: (text: string) => Promise<void> }) {
   );
 }
 
-function ChangesTab(props: { serverId: string; dbId: string; visible: boolean; openId?: string }) {
+function ChangesTab(props: { serverId: string; dbId: string; visible: boolean; openId?: string; draft?: Draft | null }) {
   const app = useApp();
   const { serverId: sid, dbId: dbid } = props;
   const [items, setItems] = useState<ChangeRequest[]>([]);
   const [filter, setFilter] = useState<"active" | "">("active");
   const [selected, setSelected] = useState<string | null>(props.openId ?? null);
-  const [creating, setCreating] = useState(false);
+  const [creating, setCreating] = useState(!!props.draft);
+  useEffect(() => { if (props.draft) { setCreating(true); setSelected(null); } }, [props.draft?.nonce]);
   const load = async () => { try { setItems(await crApi.list(dbid, filter || undefined)); } catch (e) { app.toast(errMsg(e), "error"); } };
   useEffect(() => { if (props.visible) load(); }, [props.visible, filter]);
   return (
@@ -231,7 +235,7 @@ function ChangesTab(props: { serverId: string; dbId: string; visible: boolean; o
         )}
       </div>
       <div className="cr-main">
-        {creating ? <NewRequest sid={sid} dbid={dbid} onDone={(cr) => { setCreating(false); if (cr) { setSelected(cr.id); load(); } }} />
+        {creating ? <NewRequest sid={sid} dbid={dbid} draft={props.draft} onDone={(cr) => { setCreating(false); if (cr) { setSelected(cr.id); load(); } }} />
           : selected ? <Detail id={selected} onChanged={load} />
             : <div className="muted cr-empty">{t("Pick a change request, or propose a new one.")}</div>}
       </div>
@@ -239,14 +243,28 @@ function ChangesTab(props: { serverId: string; dbId: string; visible: boolean; o
   );
 }
 
-export function openChanges(app: AppApi, sid: string, dbid: string, openId?: string) {
+export function openChanges(app: AppApi, sid: string, dbid: string, openId?: string, draftSql?: string) {
   const db = app.servers.find((s) => s.id === sid)?.databases.find((d) => d.id === dbid)?.name ?? t("database");
-  app.openTab({ kind: "changes", title: t("{db} · change requests", { db }), serverId: sid, dbId: dbid, props: { openId } });
+  const draft = draftSql ? { sql: draftSql, nonce: Date.now() } : undefined;
+  app.openTab({ kind: "changes", title: t("{db} · change requests", { db }), serverId: sid, dbId: dbid, props: { openId, draft } });
 }
+
+/** Query Tool: a statement refused by fbadmin's permissions can be proposed as a change request. */
+function ProposeButton(props: { ctx: QueryToolContext }) {
+  const app = useApp();
+  if (!props.ctx.refused) return null;
+  return <button className="btn small primary" title={t("You may not run this here: propose it, and an administrator of the database reviews and applies it")}
+    onClick={() => openChanges(app, props.ctx.serverId, props.ctx.dbId, undefined, props.ctx.refused!)}>{t("Propose as a change request…")}</button>;
+}
+
+registerQueryToolAction({ id: "propose-change", render: (ctx) => <ProposeButton ctx={ctx} /> });
 
 registerTabKind("changes", {
   icon: <span aria-hidden="true" style={{ fontSize: 12 }}>⇄</span>,
-  render: (tab, visible) => <ChangesTab serverId={tab.serverId!} dbId={tab.dbId!} visible={visible} openId={(tab.props as { openId?: string } | undefined)?.openId} />,
+  render: (tab, visible) => {
+    const p = (tab.props ?? {}) as { openId?: string; draft?: Draft };
+    return <ChangesTab serverId={tab.serverId!} dbId={tab.dbId!} visible={visible} openId={p.openId} draft={p.draft ?? null} />;
+  },
 });
 
 registerMenu((app: AppApi, sel: Selection): MenuItem[] => {

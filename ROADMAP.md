@@ -282,7 +282,7 @@ Also fixed in this milestone:
 - ⬜ **Unused index finder:** indices that appear in no recorded plan for N days (from the continuous trace and the sampler), with their size and write cost, as candidates to drop
 - ⬜ **Weekly digest per database:** the check-up, forecast, regressions, backups and change requests in one message to e-mail, Slack or webhook channels on a schedule
 - ⬜ **Maintenance windows:** alerts muted during a window, and an approved change request applied at the start of the next window instead of at once
-- ⬜ **Propose from the Query Tool:** when DDL is refused for lack of rights, offer *Propose as a change request…* with the SQL filled in
+- ✅ **Propose from the Query Tool:** when fbadmin's permissions refuse a statement, the Query Tool offers *Propose as a change request…*, which opens a new request with the SQL filled in ([docs/CHANGE_REQUESTS.md](docs/CHANGE_REQUESTS.md#proposing-a-change))
 - ⬜ **Change request follow-ups:** edit migration scripts in the page, required approvals per database, timeline entries that open their request
 - ⬜ **Check-up follow-ups:** *new since the last run* shown in the check-up page, and an opt-in AI inspection of scheduled runs
 - ✅ **Forecast in the check-up:** a capacity limit that is near (space budget, transaction counter, a sequence's column, table formats) is a check-up finding, one evidence line per limit, so a scheduled check-up alerts when a new limit comes near ([docs/MONITORING.md](docs/MONITORING.md#performance-check-up))

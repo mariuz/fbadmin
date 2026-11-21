@@ -199,6 +199,7 @@ export function QueryTool(props: { serverId: string; dbId: string; schema?: stri
   const [options, setOptions] = useState<SessionOptions | null>(null);
   const [result, setResult] = useState<ScriptResult | null>(null);
   const [running, setRunning] = useState(false);
+  const [refused, setRefused] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const [autocommit, setAutocommit] = useState(true);
   const [txOpen, setTxOpen] = useState(false);
@@ -294,6 +295,7 @@ export function QueryTool(props: { serverId: string; dbId: string; schema?: stri
     } catch { /* analysis is best-effort */ }
     setRunning(true);
     setPlan(null);
+    setRefused(null);
     const started = performance.now();
     try {
       let sid = await ensureSession();
@@ -330,6 +332,8 @@ export function QueryTool(props: { serverId: string; dbId: string; schema?: stri
       setHistory(load(HISTORY_KEY, []));
       if (!r.error && DDL_RE.test(q) && autocommit) app.invalidate(keys.db(props.serverId, props.dbId));
     } catch (e) {
+      // refused by fbadmin's permissions: the change can still be proposed (change requests)
+      if ((e as { status?: number; code?: string })?.status === 403 && (e as { code?: string }).code === "permission_denied") setRefused(q);
       setResult({ results: [], error: { message: errMsg(e), index: 0, line: 0, sql: q }, elapsed_ms: 0, transaction_open: txOpen });
       setPane("messages");
     } finally {
@@ -488,6 +492,7 @@ export function QueryTool(props: { serverId: string; dbId: string; schema?: stri
     serverId: props.serverId, dbId: props.dbId, setSql,
     selectionOrAll: () => (view.current ? selectionOrAll(view.current) : sql),
     getSql: () => view.current?.state.doc.toString() ?? sql,
+    refused,
   };
 
   return (

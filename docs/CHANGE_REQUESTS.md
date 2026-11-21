@@ -17,7 +17,9 @@ Open **Change requests…** in a database's context menu.
   applying them records them in the migration history.
 
 Anyone with at least the *read* level on the database can propose a change. A developer with read
-access, who is refused by the Query Tool when running DDL, can still propose it.
+access, who is refused by the Query Tool when running DDL, can still propose it: after the refusal the
+Query Tool shows **Propose as a change request…**, which opens a new request with the refused SQL
+filled in.
 
 The author can **edit** the SQL until the change is applied. Each edit is a new revision: it clears
 the approvals and needs a new dry run. The author can also **withdraw** the request.

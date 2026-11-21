@@ -122,6 +122,8 @@ export interface QueryToolContext {
   getSql: () => string;
   /** Replace the editor content. */
   setSql: (sql: string) => void;
+  /** The SQL of the last run when fbadmin's permissions refused it (server mode), else null. */
+  refused: string | null;
 }
 export type QueryToolAction = { id: string; render: (ctx: QueryToolContext) => ReactNode };
 const queryToolActions: QueryToolAction[] = [];
