@@ -12,7 +12,7 @@ scope.
 
 **Status:** milestones 0.1 to 2.0, the engineering backlog and the phone and tablet layout are
 implemented and verified in CI against real services. Firebird 6.0 final support waits for the
-6.0 release. Milestone 2.2 is done and 2.3 lacks only push notifications; milestone 2.4 is done; milestones 2.1, 2.5 and 3.0 below are planned. The current release is **2.1.1** ([release notes](docs/release-notes/v2.1.1.md)): on
+6.0 release. Milestone 2.2 is done and 2.3 lacks only push notifications; milestones 2.4 and 2.5 are done; milestones 2.1 and 3.0 below are planned. The current release is **2.1.1** ([release notes](docs/release-notes/v2.1.1.md)): on
 [PyPI](https://pypi.org/project/firebird-admin/) (`pip install firebird-admin`), on
 [GitHub Releases](https://github.com/mariuz/fbadmin/releases) with desktop installers for Windows,
 macOS and Linux, as a Docker image, and documented at https://mariuz.github.io/fbadmin/.
@@ -275,7 +275,7 @@ Also fixed in this milestone:
 - ✅ **Comments** on objects and notebooks: short threads ("this index is needed by the nightly report") in an object's Comments tab and below a notebook's cells, visible to whoever may see the object or notebook, editable by their author, with the `comment.added` alert event ([docs/COMMENTS.md](docs/COMMENTS.md))
 - ✅ **Translation fixes:** keys can carry a context (`t("Line@@chart")`, English shows "Line"), so one English word gets two translations: the "Line" chart type is no longer "line number" (cs, de, ru) and the token "Revoke" button no longer "remove the privilege" (cs, de) ([docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#translations))
 
-## Milestone 2.5 — Fleet view and follow-ups ⬜
+## Milestone 2.5 — Fleet view and follow-ups ✅
 
 - ✅ **Fleet health page:** one table of every database the user may read with its newest check-up, nearest capacity limit, newest backup, schema drift, change requests, history and continuous-trace state and alerts of the last day, from fbadmin's own records (no connection), worst first, filterable, each cell opening its view ([docs/FLEET.md](docs/FLEET.md))
 - ✅ **Error log from the continuous trace:** the errors statements raise, grouped by their most specific error code, with lock conflicts (deadlocks, update conflicts, lock timeouts) and constraint violations called out, an example of the failing statement, and the `trace.errors` alert when a new kind of error appears or one spikes ([docs/MONITORING.md](docs/MONITORING.md#continuous-trace))
@@ -286,7 +286,7 @@ Also fixed in this milestone:
 - ✅ **Change request follow-ups:** migration scripts edited in the page (rename, change, add, remove), the approvals needed set per database by its administrators, and timeline entries that open their request ([docs/CHANGE_REQUESTS.md](docs/CHANGE_REQUESTS.md))
 - ✅ **Check-up follow-ups:** the report marks findings *new* since the previous run and lists the ones that are gone; a scheduled check-up can send an AI inspection with its alert when something is new ([docs/MONITORING.md](docs/MONITORING.md#scheduled-check-up))
 - ✅ **Forecast in the check-up:** a capacity limit that is near (space budget, transaction counter, a sequence's column, table formats) is a check-up finding, one evidence line per limit, so a scheduled check-up alerts when a new limit comes near ([docs/MONITORING.md](docs/MONITORING.md#performance-check-up))
-- ⬜ **Continuous trace of PSQL:** optionally record procedure and function timings next to statements
+- ✅ **Continuous trace of PSQL:** optionally, procedures, functions and triggers that finish above the threshold are recorded as runs in query regressions, so a routine that got slower is flagged and alerts like a statement ([docs/MONITORING.md](docs/MONITORING.md#continuous-trace))
 
 ## Milestone 3.0 — Teams and distribution ⬜
 

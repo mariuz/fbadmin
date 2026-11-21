@@ -121,13 +121,54 @@ def test_start_failure_backs_off(client, database, monkeypatch):
     base = f"/api/servers/{sid}/databases/{dbid}/monitoring"
     client.put(base + "/history/tracking", json={"enabled": True})
     try:
-        monkeypatch.setattr(TC, "trace_config", lambda path, ms: "database\n{\n  enabled = maybe\n}\n")
+        monkeypatch.setattr(TC, "trace_config", lambda path, ms, psql=False: "database\n{\n  enabled = maybe\n}\n")
         r = client.put(base + "/trace-capture", json={"enabled": True, "threshold_ms": 500}).json()
         assert r["state"] in ("waiting", "running")
         if r["state"] == "waiting":  # rejected at start: retried later
             assert r["error"] and r["retry_at"] > time.time() + 20
             TC.check_all()  # not yet
             assert client.get(base + "/trace-capture").json()["sessions"] == 1
+    finally:
+        TC.stop(sid, dbid)
+        client.delete(base + "/history")
+
+
+def test_routine_names_and_config():
+    ev = lambda typ, line: {"type": typ, "text": f"2026-11-21T19:13:49.1150 (21:0x7f) {typ}\n\t/db\n\n{line}\n\n     31 ms"}  # noqa: E731
+    assert TC.routine_name(ev("EXECUTE_PROCEDURE_FINISH", "Procedure P_SLOW:")) == "EXECUTE PROCEDURE P_SLOW"
+    assert TC.routine_name(ev("EXECUTE_FUNCTION_FINISH", "Function PKG.F_SQ:")) == "FUNCTION PKG.F_SQ"
+    assert TC.routine_name(ev("EXECUTE_TRIGGER_FINISH", 'Trigger "PUBLIC"."TT_BI" FOR "PUBLIC"."TT" (BEFORE INSERT):')) \
+        == 'TRIGGER "PUBLIC"."TT_BI" FOR "PUBLIC"."TT" (BEFORE INSERT)'
+    assert "log_procedure_finish = true" not in TC.trace_config("/d/a.fdb", 5)
+    cfg = TC.trace_config("/d/a.fdb", 5, psql=True)
+    assert all(f"log_{k}_finish = true" in cfg for k in ("procedure", "function", "trigger"))
+
+
+@requires_server
+def test_continuous_capture_of_psql(client, database):
+    sid, dbid = database
+    base = f"/api/servers/{sid}/databases/{dbid}/monitoring"
+    execute(client, sid, dbid, "CREATE PROCEDURE P_LOOP (N INTEGER) RETURNS (R BIGINT) AS DECLARE I INTEGER = 0; "
+                               "BEGIN R = 0; WHILE (I < N) DO BEGIN R = R + I; I = I + 1; END SUSPEND; END")
+    client.put(base + "/history/tracking", json={"enabled": True})
+    try:
+        r = client.put(base + "/trace-capture", json={"enabled": True, "threshold_ms": 0, "psql": True}).json()
+        assert r["psql"] is True and r["state"] == "running", r
+        execute(client, sid, dbid, "SELECT R FROM P_LOOP(20000)")
+        found = None
+        for _ in range(60):
+            items = client.get(base + "/regressions", params={"only": "all"}).json()["statements"]
+            found = next((i for i in items if "execute procedure p_loop" in (i.get("normalized") or "").lower()), None)
+            if found:
+                break
+            time.sleep(0.25)
+        assert found, "the procedure run was not recorded"
+        d = client.get(base + f"/regressions/{found['sql_hash']}").json()
+        assert {x["source"] for x in d["runs"]} == {"trace_psql"}
+        assert client.get(base + "/trace-capture").json()["routines"] >= 1
+        # off again: the session restarts without them
+        r = client.put(base + "/trace-capture", json={"enabled": True, "threshold_ms": 0, "psql": False}).json()
+        assert r["psql"] is False and r["state"] == "running"
     finally:
         TC.stop(sid, dbid)
         client.delete(base + "/history")

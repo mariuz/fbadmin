@@ -6449,6 +6449,11 @@ export interface components {
             /** Enabled */
             enabled: boolean;
             /**
+             * Psql
+             * @default false
+             */
+            psql?: boolean;
+            /**
              * Threshold Ms
              * @default 200
              */

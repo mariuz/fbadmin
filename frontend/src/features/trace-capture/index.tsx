@@ -7,7 +7,7 @@ import { N_, t } from "../../i18n";
 import "./trace-capture.css";
 
 export interface CaptureState {
-  enabled: boolean; threshold_ms: number; tracked: boolean; per_minute: number;
+  enabled: boolean; threshold_ms: number; tracked: boolean; per_minute: number; psql?: boolean; routines?: number;
   state: "running" | "starting" | "waiting" | "stopped"; session_id: number | null; started_at: number | null;
   captured: number; slow: number; dropped: number; errors?: number; last_event_at: number | null; error: string | null; sessions: number;
   retry_at: number | null;
@@ -22,7 +22,7 @@ export const captureApi = {
   errors: (sid: string, dbid: string, hours: number) =>
     request<ErrorLog>("GET", `/api/servers/${encodeURIComponent(sid)}/databases/${encodeURIComponent(dbid)}/monitoring/errors?hours=${hours}`),
   get: (sid: string, dbid: string) => request<CaptureState>("GET", url(sid, dbid)),
-  set: (sid: string, dbid: string, enabled: boolean, threshold_ms: number) => request<CaptureState>("PUT", url(sid, dbid), { enabled, threshold_ms }),
+  set: (sid: string, dbid: string, enabled: boolean, threshold_ms: number, psql = false) => request<CaptureState>("PUT", url(sid, dbid), { enabled, threshold_ms, psql }),
 };
 
 const when = (ts: number | null) => (ts ? new Date(ts * 1000).toLocaleString() : "–");
@@ -35,10 +35,10 @@ export function TraceCapturePanel(props: { serverId: string; dbId: string; track
   const load = () => captureApi.get(props.serverId, props.dbId).then((s) => { setSt(s); setMs((cur) => cur || String(s.threshold_ms)); }).catch(() => setSt(null));
   useEffect(() => { load(); const h = setInterval(load, 15000); return () => clearInterval(h); }, [props.serverId, props.dbId, props.tracked]);
   if (!st) return null;
-  const save = async (enabled: boolean) => {
+  const save = async (enabled: boolean, psql = !!st.psql) => {
     setBusy(true);
     try {
-      const s = await captureApi.set(props.serverId, props.dbId, enabled, Math.max(1, Number(ms) || st.threshold_ms));
+      const s = await captureApi.set(props.serverId, props.dbId, enabled, Math.max(0, ms.trim() === "" || Number.isNaN(Number(ms)) ? st.threshold_ms : Number(ms)), psql);
       setSt(s);
       app.toast(enabled ? (s.state === "running" ? t("Continuous trace started") : t("Continuous trace turned on; the session is not running yet")) : t("Continuous trace turned off"), enabled && s.state !== "running" ? "error" : "ok");
     } catch (e) { app.toast(errMsg(e), "error"); }
@@ -58,6 +58,10 @@ export function TraceCapturePanel(props: { serverId: string; dbId: string; track
         <input id="tcap-ms" className="text" type="number" min={0} style={{ width: 90 }} value={ms} onChange={(e) => setMs(e.target.value)} />
         <span>{t("ms")}</span>
         {st.enabled && String(st.threshold_ms) !== ms && <button className="btn small" disabled={busy} onClick={() => save(true)}>{t("Apply")}</button>}
+        <label className="check">
+          <input type="checkbox" checked={!!st.psql} disabled={busy || (!props.tracked && !st.enabled)} onChange={(e) => save(st.enabled, e.target.checked)} />
+          {t("Also procedures, functions and triggers")}
+        </label>
       </div>
       <div className="muted">
         {!props.tracked && !st.enabled ? t("Record the history of this database to turn it on.")
@@ -65,6 +69,7 @@ export function TraceCapturePanel(props: { serverId: string; dbId: string; track
       </div>
       {st.enabled && <div className="muted tcap-stats">
         {st.state === "running" && t("Session {id} since {time}: {n} statement(s) recorded, {slow} slow, last at {last}.", { id: st.session_id ?? "", time: when(st.started_at), n: st.captured, slow: st.slow, last: when(st.last_event_at) })}
+        {st.state === "running" && st.psql && " " + t("{n} procedure, function and trigger run(s).", { n: st.routines ?? 0 })}
         {st.dropped > 0 && " " + t("{n} statement(s) dropped (more than {max} a minute).", { n: st.dropped, max: st.per_minute })}
         {st.error && <div className="err">{t("Last error: {error}", { error: st.error })}{st.retry_at ? " " + t("Next try at {time}.", { time: when(st.retry_at) }) : ""}</div>}
       </div>}

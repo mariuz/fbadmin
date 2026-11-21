@@ -18,11 +18,13 @@ router = APIRouter(tags=["monitoring"])
 class CaptureIn(BaseModel):
     enabled: bool
     threshold_ms: int = Field(default=TC.DEFAULT_THRESHOLD_MS, ge=0, le=3_600_000)
+    psql: bool = False  # also procedures, functions and triggers
 
 
 def _view(server_id: str, db_id: str) -> dict:
     cfg = TC.config(server_id, db_id)
     return {"enabled": cfg["enabled"], "threshold_ms": cfg["threshold_ms"], "updated_at": cfg["updated_at"],
+            "psql": cfg["psql"],
             "tracked": bool(history.get_store().is_tracked(server_id, db_id)),
             "per_minute": TC.PER_MINUTE, **TC.status(server_id, db_id)}
 
@@ -44,7 +46,7 @@ def set_capture(server_id: str, db_id: str, body: CaptureIn):
             raise ValueError("Record the history of this database first: the trace feeds it")
         get_state().manager._password(server_id)  # fail early (401) when no password is known
     cred = runas.issue(server_id, f"continuous trace: {db.name}") if body.enabled else None
-    runas.revoke(TC.save(server_id, db_id, body.enabled, body.threshold_ms, cred))
+    runas.revoke(TC.save(server_id, db_id, body.enabled, body.threshold_ms, cred, body.psql))
     TC.sync(server_id, db_id)
     return _view(server_id, db_id)
 

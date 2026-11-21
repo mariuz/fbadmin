@@ -106,6 +106,11 @@ The session reports each statement when it finishes, with its exact duration and
 * The `trace.errors` [alert event](ALERTS.md#events) is raised when a kind of error appears that was not
   seen in the previous 7 days, or spikes: an hour with at least 20 of it and five times its usual
   hourly count. A spike of lock conflicts is critical. Each kind alerts once a day at most.
+* **Also procedures, functions and triggers** records each routine that finishes above the threshold as a
+  run of `EXECUTE PROCEDURE name`, `FUNCTION name` or `TRIGGER name FOR table (when)` (with the schema on
+  Firebird 6). These show in [query regressions](#query-regressions) like statements, so a procedure
+  that got slower is flagged and alerts like one. The statements inside a routine are not recorded
+  separately; the statement that called it is.
 * Turning the history off (or deleting it) stops the trace. In server mode, turning it on needs the
   *admin* level on the database; the session then runs as the user who turned it on.
 
@@ -465,7 +470,7 @@ All under `/api/servers/{sid}/databases/{dbid}/monitoring` unless noted.
 | GET | `/locks` | lock waits, blockers, config |
 | GET | `/history?hours=&max_points=` | stored samples with rates |
 | PUT | `/history/tracking` `{enabled}` | opt a database in/out |
-| GET/PUT | `/trace-capture` `{enabled, threshold_ms}` | the continuous trace: settings and state |
+| GET/PUT | `/trace-capture` `{enabled, threshold_ms, psql}` | the continuous trace: settings and state |
 | GET | `/errors?hours=` | errors seen by the continuous trace, grouped by error code |
 | POST | `/history/sample` | sample now |
 | DELETE | `/history` | delete stored samples |

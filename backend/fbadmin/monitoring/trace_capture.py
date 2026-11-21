@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import contextvars
 import json
+import re
 import os
 import threading
 import time
@@ -47,6 +48,9 @@ def _ensure(store) -> None:
             "CREATE TABLE IF NOT EXISTS trace_capture (server_id TEXT NOT NULL, db_id TEXT NOT NULL, "
             "enabled INTEGER NOT NULL DEFAULT 0, threshold_ms INTEGER NOT NULL DEFAULT 200, run_as TEXT, "
             "updated_at REAL, PRIMARY KEY (server_id, db_id))")
+        cols = {r[1] for r in store._db.execute("PRAGMA table_info(trace_capture)")}
+        if "psql" not in cols:  # added in 2.5: also record procedures, functions and triggers
+            store._db.execute("ALTER TABLE trace_capture ADD COLUMN psql INTEGER NOT NULL DEFAULT 0")
         store._trace_capture_ready = True
 
 
@@ -61,25 +65,26 @@ def _store():
 def config(server_id: str, db_id: str) -> dict[str, Any]:
     s = _store()
     with s._lock:
-        row = s._db.execute("SELECT enabled, threshold_ms, run_as, updated_at FROM trace_capture "
+        row = s._db.execute("SELECT enabled, threshold_ms, run_as, updated_at, psql FROM trace_capture "
                             "WHERE server_id = ? AND db_id = ?", (server_id, db_id)).fetchone()
     if not row:
-        return {"enabled": False, "threshold_ms": DEFAULT_THRESHOLD_MS, "run_as": None, "updated_at": None}
+        return {"enabled": False, "threshold_ms": DEFAULT_THRESHOLD_MS, "run_as": None, "updated_at": None, "psql": False}
     return {"enabled": bool(row[0]), "threshold_ms": int(row[1]), "run_as": json.loads(row[2]) if row[2] else None,
-            "updated_at": row[3]}
+            "updated_at": row[3], "psql": bool(row[4])}
 
 
-def save(server_id: str, db_id: str, enabled: bool, threshold_ms: int, run_as: dict | None) -> dict | None:
+def save(server_id: str, db_id: str, enabled: bool, threshold_ms: int, run_as: dict | None,
+         psql: bool = False) -> dict | None:
     """Store the settings; returns the previous run-as credential (to revoke) when it is replaced."""
     s = _store()
     old = config(server_id, db_id)["run_as"]
     with s._lock:
-        s._db.execute("INSERT INTO trace_capture (server_id, db_id, enabled, threshold_ms, run_as, updated_at) "
-                      "VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (server_id, db_id) DO UPDATE SET enabled = excluded.enabled, "
+        s._db.execute("INSERT INTO trace_capture (server_id, db_id, enabled, threshold_ms, run_as, updated_at, psql) "
+                      "VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT (server_id, db_id) DO UPDATE SET enabled = excluded.enabled, "
                       "threshold_ms = excluded.threshold_ms, run_as = COALESCE(excluded.run_as, run_as), "
-                      "updated_at = excluded.updated_at",
+                      "updated_at = excluded.updated_at, psql = excluded.psql",
                       (server_id, db_id, int(enabled), int(threshold_ms), json.dumps(run_as) if run_as else None,
-                       time.time()))
+                       time.time(), int(psql)))
     return old if run_as is not None and old != run_as else None
 
 
@@ -117,6 +122,8 @@ class Capture:
         self.retry_at = 0.0
         self.sessions = 0          # sessions started
         self.errors = 0            # errors recorded (trace_errors.py)
+        self.routines = 0          # procedure, function and trigger runs recorded (psql)
+        self.psql = False
         self._minute = (0, 0)      # (minute, count)
         self._failed: dict[int, tuple[str, float]] = {}  # attachment -> (SQL of its last failed statement, when)
 
@@ -128,7 +135,7 @@ class Capture:
             "starting" if self.running() else "waiting" if self.error else "stopped"
         return {"state": state, "session_id": self.sess.session_id if self.sess else None,
                 "started_at": self.started_at, "captured": self.captured, "slow": self.slow, "dropped": self.dropped,
-                "errors": self.errors,
+                "errors": self.errors, "routines": self.routines,
                 "last_event_at": self.last_event_at, "error": self.error, "sessions": self.sessions,
                 "retry_at": self.retry_at if self.error and not self.running() else None}
 
@@ -157,6 +164,9 @@ class Capture:
         if typ.startswith("ERROR AT"):
             self._error(ev)
             return
+        if typ in ROUTINE_EVENTS:
+            self._routine(ev)
+            return
         if typ != "EXECUTE_STATEMENT_FINISH" or not ev.get("sql") or ev.get("duration_ms") is None:
             return
         if ev["duration_ms"] < self.threshold_ms:
@@ -176,6 +186,22 @@ class Capture:
         self.captured += 1
         self.last_event_at = now
 
+    def _routine(self, ev: dict[str, Any]) -> None:
+        """A procedure, function or trigger that finished: a run of ``EXECUTE PROCEDURE name`` (``FUNCTION name``,
+        ``TRIGGER name FOR table (when)``) in query regressions."""
+        if not self.psql or ev.get("duration_ms") is None or ev["duration_ms"] < self.threshold_ms:
+            return
+        name = routine_name(ev)
+        now = time.time()
+        if name is None or not self._take(now):
+            return
+        from . import history, regressions
+
+        regressions.record(history.get_store(), self.server_id, self.db_id, name, ev["duration_ms"] / 1000,
+                           source="trace_psql", ts=now)
+        self.routines += 1
+        self.last_event_at = now
+
     def _error(self, ev: dict[str, Any]) -> None:
         from . import trace_errors
 
@@ -193,11 +219,28 @@ class Capture:
         self.last_event_at = now
 
 
-def trace_config(db_path: str, threshold_ms: int) -> str:
+ROUTINE_EVENTS = {"EXECUTE_PROCEDURE_FINISH": "EXECUTE PROCEDURE", "EXECUTE_FUNCTION_FINISH": "FUNCTION",
+                  "EXECUTE_TRIGGER_FINISH": "TRIGGER"}
+_ROUTINE = re.compile(r"^\s*(?:Procedure|Function|Trigger)\s+(.+?):\s*$")
+
+
+def routine_name(ev: dict[str, Any]) -> str | None:
+    """``EXECUTE PROCEDURE P_SLOW``, ``FUNCTION F_SQ``, ``TRIGGER TT_BI FOR TT (BEFORE INSERT)`` (with the schema on
+    Firebird 6), from the routine line of a trace event."""
+    for line in (ev.get("text") or "").splitlines()[1:]:
+        m = _ROUTINE.match(line)
+        if m:
+            return f"{ROUTINE_EVENTS[ev['type']]} {m.group(1).strip()}"
+    return None
+
+
+def trace_config(db_path: str, threshold_ms: int, psql: bool = False) -> str:
     from ..maintenance.trace import database_pattern
 
     body = ["enabled = true", "log_statement_finish = true", "log_errors = true", "print_plan = true", "explain_plan = true",
             f"time_threshold = {int(threshold_ms)}", "max_sql_length = 16000"]
+    if psql:
+        body[2:2] = ["log_procedure_finish = true", "log_function_finish = true", "log_trigger_finish = true"]
     return f"database = {database_pattern(db_path)}\n{{\n" + "\n".join("  " + b for b in body) + "\n}\n"
 
 
@@ -214,7 +257,7 @@ def status(server_id: str, db_id: str) -> dict[str, Any]:
         return cap.status() if cap else Capture(server_id, db_id).status()
 
 
-def start(server_id: str, db_id: str, threshold_ms: int, wait: float = 10) -> Capture:
+def start(server_id: str, db_id: str, threshold_ms: int, wait: float = 10, psql: bool = False) -> Capture:
     """Start the trace session (in the caller's context: the user it runs as)."""
     from ..api.deps import get_state
     from ..maintenance.trace import TraceSession
@@ -226,7 +269,8 @@ def start(server_id: str, db_id: str, threshold_ms: int, wait: float = 10) -> Ca
         if cap.running():
             return cap
         cap.threshold_ms = threshold_ms
-    sess = TraceSession(server_id, f"fbadmin continuous capture: {db.name}", trace_config(db.path, threshold_ms),
+        cap.psql = psql
+    sess = TraceSession(server_id, f"fbadmin continuous capture: {db.name}", trace_config(db.path, threshold_ms, psql),
                         "continuous", db.path, keep_file=False, on_event=cap.on_event)
     cap.sess = sess
     cap.started_at = time.time()
@@ -274,14 +318,15 @@ def sync(server_id: str, db_id: str) -> dict[str, Any]:
     if cfg["enabled"] and get_store().is_tracked(server_id, db_id):
         with _lock:
             cap = _caps.get((server_id, db_id))
-            restart = cap is not None and cap.running() and cap.threshold_ms != cfg["threshold_ms"]
+            restart = cap is not None and cap.running() and (cap.threshold_ms != cfg["threshold_ms"]
+                                                             or cap.psql != cfg["psql"])
         if restart:
             stop(server_id, db_id)
         with _lock:
             cap = _caps.get((server_id, db_id))
             if cap is not None and not cap.running():
                 cap.retry_at = 0  # turned on (again) by hand: no waiting
-        start(server_id, db_id, cfg["threshold_ms"])
+        start(server_id, db_id, cfg["threshold_ms"], psql=cfg["psql"])
     else:
         stop(server_id, db_id)
     return status(server_id, db_id)
@@ -320,7 +365,7 @@ def check_all(now: float | None = None) -> None:
         try:
             with acting_as(cfg["run_as"], "continuous trace capture for this database"):
                 get_state().store.get_database(sid, dbid)
-                start(sid, dbid, cfg["threshold_ms"])
+                start(sid, dbid, cfg["threshold_ms"], psql=cfg["psql"])
         except (Unavailable, Exception) as exc:  # noqa: BLE001 - shown in the status, retried later
             with _lock:
                 cap = _caps.setdefault((sid, dbid), Capture(sid, dbid))
