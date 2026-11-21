@@ -283,7 +283,7 @@ Also fixed in this milestone:
 - ⬜ **Weekly digest per database:** the check-up, forecast, regressions, backups and change requests in one message to e-mail, Slack or webhook channels on a schedule
 - ⬜ **Maintenance windows:** alerts muted during a window, and an approved change request applied at the start of the next window instead of at once
 - ✅ **Propose from the Query Tool:** when fbadmin's permissions refuse a statement, the Query Tool offers *Propose as a change request…*, which opens a new request with the SQL filled in ([docs/CHANGE_REQUESTS.md](docs/CHANGE_REQUESTS.md#proposing-a-change))
-- ⬜ **Change request follow-ups:** edit migration scripts in the page, required approvals per database, timeline entries that open their request
+- ✅ **Change request follow-ups:** migration scripts edited in the page (rename, change, add, remove), the approvals needed set per database by its administrators, and timeline entries that open their request ([docs/CHANGE_REQUESTS.md](docs/CHANGE_REQUESTS.md))
 - ✅ **Check-up follow-ups:** the report marks findings *new* since the previous run and lists the ones that are gone; a scheduled check-up can send an AI inspection with its alert when something is new ([docs/MONITORING.md](docs/MONITORING.md#scheduled-check-up))
 - ✅ **Forecast in the check-up:** a capacity limit that is near (space budget, transaction counter, a sequence's column, table formats) is a check-up finding, one evidence line per limit, so a scheduled check-up alerts when a new limit comes near ([docs/MONITORING.md](docs/MONITORING.md#performance-check-up))
 - ⬜ **Continuous trace of PSQL:** optionally record procedure and function timings next to statements

@@ -11,7 +11,8 @@ Who may do what (server mode):
 * **edit**, **withdraw**: the author, while the request is not applied;
 * **dry run**, **approve**, **reject**, **apply**: the ``admin`` level on the database (the dry run restores a
   copy with the service API). The author cannot approve their own request unless
-  ``FBADMIN_CHANGE_SELF_APPROVE=1``. ``FBADMIN_CHANGE_APPROVALS`` approvals are needed (default 1).
+  ``FBADMIN_CHANGE_SELF_APPROVE=1``. ``FBADMIN_CHANGE_APPROVALS`` approvals are needed (default 1); an
+  administrator of a database can require another number there.
 
 Approvals belong to one dry run: editing the request clears them, and a later dry run that finds different schema
 changes clears them too. Applying is refused when the database's schema changed since the dry run.
@@ -108,8 +109,11 @@ class ChangeStore:
         self.path = path
         self._lock = threading.RLock()
         self.items: dict[str, ChangeRequest] = {}
+        self.approvals: dict[str, int] = {}  # "server_id/db_id" -> approvals needed there
         if path.exists():
-            for d in json.loads(path.read_text("utf-8") or "{}").get("requests", []):
+            raw = json.loads(path.read_text("utf-8") or "{}")
+            self.approvals = {k: int(v) for k, v in (raw.get("approvals") or {}).items()}
+            for d in raw.get("requests", []):
                 try:
                     cr = ChangeRequest(**d)
                     if cr.status == "applying":  # fbadmin stopped while applying: what ran is unknown
@@ -123,7 +127,8 @@ class ChangeStore:
     def _save(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         tmp = self.path.with_suffix(".tmp")
-        tmp.write_text(json.dumps({"requests": [c.model_dump() for c in self.items.values()]}, default=str), "utf-8")
+        tmp.write_text(json.dumps({"requests": [c.model_dump() for c in self.items.values()],
+                                   "approvals": self.approvals}, default=str), "utf-8")
         os.chmod(tmp, 0o600)
         os.replace(tmp, self.path)
 
@@ -158,6 +163,19 @@ class ChangeStore:
     def all(self) -> list[ChangeRequest]:
         with self._lock:
             return sorted(self.items.values(), key=lambda c: -c.created_at)
+
+    def needed(self, server_id: str, db_id: str) -> int:
+        with self._lock:
+            return self.approvals.get(f"{server_id}/{db_id}", APPROVALS)
+
+    def set_needed(self, server_id: str, db_id: str, n: int | None) -> None:
+        with self._lock:
+            key = f"{server_id}/{db_id}"
+            if n is None:
+                self.approvals.pop(key, None)
+            else:
+                self.approvals[key] = n
+            self._save()
 
     def forget_database(self, server_id: str, db_id: str) -> None:
         with self._lock:
@@ -306,7 +324,8 @@ def notify(cr: ChangeRequest, action: str, who: Actor, detail: str = "") -> None
 
         timeline().add(cr.server_id, cr.database_id, "schema", f"change_{action}", title,
                        detail=(detail + "\n\n" if detail else "") + cr.text()[:15000], username=who.username,
-                       status={"applied": "ok", "failed": "failed", "rejected": "warning"}.get(action, "ok"))
+                       status={"applied": "ok", "failed": "failed", "rejected": "warning"}.get(action, "ok"),
+                       ref={"type": "change_request", "id": cr.id})
     except Exception:  # noqa: BLE001 - the timeline must not break the request
         pass
 

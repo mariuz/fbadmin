@@ -87,7 +87,7 @@ def _view(cr: C.ChangeRequest, full: bool = True) -> dict[str, Any]:
         out["server"] = st.store.get(cr.server_id).name
     except KeyError:
         out["database"] = out["server"] = None
-    out["approvals_needed"] = C.APPROVALS
+    out["approvals_needed"] = C.get_store().needed(cr.server_id, cr.database_id)
     out["mine"] = C.is_author(cr, who) and not who.desktop
     out["can"] = C.actions(cr, who)
     out["approve_blocked"] = C.may_approve(cr, who)
@@ -135,6 +135,37 @@ def create(body: ChangeIn):
     C.audit(cr, f"submitted: {cr.title}")
     C.notify(cr, "submitted", who, cr.description)
     return _view(cr)
+
+
+class SettingsIn(BaseModel):
+    approvals: int | None = Field(default=None, ge=1, le=10)  # None: the default (FBADMIN_CHANGE_APPROVALS)
+
+
+@router.get("/settings")
+def get_settings(server_id: str, database_id: str):
+    """Approvals needed for a database's change requests, and whether this user may change it."""
+    from ..security.access import ADMIN
+
+    lvl = C.level(server_id, database_id)
+    if lvl < READ:
+        raise KeyError("Unknown database")
+    return {"approvals": C.get_store().needed(server_id, database_id), "default": C.APPROVALS,
+            "custom": f"{server_id}/{database_id}" in C.get_store().approvals, "can_edit": lvl >= ADMIN}
+
+
+@router.put("/settings")
+def put_settings(server_id: str, database_id: str, body: SettingsIn):
+    from ..security.access import ADMIN
+
+    if C.level(server_id, database_id) < ADMIN:
+        raise AccessDenied("Changing the approvals needs the 'admin' level on the database")
+    C.get_store().set_needed(server_id, database_id, body.approvals)
+    sec = getattr(get_state(), "security", None)
+    if sec is not None and sec.audit.enabled:
+        sec.audit.record(server_id=server_id, db_id=database_id, success=True, cat="DDL",
+                         statement=f"-- change requests: approvals needed set to "
+                                   f"{body.approvals or f'the default ({C.APPROVALS})'}")
+    return get_settings(server_id, database_id)
 
 
 @router.get("/{cid}")
@@ -212,7 +243,7 @@ def approve(cid: str, body: TextIn | None = None):
         cr.approvals.append(C.Approval(by=who.username, user_id=who.user_id, comment=note,
                                        changes=cr.dry_run.get("changes_fp", "") if cr.dry_run else ""))
         cr.log(who, "approved", note)
-        if len(cr.approvals) >= C.APPROVALS:
+        if len(cr.approvals) >= C.get_store().needed(cr.server_id, cr.database_id):
             cr.status = "approved"
 
     cr = C.get_store().update(cid, fn)

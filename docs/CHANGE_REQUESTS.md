@@ -21,7 +21,8 @@ access, who is refused by the Query Tool when running DDL, can still propose it:
 Query Tool shows **Propose as a change request…**, which opens a new request with the refused SQL
 filled in.
 
-The author can **edit** the SQL until the change is applied. Each edit is a new revision: it clears
+The author can **edit** the SQL (or the migration scripts: rename, change, add or remove them) until the
+change is applied. Each edit is a new revision: it clears
 the approvals and needs a new dry run. The author can also **withdraw** the request.
 
 ## Review
@@ -63,7 +64,7 @@ history too. The same steps are recorded in:
 
 * the [audit log](SECURITY.md) (server mode), together with each statement the change ran;
 * the database's [timeline](TIMELINE.md), under *schema*: proposed, approved, rejected, withdrawn,
-  applied and failed, with the SQL;
+  applied and failed, with the SQL; each entry opens its request;
 * the [schema history](SCHEMA_HISTORY.md), when the database has one: applying makes a snapshot like
   any DDL run from fbadmin.
 
@@ -83,7 +84,7 @@ In desktop mode there is one user, who can do everything, including approving th
 
 | Setting | Default | |
 |---|---|---|
-| `FBADMIN_CHANGE_APPROVALS` | `1` | approvals needed before a change can be applied |
+| `FBADMIN_CHANGE_APPROVALS` | `1` | approvals needed before a change can be applied; an administrator of a database can require another number there (**Approvals needed** in its change requests tab) |
 | `FBADMIN_CHANGE_SELF_APPROVE` | off | let authors approve their own changes in server mode |
 
 Requests are kept in `<data dir>/change_requests.json`.
@@ -94,6 +95,7 @@ Requests are kept in `<data dir>/change_requests.json`.
 |---|---|---|
 | GET | `/api/changes?server_id=&database_id=&status=` | requests the user may see (`status=active`: open and approved) |
 | POST | `/api/changes` `{server_id, database_id, title, description, kind, sql \| scripts}` | propose |
+| GET / PUT | `/api/changes/settings?server_id=&database_id=` `{approvals}` | approvals needed on a database (`null`: the default) |
 | GET / PUT | `/api/changes/{id}` | a request with its dry run, approvals and history / edit it (author) |
 | POST | `/api/changes/{id}/comments` `{text}` | comment |
 | POST | `/api/changes/{id}/dry-run` `{copy_mode}` | dry run (a job) |

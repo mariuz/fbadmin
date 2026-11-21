@@ -36,4 +36,8 @@ export const crApi = {
   withdraw: (id: string) => request<ChangeRequest>("POST", u(id, "/withdraw")),
   dryRun: (id: string, copy_mode: "metadata" | "full") => request<Job>("POST", u(id, "/dry-run"), { copy_mode }),
   apply: (id: string) => request<Job>("POST", u(id, "/apply")),
+  settings: (sid: string, dbid: string) =>
+    request<{ approvals: number; default: number; custom: boolean; can_edit: boolean }>("GET", `/api/changes/settings?server_id=${encodeURIComponent(sid)}&database_id=${encodeURIComponent(dbid)}`),
+  setSettings: (sid: string, dbid: string, approvals: number | null) =>
+    request<{ approvals: number; default: number; custom: boolean; can_edit: boolean }>("PUT", `/api/changes/settings?server_id=${encodeURIComponent(sid)}&database_id=${encodeURIComponent(dbid)}`, { approvals }),
 };

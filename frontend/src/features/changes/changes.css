@@ -21,3 +21,6 @@
 .cr .cr-chg { display: inline-block; min-width: 64px; font-weight: 600; }
 .cr .cr-history { list-style: none; padding: 0; margin: 0 0 8px; display: flex; flex-direction: column; gap: 6px; }
 .cr .cr-comment { white-space: pre-wrap; border-left: 3px solid var(--border); padding-left: 8px; margin-top: 2px; }
+.cr .cr-script { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+.cr .cr-editor.small { height: 140px; }
+.cr .cr-approvals-setting { gap: 6px; font-size: 12px; }

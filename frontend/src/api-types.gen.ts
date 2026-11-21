@@ -1029,6 +1029,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/changes/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Settings
+         * @description Approvals needed for a database's change requests, and whether this user may change it.
+         */
+        get: operations["get_settings_api_changes_settings_get"];
+        /** Put Settings */
+        put: operations["put_settings_api_changes_settings_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/changes/{cid}": {
         parameters: {
             query?: never;
@@ -6468,6 +6489,11 @@ export interface components {
         /** CheckupOptions */
         CheckupOptions: {
             /**
+             * Ai
+             * @default false
+             */
+            ai?: boolean;
+            /**
              * Fix Selectivity
              * @default false
              */
@@ -7942,31 +7968,6 @@ export interface components {
             /** Server Id */
             server_id: string;
         };
-        /** SettingsIn */
-        SettingsIn: {
-            /** Interval */
-            interval?: number | null;
-            /** Metrics Enabled */
-            metrics_enabled?: boolean | null;
-            /** Regression Baseline Days */
-            regression_baseline_days?: number | null;
-            /** Regression Factor */
-            regression_factor?: number | null;
-            /** Regression Keep Days */
-            regression_keep_days?: number | null;
-            /** Regression Min Runs */
-            regression_min_runs?: number | null;
-            /** Regression Min Seconds */
-            regression_min_seconds?: number | null;
-            /** Regression Query Ms */
-            regression_query_ms?: number | null;
-            /** Regression Recent Hours */
-            regression_recent_hours?: number | null;
-            /** Retention Hours */
-            retention_hours?: number | null;
-            /** Slow Seconds */
-            slow_seconds?: number | null;
-        };
         /** ShutdownIn */
         ShutdownIn: {
             /**
@@ -8432,6 +8433,11 @@ export interface components {
             /** Scratch */
             scratch?: string | null;
         };
+        /** SettingsIn */
+        fbadmin__api__changes__SettingsIn: {
+            /** Approvals */
+            approvals?: number | null;
+        };
         /** TextIn */
         fbadmin__api__changes__TextIn: {
             /**
@@ -8596,6 +8602,31 @@ export interface components {
             source_ref?: string | null;
             /** Target */
             target?: string | null;
+        };
+        /** SettingsIn */
+        fbadmin__api__monitoring__SettingsIn: {
+            /** Interval */
+            interval?: number | null;
+            /** Metrics Enabled */
+            metrics_enabled?: boolean | null;
+            /** Regression Baseline Days */
+            regression_baseline_days?: number | null;
+            /** Regression Factor */
+            regression_factor?: number | null;
+            /** Regression Keep Days */
+            regression_keep_days?: number | null;
+            /** Regression Min Runs */
+            regression_min_runs?: number | null;
+            /** Regression Min Seconds */
+            regression_min_seconds?: number | null;
+            /** Regression Query Ms */
+            regression_query_ms?: number | null;
+            /** Regression Recent Hours */
+            regression_recent_hours?: number | null;
+            /** Retention Hours */
+            retention_hours?: number | null;
+            /** Slow Seconds */
+            slow_seconds?: number | null;
         };
         /** CopyIn */
         fbadmin__api__notebooks__CopyIn: {
@@ -11010,6 +11041,74 @@ export interface operations {
             };
         };
     };
+    get_settings_api_changes_settings_get: {
+        parameters: {
+            query: {
+                server_id: string;
+                database_id: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_settings_api_changes_settings_put: {
+        parameters: {
+            query: {
+                server_id: string;
+                database_id: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["fbadmin__api__changes__SettingsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_one_api_changes__cid__get: {
         parameters: {
             query?: never;
@@ -12779,7 +12878,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["SettingsIn"];
+                "application/json": components["schemas"]["fbadmin__api__monitoring__SettingsIn"];
             };
         };
         responses: {

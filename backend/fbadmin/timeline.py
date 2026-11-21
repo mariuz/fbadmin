@@ -59,6 +59,9 @@ class TimelineStore:
                 PRIMARY KEY (server_id, db_id));
             """
         )
+        cols = {r[1] for r in self._db.execute("PRAGMA table_info(events)")}
+        if "ref" not in cols:  # what an event links to (e.g. a change request); added in 2.5
+            self._db.execute("ALTER TABLE events ADD COLUMN ref TEXT")
         try:
             os.chmod(path, 0o600)
         except OSError:
@@ -72,14 +75,15 @@ class TimelineStore:
 
     def add(self, server_id: str, db_id: str, category: str, action: str, title: str, *, detail: str | None = None,
             username: str | None = None, status: str = "ok", job_id: str | None = None, error: str | None = None,
-            ts: float | None = None) -> int:
+            ts: float | None = None, ref: dict | None = None) -> int:
         now = time.time()
         with self._lock:
             cur = self._db.execute(
                 "INSERT INTO events (ts, server_id, db_id, category, action, title, detail, username, status, job_id, "
-                "error, finished_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "error, finished_at, ref) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (ts or now, server_id, db_id, category, action, title[:500], (detail or None) and detail[:20000],
-                 username, status, job_id, error, None if status == "running" else (ts or now)))
+                 username, status, job_id, error, None if status == "running" else (ts or now),
+                 json.dumps(ref) if ref else None))
             if now - self._pruned > 3600:
                 self._pruned = now
                 self._db.execute("DELETE FROM events WHERE ts < ?", (now - KEEP_DAYS * 86400,))
@@ -429,7 +433,8 @@ def _local(server_id: str, db_id: str, since, until) -> list[dict]:
     for r in get_store().events(server_id, db_id, since, until):
         out.append(_ev("fbadmin", str(r["id"]), r["ts"], r["category"], r["action"], r["title"], detail=r["detail"],
                        status=r["status"], user=r["username"], finished_at=r["finished_at"], error=r["error"],
-                       ref={"type": "job", "job_id": r["job_id"]} if r["job_id"] else {}))
+                       ref=json.loads(r["ref"]) if r.get("ref") else
+                       ({"type": "job", "job_id": r["job_id"]} if r["job_id"] else {})))
     return out
 
 

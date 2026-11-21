@@ -10,6 +10,7 @@ import { registerMenu, registerTabKind } from "../../registry";
 import { IconRefresh } from "../../components/Icons";
 import { openSchemaHistory } from "../schema-history";
 import { openMigrations } from "../migrations";
+import { openChanges } from "../changes";
 import "./timeline.css";
 import { timelineApi, type Category, type Timeline, type TimelineEvent } from "./api";
 
@@ -48,6 +49,7 @@ function Event(props: { e: TimelineEvent; sid: string; dbid: string }) {
       case "migrations": return [t("Open migrations"), () => openMigrations(app, props.sid, props.dbid)] as const;
       case "alert": return [t("Open alerts"), () => app.openTab({ kind: "alerts", title: t("Alerts") })] as const;
       case "schedule": return [t("Open schedules"), () => app.openTab({ kind: "schedules", title: t("Schedules") })] as const;
+      case "change_request": return [t("Open the change request"), () => openChanges(app, props.sid, props.dbid, e.ref.id)] as const;
       case "audit": return [t("Open the audit log"), () => app.openTab({ kind: "security-audit", title: t("Audit log") })] as const;
       default: return null;
     }

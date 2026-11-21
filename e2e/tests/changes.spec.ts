@@ -103,3 +103,28 @@ test("the column exists and the timeline has the change", async ({ request }) =>
   const tl = (await (await request.get(base() + "/timeline")).json()).events as { action: string }[];
   expect(tl.map((e) => e.action)).toContain("change_applied");
 });
+
+test("approvals needed, migration scripts edited in the page", async ({ request }) => {
+  await pane().getByLabel("Approvals needed").selectOption("2");
+  await expect(page.getByText("Saved").last()).toBeVisible();
+  const s = await (await request.get("/api/changes/settings", { params: { server_id: serverId, database_id: dbId } })).json();
+  expect(s.approvals).toBe(2);
+  await pane().getByLabel("Approvals needed").selectOption("");
+
+  const cr = await (await request.post("/api/changes", { data: {
+    server_id: serverId, database_id: dbId, title: "Customers", kind: "migrations",
+    scripts: [{ name: "V1__customers.sql", sql: "CREATE TABLE CUSTOMERS (ID INTEGER NOT NULL);" }],
+  } })).json();
+  await pane().getByLabel("Show").selectOption("active");
+  await pane().getByRole("list", { name: "Change requests" }).getByText("Customers").click();
+  await pane().getByRole("button", { name: "Edit", exact: true }).click();
+  await pane().getByRole("button", { name: "Add a script" }).click();
+  await pane().getByLabel("Script name").last().fill("V2__customer_name.sql");
+  await pane().locator(".cr-script .cm-content").last().click();
+  await page.keyboard.type("ALTER TABLE CUSTOMERS ADD NAME VARCHAR(40);");
+  await pane().getByRole("button", { name: "Save the revision" }).click();
+  await expect(pane().locator(".cr-history")).toContainText("revised the change");
+  const got = await (await request.get(`/api/changes/${cr.id}`)).json();
+  expect(got.revision).toBe(2);
+  expect(got.scripts.map((x: { name: string }) => x.name)).toEqual(["V1__customers.sql", "V2__customer_name.sql"]);
+});

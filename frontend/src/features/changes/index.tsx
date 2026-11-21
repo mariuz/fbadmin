@@ -93,9 +93,10 @@ function Detail(props: { id: string; onChanged: () => void }) {
   const [running, setRunning] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [editing, setEditing] = useState<string | null>(null);
+  const [editScripts, setEditScripts] = useState<ScriptItem[] | null>(null);
   const [copy, setCopy] = useState<"metadata" | "full">("metadata");
   const load = async () => { try { setCr(await crApi.get(props.id)); setError(null); } catch (e) { setError(errMsg(e)); } };
-  useEffect(() => { setCr(null); setEditing(null); setNote(""); load(); }, [props.id]);
+  useEffect(() => { setCr(null); setEditing(null); setEditScripts(null); setNote(""); load(); }, [props.id]);
   const act = async (fn: () => Promise<ChangeRequest>, ok?: string) => {
     try { setCr(await fn()); setNote(""); if (ok) app.toast(ok, "ok"); props.onChanged(); } catch (e) { app.toast(errMsg(e), "error"); }
   };
@@ -130,7 +131,7 @@ function Detail(props: { id: string; onChanged: () => void }) {
           {cr.can.apply && <button className="btn primary small" disabled={!!running} onClick={() => {
             if (window.confirm(t("Apply change request #{n} to {db} now?", { n: cr.number, db: cr.database ?? "" }))) job(t("Applying…"), () => crApi.apply(cr.id));
           }}>{t("Apply the change")}</button>}
-          {cr.can.edit && editing === null && <button className="btn small" onClick={() => setEditing(text)} disabled={cr.kind !== "sql"} title={cr.kind !== "sql" ? t("Propose the new scripts as a new request") : undefined}>{t("Edit")}</button>}
+          {cr.can.edit && editing === null && editScripts === null && <button className="btn small" onClick={() => (cr.kind === "sql" ? setEditing(text) : setEditScripts((cr.scripts ?? []).map((s) => ({ ...s }))))}>{t("Edit")}</button>}
           {cr.can.withdraw && <button className="btn small" onClick={() => window.confirm(t("Withdraw change request #{n}?", { n: cr.number })) && act(() => crApi.withdraw(cr.id), t("Withdrawn"))}>{t("Withdraw")}</button>}
         </div>
         {running && <div className="muted" role="status">{running}</div>}
@@ -161,6 +162,24 @@ function Detail(props: { id: string; onChanged: () => void }) {
           <div className="mt-row" style={{ marginTop: 8 }}>
             <button className="btn primary small" onClick={() => act(() => crApi.edit(cr.id, { sql: editing }), t("Saved")).then(() => setEditing(null))}>{t("Save the revision")}</button>
             <button className="btn small" onClick={() => setEditing(null)}>{t("Cancel")}</button>
+            <span className="muted">{t("Saving a new revision clears the approvals and needs a new dry run.")}</span>
+          </div>
+        </> : editScripts !== null ? <>
+          {editScripts.map((s, i) => (
+            <div key={i} className="cr-script">
+              <div className="mt-row">
+                <input className="text mono" aria-label={t("Script name")} value={s.name} style={{ flex: 1 }}
+                  onChange={(e) => setEditScripts(editScripts.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))} />
+                <button className="btn small" onClick={() => setEditScripts(editScripts.filter((_, j) => j !== i))}>{t("Remove")}</button>
+              </div>
+              <div className="cr-editor small"><SqlEditor value={s.sql} onChange={(v) => setEditScripts(editScripts.map((x, j) => (j === i ? { ...x, sql: v } : x)))} /></div>
+            </div>
+          ))}
+          <div className="mt-row" style={{ marginTop: 8 }}>
+            <button className="btn small" onClick={() => setEditScripts([...editScripts, { name: `V${editScripts.length + 1}__change.sql`, sql: "" }])}><IconPlus size={12} /> {t("Add a script")}</button>
+            <button className="btn primary small" disabled={!editScripts.length || editScripts.some((s) => !s.name.trim())}
+              onClick={() => act(() => crApi.edit(cr.id, { scripts: editScripts }), t("Saved")).then(() => setEditScripts(null))}>{t("Save the revision")}</button>
+            <button className="btn small" onClick={() => setEditScripts(null)}>{t("Cancel")}</button>
             <span className="muted">{t("Saving a new revision clears the approvals and needs a new dry run.")}</span>
           </div>
         </> : <div className="cr-editor ro"><SqlEditor value={text} readOnly /></div>}
@@ -195,6 +214,26 @@ function Detail(props: { id: string; onChanged: () => void }) {
   );
 }
 
+function ApprovalsSetting(props: { sid: string; dbid: string }) {
+  const app = useApp();
+  const [s, setS] = useState<{ approvals: number; default: number; custom: boolean; can_edit: boolean } | null>(null);
+  useEffect(() => { crApi.settings(props.sid, props.dbid).then(setS).catch(() => setS(null)); }, [props.sid, props.dbid]);
+  if (!s) return null;
+  if (!s.can_edit) return <div className="muted cr-meta">{t("Approvals needed: {n}", { n: s.approvals })}</div>;
+  return (
+    <div className="mt-row cr-approvals-setting">
+      <label htmlFor="cr-needed">{t("Approvals needed")}</label>
+      <select id="cr-needed" className="text" value={s.custom ? String(s.approvals) : ""} onChange={async (e) => {
+        try { setS(await crApi.setSettings(props.sid, props.dbid, e.target.value ? Number(e.target.value) : null)); app.toast(t("Saved"), "ok"); }
+        catch (err) { app.toast(errMsg(err), "error"); }
+      }}>
+        <option value="">{t("default ({n})", { n: s.default })}</option>
+        {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
+      </select>
+    </div>
+  );
+}
+
 function CommentBox(props: { onSend: (text: string) => Promise<void> }) {
   const [text, setText] = useState("");
   return (
@@ -211,6 +250,7 @@ function ChangesTab(props: { serverId: string; dbId: string; visible: boolean; o
   const [items, setItems] = useState<ChangeRequest[]>([]);
   const [filter, setFilter] = useState<"active" | "">("active");
   const [selected, setSelected] = useState<string | null>(props.openId ?? null);
+  useEffect(() => { if (props.openId) { setSelected(props.openId); setCreating(false); } }, [props.openId]);
   const [creating, setCreating] = useState(!!props.draft);
   useEffect(() => { if (props.draft) { setCreating(true); setSelected(null); } }, [props.draft?.nonce]);
   const load = async () => { try { setItems(await crApi.list(dbid, filter || undefined)); } catch (e) { app.toast(errMsg(e), "error"); } };
@@ -225,6 +265,7 @@ function ChangesTab(props: { serverId: string; dbId: string; visible: boolean; o
             <option value="">{t("all")}</option>
           </select>
         </div>
+        <ApprovalsSetting sid={sid} dbid={dbid} />
         {items.length === 0 ? <div className="muted">{filter ? t("No open change requests.") : t("No change requests yet.")}</div> : (
           <ul className="cr-list" aria-label={t("Change requests")}>{items.map((c) => (
             <li key={c.id}><button className={"cr-item" + (selected === c.id ? " sel" : "")} aria-current={selected === c.id} onClick={() => { setSelected(c.id); setCreating(false); }}>

@@ -161,6 +161,9 @@ def test_change_request_permissions(srv, tmp_path):  # noqa: F811
         cid = cr.json()["id"]
         assert cr.json()["author"] == "dave" and cr.json()["mine"] is True and cr.json()["can"]["dry_run"] is False
         assert c.post(f"/api/changes/{cid}/dry-run").status_code == 403
+        assert c.put("/api/changes/settings", params={"server_id": s["id"], "database_id": dbid},
+                     json={"approvals": 3}).status_code == 403
+        assert c.get("/api/changes/settings", params={"server_id": s["id"], "database_id": dbid}).json()["can_edit"] is False
         assert c.post(f"/api/changes/{cid}/reject", json={"text": "no"}).status_code == 403
 
         _switch(c, "erin", "erin-password")  # no access: the request does not exist for her
@@ -205,3 +208,29 @@ def test_store_reload_marks_an_interrupted_apply(tmp_path, monkeypatch):
     st.update(cr.id, lambda c: setattr(c, "status", "applying"))
     again = C.ChangeStore(st.path).get(cr.id)
     assert again.status == "failed" and "stopped while applying" in again.history[-1].detail
+
+
+@requires_server
+def test_approvals_per_database_and_timeline_links(client, database):
+    sid, dbid = database
+    s = client.get("/api/changes/settings", params={"server_id": sid, "database_id": dbid}).json()
+    assert s == {"approvals": C.APPROVALS, "default": C.APPROVALS, "custom": False, "can_edit": True}
+    assert client.put("/api/changes/settings", params={"server_id": sid, "database_id": dbid},
+                      json={"approvals": 0}).status_code == 422
+    s = client.put("/api/changes/settings", params={"server_id": sid, "database_id": dbid}, json={"approvals": 2}).json()
+    assert s["approvals"] == 2 and s["custom"]
+    cr = client.post("/api/changes", json={"server_id": sid, "database_id": dbid, "title": "Two eyes",
+                                           "sql": "CREATE TABLE TWO (X INTEGER)"}).json()
+    assert cr["approvals_needed"] == 2
+    _job(client, client.post(f"/api/changes/{cr['id']}/dry-run"))
+    r = client.post(f"/api/changes/{cr['id']}/approve").json()
+    assert r["status"] == "open" and len(r["approvals"]) == 1  # one of two
+    r = client.post(f"/api/changes/{cr['id']}/approve").json()  # desktop mode: the one user approves again
+    assert r["status"] == "approved"
+    # back to the default
+    s = client.put("/api/changes/settings", params={"server_id": sid, "database_id": dbid}, json={"approvals": None}).json()
+    assert s["approvals"] == C.APPROVALS and not s["custom"]
+    # the timeline entries open their request
+    ev = [e for e in client.get(f"/api/servers/{sid}/databases/{dbid}/timeline").json()["events"]
+          if e["action"].startswith("change_")]
+    assert ev and all(e["ref"] == {"type": "change_request", "id": cr["id"]} for e in ev)
