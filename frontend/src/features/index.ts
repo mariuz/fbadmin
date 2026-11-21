@@ -33,3 +33,5 @@ import "./anonymise";
 import "./links";
 import "./forecast";
 import "./changes";
+import "./comments";
+import "./fleet";

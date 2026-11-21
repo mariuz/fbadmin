@@ -74,6 +74,7 @@ nav:
       - Charts from query results: CHARTS.md
       - SQL notebooks: NOTEBOOKS.md
       - Shareable links: SHAREABLE_LINKS.md
+      - Comments: COMMENTS.md
       - Data grid: user-guide/data-grid.md
       - Object dialogs: OBJECT_DIALOGS.md
       - PSQL debugging and tests: PSQL_DEBUGGING.md
@@ -90,6 +91,7 @@ nav:
       - Monitoring and maintenance: user-guide/monitoring.md
       - Monitoring and performance: MONITORING.md
       - Server overview: OVERVIEW.md
+      - Fleet health: FLEET.md
       - Phones and tablets: MOBILE.md
       - Event monitor: EVENTS.md
   - Administration:

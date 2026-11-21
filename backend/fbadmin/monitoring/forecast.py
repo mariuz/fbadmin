@@ -62,6 +62,8 @@ def _ensure(store) -> None:
             CREATE INDEX IF NOT EXISTS forecast_obs_db ON forecast_obs (server_id, db_id, ts);
             CREATE TABLE IF NOT EXISTS forecast_settings (server_id TEXT NOT NULL, db_id TEXT NOT NULL,
                 budget_bytes INTEGER, alerted TEXT, PRIMARY KEY (server_id, db_id));
+            CREATE TABLE IF NOT EXISTS forecast_summary (server_id TEXT NOT NULL, db_id TEXT NOT NULL, ts REAL,
+                summary TEXT, PRIMARY KEY (server_id, db_id));
             """
         )
         store._forecast_ready = True
@@ -101,6 +103,7 @@ def forget(server_id: str, db_id: str) -> None:
     with s._lock:
         s._db.execute("DELETE FROM forecast_obs WHERE server_id = ? AND db_id = ?", (server_id, db_id))
         s._db.execute("DELETE FROM forecast_settings WHERE server_id = ? AND db_id = ?", (server_id, db_id))
+        s._db.execute("DELETE FROM forecast_summary WHERE server_id = ? AND db_id = ?", (server_id, db_id))
     _last.pop((server_id, db_id), None)
 
 
@@ -334,7 +337,32 @@ def analyze(server_id: str, db_id: str, conn, now: float | None = None) -> dict[
                                       "back up and restore before it can no longer be altered"})
     findings.sort(key=lambda x: 0 if x["severity"] == "critical" else 1)
     out["findings"] = findings
+    _remember(server_id, db_id, out, now)
     return out
+
+
+def _remember(server_id: str, db_id: str, out: dict[str, Any], now: float) -> None:
+    """The newest result in short, for the fleet page (which opens no connection)."""
+    f = out["findings"]
+    summary = {"severity": f[0]["severity"] if f else "ok", "title": f[0]["title"] if f else None,
+               "findings": len(f), "enough": out.get("enough"), "size_bytes": (out.get("size") or {}).get("bytes")}
+    try:
+        s = _store()
+        with s._lock:
+            s._db.execute("INSERT INTO forecast_summary (server_id, db_id, ts, summary) VALUES (?, ?, ?, ?) "
+                          "ON CONFLICT (server_id, db_id) DO UPDATE SET ts = excluded.ts, summary = excluded.summary",
+                          (server_id, db_id, now, json.dumps(summary)))
+    except Exception:  # noqa: BLE001 - never breaks the forecast
+        pass
+
+
+def summary(server_id: str, db_id: str) -> dict[str, Any] | None:
+    """The newest forecast in short (``analyze`` keeps it), or None."""
+    s = _store()
+    with s._lock:
+        r = s._db.execute("SELECT ts, summary FROM forecast_summary WHERE server_id = ? AND db_id = ?",
+                          (server_id, db_id)).fetchone()
+    return {"at": r[0], **json.loads(r[1])} if r else None
 
 
 def _fmt_days(d: float | None) -> str:

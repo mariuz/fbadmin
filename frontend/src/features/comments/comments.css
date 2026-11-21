@@ -1,0 +1,11 @@
+.cmt { display: flex; flex-direction: column; gap: 10px; max-width: 900px; }
+.cmt .cmt-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.cmt .cmt-item { border: 1px solid var(--border); border-radius: var(--radius); padding: 6px 10px; background: var(--panel-2); }
+.cmt .cmt-meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; font-size: 12px; }
+.cmt .cmt-actions { margin-left: auto; display: flex; gap: 4px; }
+.cmt .cmt-text { white-space: pre-wrap; overflow-wrap: anywhere; margin-top: 4px; }
+.cmt .cmt-edit, .cmt .cmt-new { display: flex; flex-direction: column; gap: 6px; }
+.cmt .cmt-new { flex-direction: row; align-items: flex-end; }
+.cmt .cmt-new textarea { flex: 1; }
+.nb-comments { margin: 16px 0 8px; }
+.nb-comments > summary { cursor: pointer; font-weight: 600; margin-bottom: 8px; }

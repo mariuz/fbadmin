@@ -125,6 +125,9 @@ def update_notebook(nb_id: str, body: NotebookUpdate):
 @router.delete("/{nb_id}", status_code=204)
 def delete_notebook(nb_id: str):
     get_store().delete(nb_id, writer())
+    from .. import comments
+
+    comments.get_store().forget(lambda c: c.target.kind == "notebook" and c.target.notebook_id == nb_id)
     return Response(status_code=204)
 
 

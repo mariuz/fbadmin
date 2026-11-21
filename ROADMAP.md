@@ -12,7 +12,7 @@ scope.
 
 **Status:** milestones 0.1 to 2.0, the engineering backlog and the phone and tablet layout are
 implemented and verified in CI against real services. Firebird 6.0 final support waits for the
-6.0 release. Milestone 2.2 is done and 2.3 lacks only push notifications; milestones 2.1, 2.4 (comments left), 2.5 and 3.0 below are planned. The current release is **2.1.1** ([release notes](docs/release-notes/v2.1.1.md)): on
+6.0 release. Milestone 2.2 is done and 2.3 lacks only push notifications; milestone 2.4 is done; milestones 2.1, 2.5 and 3.0 below are planned. The current release is **2.1.1** ([release notes](docs/release-notes/v2.1.1.md)): on
 [PyPI](https://pypi.org/project/firebird-admin/) (`pip install firebird-admin`), on
 [GitHub Releases](https://github.com/mariuz/fbadmin/releases) with desktop installers for Windows,
 macOS and Linux, as a Docker image, and documented at https://mariuz.github.io/fbadmin/.
@@ -265,19 +265,19 @@ Also fixed in this milestone:
 - ⬜ **Push notifications for alerts:** Web Push to the installed phone app, next to the e-mail, Slack and webhook channels
 - ✅ **Shareable links** to an object, a saved query, a notebook or a result snapshot (`/#/link/<id>`), opened with the viewer's own permissions (the link grants nothing; snapshots only for users who may read their whole database); copy from the object menu, the library, notebooks and the Query Tool's Share view; expiry, revocation, a list of your links with open counts ([docs/SHAREABLE_LINKS.md](docs/SHAREABLE_LINKS.md))
 
-## Milestone 2.4 — Automation and foresight ⬜
+## Milestone 2.4 — Automation and foresight ✅
 
 - ✅ **Scheduled notebooks and reports:** a notebook runs on a cron schedule as the schedule's owner, with that user's fbadmin permissions (hidden tables stay hidden, audit log in server mode), read-only by default, stopping at the first error; results kept in the notebook; a report (the notebook as Markdown, the first rows, CSV attachments by e-mail) to e-mail, Slack or webhook channels after every run, only when a result has rows, or only on errors ([docs/NOTEBOOKS.md](docs/NOTEBOOKS.md#scheduled-notebooks-and-reports))
 - ✅ **Capacity and transaction-ID forecasting:** project database growth, transaction numbers, sequences against the columns they feed and table formats from the history, and warn before a limit is reached ([docs/MONITORING.md](docs/MONITORING.md#capacity-forecast))
 - ✅ **Scheduled performance check-up:** run the check-up on a schedule and alert only on what is new since the previous run (a stuck OAT, selectivity outdated after a load), with a severity floor, finding types to leave out, an optional automatic selectivity recompute and one *resolved* message ([docs/MONITORING.md](docs/MONITORING.md#scheduled-check-up))
 - ✅ **Change requests with approval:** a developer with read access proposes a SQL change or migration scripts; an administrator of the database runs a dry run on a copy that shows the schema diff, approves or rejects it with a comment (not their own, in server mode), and fbadmin applies it, refusing when the schema changed since the dry run; the request's history, the audit log, the timeline and the `change.request` alert record each step ([docs/CHANGE_REQUESTS.md](docs/CHANGE_REQUESTS.md))
 - ✅ **Continuous trace capture:** an optional always-on trace session per database (kept running by fbadmin, restarted with a backoff) feeding the slow statement log and query regressions with every statement that finishes above a threshold, with its explained plan, so no slow statement is missed between samples ([docs/MONITORING.md](docs/MONITORING.md#continuous-trace))
-- ⬜ **Comments** on objects and notebooks: short threads ("this index is needed by the nightly report") shown where the object is
+- ✅ **Comments** on objects and notebooks: short threads ("this index is needed by the nightly report") in an object's Comments tab and below a notebook's cells, visible to whoever may see the object or notebook, editable by their author, with the `comment.added` alert event ([docs/COMMENTS.md](docs/COMMENTS.md))
 - ✅ **Translation fixes:** keys can carry a context (`t("Line@@chart")`, English shows "Line"), so one English word gets two translations: the "Line" chart type is no longer "line number" (cs, de, ru) and the token "Revoke" button no longer "remove the privilege" (cs, de) ([docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#translations))
 
 ## Milestone 2.5 — Fleet view and follow-ups ⬜
 
-- ⬜ **Fleet health page:** one table of every database with its newest check-up result, nearest capacity limit, newest backup, open change requests, schema drift and continuous-trace state, sortable and filterable, linking to each view
+- ✅ **Fleet health page:** one table of every database the user may read with its newest check-up, nearest capacity limit, newest backup, schema drift, change requests, history and continuous-trace state and alerts of the last day, from fbadmin's own records (no connection), worst first, filterable, each cell opening its view ([docs/FLEET.md](docs/FLEET.md))
 - ⬜ **Error log from the continuous trace:** failed statements grouped by error code, deadlocks and lock conflicts, with an alert when a new kind of error appears or one spikes
 - ⬜ **Unused index finder:** indices that appear in no recorded plan for N days (from the continuous trace and the sampler), with their size and write cost, as candidates to drop
 - ⬜ **Weekly digest per database:** the check-up, forecast, regressions, backups and change requests in one message to e-mail, Slack or webhook channels on a schedule

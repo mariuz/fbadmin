@@ -46,6 +46,8 @@ from . import links
 from . import forecast
 from . import changes
 from . import trace_capture
+from . import comments
+from . import fleet
 
 ROUTERS: list[APIRouter] = [
     servers.router,
@@ -94,4 +96,6 @@ ROUTERS: list[APIRouter] = [
     forecast.router,
     changes.router,
     trace_capture.router,
+    comments.router,
+    fleet.router,
 ]

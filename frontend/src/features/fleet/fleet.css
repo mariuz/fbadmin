@@ -1,0 +1,11 @@
+.fl { padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.fl .fl-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: -12px -16px 0; }
+.fl .fl-hint { margin: 0; font-size: 12px; }
+.fl .fl-grid td { vertical-align: top; }
+.fl .fl-problems { margin: 4px 0 0; padding-left: 16px; font-size: 12px; max-width: 320px; }
+.fl .fl-clip { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.fl .fl-sort { background: none; border: 0; padding: 0; font: inherit; color: inherit; cursor: pointer; font-weight: 600; }
+.fl .linkish { background: none; border: 0; padding: 0; font: inherit; color: var(--accent); cursor: pointer; text-align: left; }
+.fl .linkish .muted { color: var(--muted); }
+.fl tr.fl-critical td:first-child { box-shadow: inset 3px 0 0 var(--st-critical); }
+.fl tr.fl-warning td:first-child { box-shadow: inset 3px 0 0 var(--st-warning); }

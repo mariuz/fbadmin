@@ -14,6 +14,7 @@ import { ChartView } from "../charts/ChartView";
 import { defaultConfig, type ChartConfig } from "../charts/shape";
 import "../charts/charts.css";
 import { nbApi, newId, type Cell, type Notebook, type Output, type ResultOut, type RevisionInfo } from "./api";
+import { NotebookComments } from "../comments/notebook";
 
 const SAVE_DELAY = 1200;
 const RUN_ROWS = 1000;
@@ -298,6 +299,7 @@ export function NotebookTab(props: { id: string; visible: boolean; user: string 
           <button className="btn small" onClick={() => add(cells.length, "markdown")}>{t("+ Note")}</button>
         </div>}
       </div>
+      <NotebookComments id={nb.id} />
       {history && <History nb={nb} onClose={() => setHistory(false)} onRestored={adopt} />}
     </div>
   );

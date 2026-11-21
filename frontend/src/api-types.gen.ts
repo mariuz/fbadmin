@@ -1155,6 +1155,65 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/comments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Thread
+         * @description The comments of one object or notebook, oldest first.
+         */
+        get: operations["thread_api_comments_get"];
+        put?: never;
+        /** Add */
+        post: operations["add_api_comments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/comments/counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Counts
+         * @description Objects of a database that have comments (the ones this user may see), most recent first.
+         */
+        get: operations["counts_api_comments_counts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/comments/{cid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Edit */
+        put: operations["edit_api_comments__cid__put"];
+        post?: never;
+        /** Delete */
+        delete: operations["delete_api_comments__cid__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/datacompare/compare": {
         parameters: {
             query?: never;
@@ -1348,6 +1407,26 @@ export interface paths {
         };
         /** Status */
         get: operations["status_api_embedded_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/fleet": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Fleet Health
+         * @description One row per database: history, check-up, forecast, backup, drift, change requests, trace, alerts.
+         */
+        get: operations["fleet_health_api_fleet_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -6427,6 +6506,29 @@ export interface components {
             /** Relations */
             relations: string[];
         };
+        /** CommentIn */
+        CommentIn: {
+            /** Database Id */
+            database_id?: string | null;
+            /**
+             * Kind
+             * @default object
+             * @enum {string}
+             */
+            kind?: "object" | "notebook";
+            /** Name */
+            name?: string | null;
+            /** Notebook Id */
+            notebook_id?: string | null;
+            /** Otype */
+            otype?: string | null;
+            /** Schema */
+            schema?: string | null;
+            /** Server Id */
+            server_id?: string | null;
+            /** Text */
+            text: string;
+        };
         /** CompareIn */
         CompareIn: {
             /**
@@ -8093,14 +8195,6 @@ export interface components {
             /** Name */
             name?: string | null;
         };
-        /** TextIn */
-        TextIn: {
-            /**
-             * Text
-             * @default
-             */
-            text?: string;
-        };
         /** TokenIn */
         TokenIn: {
             /**
@@ -8337,6 +8431,19 @@ export interface components {
             copy_mode?: "metadata" | "full";
             /** Scratch */
             scratch?: string | null;
+        };
+        /** TextIn */
+        fbadmin__api__changes__TextIn: {
+            /**
+             * Text
+             * @default
+             */
+            text?: string;
+        };
+        /** TextIn */
+        fbadmin__api__comments__TextIn: {
+            /** Text */
+            text: string;
         };
         /** ExecuteIn */
         fbadmin__api__databases__ExecuteIn: {
@@ -11011,7 +11118,7 @@ export interface operations {
         };
         requestBody?: {
             content: {
-                "application/json": components["schemas"]["TextIn"] | null;
+                "application/json": components["schemas"]["fbadmin__api__changes__TextIn"] | null;
             };
         };
         responses: {
@@ -11046,7 +11153,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["TextIn"];
+                "application/json": components["schemas"]["fbadmin__api__changes__TextIn"];
             };
         };
         responses: {
@@ -11116,7 +11223,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["TextIn"];
+                "application/json": components["schemas"]["fbadmin__api__changes__TextIn"];
             };
         };
         responses: {
@@ -11159,6 +11266,173 @@ export interface operations {
                 content: {
                     "application/json": unknown;
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    thread_api_comments_get: {
+        parameters: {
+            query?: {
+                kind?: string;
+                server_id?: string | null;
+                database_id?: string | null;
+                otype?: string | null;
+                name?: string | null;
+                schema?: string | null;
+                notebook_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_api_comments_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CommentIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    counts_api_comments_counts_get: {
+        parameters: {
+            query: {
+                server_id: string;
+                database_id: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    edit_api_comments__cid__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["fbadmin__api__comments__TextIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_api_comments__cid__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -11499,6 +11773,26 @@ export interface operations {
         };
     };
     status_api_embedded_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    fleet_health_api_fleet_get: {
         parameters: {
             query?: never;
             header?: never;

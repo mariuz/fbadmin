@@ -86,3 +86,6 @@ for one user and checked for another. Results are cached per user.
 (`oat_gap`, `oit_gap`, `long_transactions`, `nbackup_stalled`, `alert`, `job_failed`) and the
 error codes (`unreachable`, `timeout`, `password_not_saved`, `locked`). Add `?refresh=true` to skip
 the cache.
+
+For what fbadmin records about each database (check-ups, forecasts, scheduled backups, drift, change
+requests), without connecting to any of them, see [Fleet health](FLEET.md).
