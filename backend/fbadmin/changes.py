@@ -86,6 +86,7 @@ class ChangeRequest(BaseModel):
     approvals: list[Approval] = Field(default_factory=list)
     applied: dict[str, Any] | None = None   # {at, by, job_id, ok, results, error}
     apply_job: str | None = None
+    apply_in_window: dict[str, Any] | None = None  # {at, window, by, run_as}: applied when that window opens
     history: list[Event] = Field(default_factory=list)
 
     def text(self) -> str:
@@ -268,6 +269,8 @@ def actions(cr: ChangeRequest, who: Actor) -> dict[str, bool]:
         "approve": may_approve(cr, who) is None,
         "reject": review and cr.status in ("open", "approved"),
         "apply": review and cr.status == "approved",
+        "schedule": review and cr.status == "approved" and not cr.apply_in_window,
+        "unschedule": review and bool(cr.apply_in_window),
         "comment": True,
     }
 

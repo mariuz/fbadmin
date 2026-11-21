@@ -36,3 +36,4 @@ import "./changes";
 import "./comments";
 import "./fleet";
 import "./unused-indices";
+import "./windows";

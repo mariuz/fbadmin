@@ -42,6 +42,9 @@ Review needs the *admin* level on the database.
    then revise it. When fbadmin stops while applying, the request is marked *failed* on restart: check
    the database before trying again.
 
+An approved change can also wait: **Apply in the next maintenance window** applies it when the next
+[maintenance window](MAINTENANCE.md#maintenance-windows) of the database opens.
+
 **The review belongs to the schema it was made on.** fbadmin refuses to apply a change when the
 database's schema changed since the dry run, for example when someone else altered a table in the
 meantime. Run the dry run again. If it finds the same schema changes, the approvals stay. Otherwise
@@ -103,3 +106,4 @@ Requests are kept in `<data dir>/change_requests.json`.
 | POST | `/api/changes/{id}/reject` `{text}` | reject |
 | POST | `/api/changes/{id}/withdraw` | withdraw (author) |
 | POST | `/api/changes/{id}/apply` | apply (a job); 409 when the schema changed since the dry run |
+| POST / DELETE | `/api/changes/{id}/schedule` | apply in the next maintenance window / do not wait |

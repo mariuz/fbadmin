@@ -193,6 +193,30 @@ Backups can be **encrypted** (*Encrypt the backups*), and **restore drills** reg
 backup, from the archive or from cloud storage, possibly on another server, and check it: see
 [Backup encryption and restore drills](BACKUP_ENCRYPTION_DRILLS.md).
 
+## Maintenance windows
+
+**Maintenance windows…** (database context menu) lists the windows that cover the database and adds new
+ones. A maintenance window is a period when work on a database is expected:
+
+* **Alerts are muted while it is open.** Alerts for what it covers are recorded in the
+  [alert history](ALERTS.md), marked *muted: maintenance window …*, but not sent to any channel. Turn
+  off **Mute alerts while it is open** for a window that should only schedule changes.
+* **Approved change requests can wait for it.** **Apply in the next maintenance window** on an approved
+  [change request](CHANGE_REQUESTS.md) stores when the next window opens. The scheduler applies the change
+  then, with the same checks as **Apply the change**, as the administrator who asked for it.
+  **Do not wait for the window** cancels it. If the window is removed or changed, the request waits for
+  the next window that covers its database.
+
+A window covers **this database**, **every database of the server** or **every database**. It is either
+**recurring**, with a cron expression for when it opens (`0 22 * * *`: every day at 22:00) and how long
+it lasts, or **once**, from a start to an end. Windows can be paused. Times are the fbadmin host's local
+time, as for scheduled jobs.
+
+In server mode, a window for a database needs the *admin* level on it, a window for a whole server the
+*admin* level on the server, and a window for everything an fbadmin administrator. Everyone who sees a
+database sees its windows. Windows are kept in `<data dir>/maintenance_windows.json`; the API is
+`/api/maintenance-windows` (GET, POST, PUT, DELETE).
+
 ## Cloud storage targets
 
 Backups can also be copied to object storage: **Amazon S3** (and S3-compatible services),

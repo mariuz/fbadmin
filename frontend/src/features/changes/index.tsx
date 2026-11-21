@@ -27,6 +27,8 @@ const ACTION_LABEL: Record<string, string> = {
   submitted: N_("proposed the change"), revised: N_("revised the change"), edited: N_("edited the description"),
   comment: N_("commented"), dry_run: N_("ran the dry run"), approved: N_("approved"), rejected: N_("rejected"),
   withdrawn: N_("withdrew the request"), applying: N_("started applying"), applied: N_("applied the change"), failed: N_("applying failed"),
+  window_scheduled: N_("scheduled it for a maintenance window"), window_cancelled: N_("cancelled the maintenance window"),
+  window_apply: N_("started it in the maintenance window"), window_failed: N_("could not start it in the maintenance window"),
 };
 const CHANGE_LABEL: Record<string, string> = { created: N_("created"), altered: N_("altered"), dropped: N_("dropped") };
 export const statusPill = (s: ChangeStatus) => <span className={"pill " + STATUS_PILL[s]}>{t(STATUS_LABEL[s])}</span>;
@@ -131,10 +133,14 @@ function Detail(props: { id: string; onChanged: () => void }) {
           {cr.can.apply && <button className="btn primary small" disabled={!!running} onClick={() => {
             if (window.confirm(t("Apply change request #{n} to {db} now?", { n: cr.number, db: cr.database ?? "" }))) job(t("Applying…"), () => crApi.apply(cr.id));
           }}>{t("Apply the change")}</button>}
+          {cr.can.schedule && <button className="btn small" disabled={!!running} onClick={() => act(() => crApi.schedule(cr.id), t("Scheduled"))}>{t("Apply in the next maintenance window")}</button>}
+          {cr.can.unschedule && <button className="btn small" onClick={() => act(() => crApi.unschedule(cr.id))}>{t("Do not wait for the window")}</button>}
           {cr.can.edit && editing === null && editScripts === null && <button className="btn small" onClick={() => (cr.kind === "sql" ? setEditing(text) : setEditScripts((cr.scripts ?? []).map((s) => ({ ...s }))))}>{t("Edit")}</button>}
           {cr.can.withdraw && <button className="btn small" onClick={() => window.confirm(t("Withdraw change request #{n}?", { n: cr.number })) && act(() => crApi.withdraw(cr.id), t("Withdrawn"))}>{t("Withdraw")}</button>}
         </div>
         {running && <div className="muted" role="status">{running}</div>}
+        {cr.apply_in_window && <div className="alerts"><div className="alert warning"><span className="lvl">{t("scheduled")}</span>
+          <span>{t("Applied in the maintenance window {name}, at {time}", { name: cr.apply_in_window.window, time: fmtTime(cr.apply_in_window.at) })}</span></div></div>}
         <div className="cr-approvals">
           <strong>{t("Approvals: {n} of {m}", { n: cr.approvals.length, m: cr.approvals_needed })}</strong>
           {cr.approvals.map((a, i) => <div key={i}>✓ {t("{who} on {time}", { who: a.by ?? t("you"), time: fmtTime(a.at) })}{a.comment ? `: ${a.comment}` : ""}</div>)}

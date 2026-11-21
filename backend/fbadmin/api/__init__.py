@@ -48,6 +48,7 @@ from . import changes
 from . import trace_capture
 from . import comments
 from . import fleet
+from . import windows
 
 ROUTERS: list[APIRouter] = [
     servers.router,
@@ -98,4 +99,5 @@ ROUTERS: list[APIRouter] = [
     trace_capture.router,
     comments.router,
     fleet.router,
+    windows.router,
 ]

@@ -89,6 +89,9 @@ database.
 | `restore.drill_failed` | A [restore drill](BACKUP_ENCRYPTION_DRILLS.md#restore-drills) failed: no backup or too old, missing key, the restore, the validation or reading a table failed. When a drill works again, one *resolved* message follows. |
 | `schema.drift` | A scheduled [drift check](SCHEMA_DRIFT.md) found differences from its baseline. A different drift is sent at once, even during the cool-down; when the drift is gone, one *resolved* message follows. |
 
+During a [maintenance window](MAINTENANCE.md#maintenance-windows) that mutes alerts, alerts for what it
+covers are recorded in the history, marked *muted*, but not sent.
+
 `schedule.failed` also covers the three more specific events. A rule on `schedule.failed` and
 another on `backup.verify_failed` therefore both send their message when a test restore fails.
 

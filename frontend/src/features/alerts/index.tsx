@@ -309,7 +309,7 @@ export function AlertsPanel(props: { visible: boolean; serverId?: string; dbId?:
                 <td><span className={"pill al-" + a.level}>{t(a.level)}</span></td>
                 <td style={{ whiteSpace: "normal" }}><b>{a.title}</b><div className="muted small">{a.message}</div></td>
                 <td>{[a.server, a.database].filter(Boolean).join(" / ") || "—"}</td>
-                <td style={{ whiteSpace: "normal" }}>{a.deliveries.length === 0 ? <span className="muted">{t("pending")}</span> : a.deliveries.map((d) => (
+                <td style={{ whiteSpace: "normal" }}>{(a as { muted?: string }).muted ? <span className="muted">{t("muted: maintenance window {name}", { name: (a as { muted?: string }).muted ?? "" })}</span> : a.deliveries.length === 0 ? <span className="muted">{t("pending")}</span> : a.deliveries.map((d) => (
                   <div key={d.channel_id} className={d.ok ? "ok" : "err"} title={d.error ?? d.result}>{d.ok ? "✓" : "✗"} {d.channel}{d.error ? `: ${d.error}` : ""}</div>
                 ))}</td>
               </tr>

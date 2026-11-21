@@ -1159,6 +1159,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/changes/{cid}/schedule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Schedule Apply
+         * @description Apply an approved change when the next maintenance window of its database opens (windows.py).
+         */
+        post: operations["schedule_apply_api_changes__cid__schedule_post"];
+        /** Unschedule Apply */
+        delete: operations["unschedule_apply_api_changes__cid__schedule_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/changes/{cid}/withdraw": {
         parameters: {
             query?: never;
@@ -1890,6 +1911,45 @@ export interface paths {
         post?: never;
         /** Revoke Link */
         delete: operations["revoke_link_api_links__link_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/maintenance-windows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Windows
+         * @description Windows visible to the user; with a database, those that cover it.
+         */
+        get: operations["list_windows_api_maintenance_windows_get"];
+        put?: never;
+        /** Create */
+        post: operations["create_api_maintenance_windows_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/maintenance-windows/{wid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update */
+        put: operations["update_api_maintenance_windows__wid__put"];
+        post?: never;
+        /** Delete */
+        delete: operations["delete_api_maintenance_windows__wid__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -8397,6 +8457,48 @@ export interface components {
             /** Path */
             path: string;
         };
+        /** Window */
+        Window: {
+            /** Created At */
+            created_at?: number;
+            /** Created By */
+            created_by?: string | null;
+            /** Cron */
+            cron?: string | null;
+            /** Database Id */
+            database_id?: string | null;
+            /**
+             * Duration Minutes
+             * @default 120
+             */
+            duration_minutes?: number;
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled?: boolean;
+            /** End */
+            end?: number | null;
+            /** Id */
+            id?: string;
+            /**
+             * Kind
+             * @default recurring
+             * @enum {string}
+             */
+            kind?: "recurring" | "once";
+            /**
+             * Mute Alerts
+             * @default true
+             */
+            mute_alerts?: boolean;
+            /** Name */
+            name: string;
+            /** Server Id */
+            server_id?: string | null;
+            /** Start */
+            start?: number | null;
+        };
         /** GrantIn */
         fbadmin__api__access__GrantIn: {
             /** Db Id */
@@ -11398,6 +11500,68 @@ export interface operations {
             };
         };
     };
+    schedule_apply_api_changes__cid__schedule_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unschedule_apply_api_changes__cid__schedule_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     withdraw_api_changes__cid__withdraw_post: {
         parameters: {
             query?: never;
@@ -12878,6 +13042,135 @@ export interface operations {
             header?: never;
             path: {
                 link_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_windows_api_maintenance_windows_get: {
+        parameters: {
+            query?: {
+                server_id?: string | null;
+                database_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_api_maintenance_windows_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Window"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_api_maintenance_windows__wid__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Window"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_api_maintenance_windows__wid__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wid: string;
             };
             cookie?: never;
         };

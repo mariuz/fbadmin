@@ -114,9 +114,19 @@ class Engine:
             "time": now, "time_text": time.strftime("%Y-%m-%d %H:%M:%S %Z", time.localtime(now)),
             "rule": rule.name, "rule_id": rule.id, "key": key, "details": details or {}, "deliveries": [],
         }
+        try:
+            from ..windows import open_window
+
+            muted = open_window(server_id, database_id, now, purpose="alerts")
+        except Exception:  # noqa: BLE001 - never stop an alert because of the windows
+            muted = None
+        if muted is not None:
+            alert["muted"] = muted.name  # a maintenance window: recorded, not sent
         with self._lock:
             self.history.append(alert)
             self._save_history()
+        if muted is not None:
+            return alert
         self._queue.put({"alert": alert, "channels": list(rule.channels)})
         self._ensure_worker()
         return alert

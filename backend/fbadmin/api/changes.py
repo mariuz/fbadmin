@@ -92,6 +92,8 @@ def _view(cr: C.ChangeRequest, full: bool = True) -> dict[str, Any]:
     out["can"] = C.actions(cr, who)
     out["approve_blocked"] = C.may_approve(cr, who)
     out["statements"] = _count(cr)
+    if out.get("apply_in_window"):
+        out["apply_in_window"] = {k: v for k, v in out["apply_in_window"].items() if k != "run_as"}
     if full and cr.dry_run:
         out["dry_run"] = {**cr.dry_run, "stale": cr.dry_run.get("revision") != cr.revision}
     return out
@@ -270,6 +272,51 @@ def reject(cid: str, body: TextIn):
     cr = C.get_store().update(cid, fn)
     C.audit(cr, f"rejected: {body.text.strip()}")
     C.notify(cr, "rejected", who, body.text.strip())
+    return _view(cr)
+
+
+# ------------------------------------------------------------------ maintenance windows
+@router.post("/{cid}/schedule")
+def schedule_apply(cid: str):
+    """Apply an approved change when the next maintenance window of its database opens (windows.py)."""
+    from .. import windows
+    from ..security import runas
+
+    cr = _visible(cid)
+    who = actor()
+    if not C.actions(cr, who)["schedule"]:
+        raise AccessDenied("Scheduling needs the 'admin' level on the database and an approved request")
+    nxt = windows.next_window(cr.server_id, cr.database_id)
+    if nxt is None:
+        raise ValueError("No maintenance window covers this database: add one first")
+    w, start, _end = nxt
+    cred = runas.issue(cr.server_id, f"change request #{cr.number} in a maintenance window")
+
+    def fn(c: C.ChangeRequest) -> None:
+        c.apply_in_window = {"at": start, "window": w.name, "window_id": w.id, "by": who.username, "run_as": cred}
+        c.log(who, "window_scheduled", f"to be applied in {w.name} at {time.strftime('%Y-%m-%d %H:%M', time.localtime(start))}")
+
+    cr = C.get_store().update(cr.id, fn)
+    C.audit(cr, f"scheduled for the maintenance window {w.name}")
+    return _view(cr)
+
+
+@router.delete("/{cid}/schedule")
+def unschedule_apply(cid: str):
+    from ..security import runas
+
+    cr = _visible(cid)
+    who = actor()
+    if not C.actions(cr, who)["unschedule"]:
+        raise AccessDenied("Only an administrator of the database can cancel it")
+    old = (cr.apply_in_window or {}).get("run_as")
+
+    def fn(c: C.ChangeRequest) -> None:
+        c.apply_in_window = None
+        c.log(who, "window_cancelled")
+
+    cr = C.get_store().update(cr.id, fn)
+    runas.revoke(old)
     return _view(cr)
 
 

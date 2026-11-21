@@ -175,6 +175,12 @@ class Scheduler:
                 started.append(self._run_as_owner(s)["id"])
             except Exception as exc:  # noqa: BLE001
                 self._record(s, None, now, "failed", str(exc) or exc.__class__.__name__)
+        try:
+            from ..windows import apply_due
+
+            apply_due(now)  # approved change requests waiting for a maintenance window
+        except Exception:  # noqa: BLE001
+            pass
         return started
 
     def _record(self, s: Schedule, job_id: str | None, started: float, status: str, error: str | None = None,

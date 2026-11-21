@@ -11,7 +11,7 @@ export interface ChangeDryRun {
   summary: Record<string, number>; changes: SchemaChange[];
   scripts: { script: string; ok: boolean; statements: number; ms: number; error?: { message: string; line: number; sql: string } }[];
 }
-export interface ChangeActions { edit: boolean; withdraw: boolean; dry_run: boolean; approve: boolean; reject: boolean; apply: boolean; comment: boolean }
+export interface ChangeActions { edit: boolean; withdraw: boolean; dry_run: boolean; approve: boolean; reject: boolean; apply: boolean; comment: boolean; schedule?: boolean; unschedule?: boolean }
 export interface ChangeRequest {
   id: string; number: number; server_id: string; database_id: string; server: string | null; database: string | null;
   title: string; description: string; kind: "sql" | "migrations"; sql?: string; scripts?: ScriptItem[];
@@ -20,6 +20,7 @@ export interface ChangeRequest {
   statements: number; dry_run?: ChangeDryRun | null; dry_run_job?: string | null; apply_job?: string | null;
   applied?: { at: number; by: string | null; ok: boolean; error: string | null; results: { sql?: string; script?: string; kind?: string; message?: string; row_count?: number | null; ok?: boolean }[] } | null;
   history?: ChangeEvent[];
+  apply_in_window?: { at: number; window: string; by: string | null } | null;
 }
 export interface ChangeIn { server_id: string; database_id: string; title: string; description: string; kind: "sql" | "migrations"; sql?: string; scripts?: ScriptItem[] }
 
@@ -36,6 +37,8 @@ export const crApi = {
   withdraw: (id: string) => request<ChangeRequest>("POST", u(id, "/withdraw")),
   dryRun: (id: string, copy_mode: "metadata" | "full") => request<Job>("POST", u(id, "/dry-run"), { copy_mode }),
   apply: (id: string) => request<Job>("POST", u(id, "/apply")),
+  schedule: (id: string) => request<ChangeRequest>("POST", u(id, "/schedule")),
+  unschedule: (id: string) => request<ChangeRequest>("DELETE", u(id, "/schedule")),
   settings: (sid: string, dbid: string) =>
     request<{ approvals: number; default: number; custom: boolean; can_edit: boolean }>("GET", `/api/changes/settings?server_id=${encodeURIComponent(sid)}&database_id=${encodeURIComponent(dbid)}`),
   setSettings: (sid: string, dbid: string, approvals: number | null) =>
