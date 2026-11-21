@@ -29,3 +29,4 @@
 .checkup .cu-meta { font-size: 11px; margin-top: 4px; }
 .checkup .cu-follow input { flex: 1; min-width: 240px; }
 .cu-ignore { display: flex; flex-wrap: wrap; gap: 2px 14px; }
+.checkup .cu-new { font-size: 10px; margin-left: 4px; }

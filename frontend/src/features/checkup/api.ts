@@ -8,6 +8,8 @@ export interface CheckupAction { kind: string; label: string; confirm: string | 
 export interface CheckupFinding {
   code: string; severity: Severity; rank: number; title: string; advice: string; params: Record<string, string | number>;
   evidence: { label: string; value?: string; sql?: string }[]; actions: CheckupAction[];
+  /** new since the previous check-up (not there, more severe, or naming new objects) */
+  new?: boolean;
 }
 export interface CheckupReport {
   database: string; generated_at: number; duration: number; gstat: boolean; engine_version: string | null;
@@ -21,6 +23,7 @@ export interface CheckupReport {
   findings: CheckupFinding[];
   ai?: AiItem[];
   schedule?: { id: string; name: string }; fixed?: string[];
+  compared_with?: number | null; gone?: { code: string; severity: Severity; title: string; params: Record<string, string | number> }[];
 }
 export interface AiItem { question: string | null; answer: string; at: number; provider?: string; model?: string }
 export interface CheckupState { report: CheckupReport | null; job: { id: string; status: string; error: string | null; log: string[] } | null }

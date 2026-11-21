@@ -7,7 +7,7 @@ import { Modal } from "../../components/Modal";
 import { Check } from "../maintenance/common";
 import { fmtTime, mapi, waitJob, type CheckupScheduleOptions, type HistoryItem, type Schedule } from "../maintenance/api";
 
-export const defaultCheckupOptions = (): CheckupScheduleOptions => ({ gstat: true, min_severity: "warning", fix_selectivity: false, ignore: [] });
+export const defaultCheckupOptions = (): CheckupScheduleOptions => ({ gstat: true, min_severity: "warning", fix_selectivity: false, ignore: [], ai: false });
 
 /** Findings worth alerting on that someone may want to leave out (their codes, see monitoring/checkup.py). */
 const CODES: [string, string][] = [
@@ -40,6 +40,7 @@ export function CheckupOptionsForm(props: { value: CheckupScheduleOptions; onCha
       <div>
         <Check label={t("Include gstat (reads the whole database)")} checked={v.gstat} onChange={(gstat) => set({ gstat })} />
         <Check label={t("Recompute missing or outdated selectivity at once")} checked={v.fix_selectivity} onChange={(fix_selectivity) => set({ fix_selectivity })} />
+        <Check label={t("Send an AI inspection with the alert when something is new (needs the AI assistant)")} checked={!!v.ai} onChange={(ai) => set({ ai })} />
       </div>
       <span className="l">{t("Never alert on")}</span>
       <div className="cu-ignore">
@@ -60,6 +61,9 @@ export function checkupResult(h: HistoryItem): string {
   if (h.new?.length) parts.push(t("{n} new: {codes}", { n: h.new.length, codes: h.new.map((c) => h.alerted?.[c]?.title ?? c).join("; ") }));
   if (h.fixed?.length) parts.push(t("selectivity recomputed for {n} index(es)", { n: h.fixed.length }));
   if (h.check_errors?.length) parts.push(t("could not check: {names}", { names: h.check_errors.join(", ") }));
+  const x = h as HistoryItem & { ai?: boolean; ai_error?: string | null };
+  if (x.ai) parts.push(t("AI inspection sent"));
+  if (x.ai_error) parts.push(t("AI inspection failed: {error}", { error: x.ai_error }));
   return parts.join(" · ") || t("ok");
 }
 

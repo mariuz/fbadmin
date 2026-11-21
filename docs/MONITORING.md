@@ -109,6 +109,10 @@ gstat. That finds record versions and the real index selectivity, and takes as l
 Without it the check-up takes a second or two. The last report of each database is kept until fbadmin
 restarts.
 
+From the second run on, the report says what changed since the previous one: findings marked **new**
+(not there before, more severe, or naming objects they did not name, such as another index with
+outdated selectivity), and the findings that are gone.
+
 | Finding | From | Fix actions |
 |---|---|---|
 | **The oldest active transaction is stuck** (next − OAT ≥ 10,000; critical at 100,000) | `MON$DATABASE`, `MON$TRANSACTIONS`; who holds it | Show transactions; disconnect the holder's attachment |
@@ -155,6 +159,10 @@ message every night:
 * **Recompute missing or outdated selectivity at once**: the usual fix after a bulk load. The indices
   are recomputed right after the check-up and their findings are not alerted on. The run's history and
   the report list them.
+* **Send an AI inspection with the alert when something is new:** with the [AI assistant](#ai-inspection)
+  on, a run with new findings asks it for a diagnosis and sends it with the message (the first 3,000
+  characters; the whole answer is on the check-up page). Runs with nothing new ask nothing, so the
+  inspection costs only when there is news. When the assistant is off or fails, the message says so.
 * **Include gstat** reads the whole database; turn it off for a large database checked often.
   Outdated selectivity and record versions need gstat; missing selectivity does not.
 

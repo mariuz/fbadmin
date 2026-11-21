@@ -59,7 +59,7 @@ export interface Schedule {
   checkup?: CheckupScheduleOptions | null;
 }
 export interface CheckupScheduleOptions {
-  gstat: boolean; min_severity: "critical" | "warning"; fix_selectivity: boolean; ignore: string[];
+  gstat: boolean; min_severity: "critical" | "warning"; fix_selectivity: boolean; ignore: string[]; ai?: boolean;
 }
 export interface NotebookScheduleOptions {
   notebook_id: string; channels: string[]; send: "always" | "rows" | "error"; read_only: boolean; save_results: boolean; attach_csv: boolean;

@@ -30,6 +30,23 @@ def test_state_and_news():
     assert set(CS.state([_f("oat_stuck", "critical")], CS.CheckupOptions(ignore=["oat_stuck"]))) == set()
 
 
+def test_compare_marks_new_and_gone():
+    from fbadmin.monitoring import checkup as C
+
+    prev = {"generated_at": 1.0, "findings": [_f("oat_stuck", "warning"), _f("selectivity_outdated", "warning", ["IX_A"]),
+                                              _f("sweep_off", "info")]}
+    for f in prev["findings"]:
+        f.update(params={}, title=f["code"])
+    rep = {"findings": [_f("oat_stuck", "critical"), _f("selectivity_outdated", "warning", ["IX_A"]),
+                        _f("page_cache", "info")]}
+    C.compare(rep, prev)
+    assert [f["new"] for f in rep["findings"]] == [True, False, True]  # more severe, unchanged, new
+    assert rep["compared_with"] == 1.0 and [g["code"] for g in rep["gone"]] == ["sweep_off"]
+    first = {"findings": [_f("oat_stuck", "critical")]}
+    C.compare(first, None)
+    assert first["findings"][0]["new"] is False and first["compared_with"] is None
+
+
 @requires_server
 def test_scheduled_checkup(client, database, receiver):  # noqa: F811
     sid, dbid = database
@@ -46,7 +63,8 @@ def test_scheduled_checkup(client, database, receiver):  # noqa: F811
                                             "checkup": {"gstat": False}})
     assert r.status_code == 201, r.text
     sched = r.json()
-    assert sched["checkup"] == {"gstat": False, "min_severity": "warning", "fix_selectivity": False, "ignore": []}
+    assert sched["checkup"] == {"gstat": False, "min_severity": "warning", "fix_selectivity": False, "ignore": [],
+                                "ai": False}
 
     def run():
         job = wait_job(client, client.post(f"/api/schedules/{sched['id']}/run").json())
@@ -66,10 +84,12 @@ def test_scheduled_checkup(client, database, receiver):  # noqa: F811
     rep = client.get(f"/api/servers/{sid}/databases/{dbid}/monitoring/checkup").json()["report"]
     assert rep["schedule"]["id"] == sched["id"] and any(f["code"] == "selectivity_never" for f in rep["findings"])
 
-    # the same findings again: nothing new, no message
+    # the same findings again: nothing new, no message; the page marks nothing new
     h = run()
     assert h["status"] == "findings" and h["new"] == []
     assert len(receiver.requests) == sent
+    rep = client.get(f"/api/servers/{sid}/databases/{dbid}/monitoring/checkup").json()["report"]
+    assert rep["compared_with"] and not any(f["new"] for f in rep["findings"])
 
     # fix it automatically: the findings are gone, one resolved message
     others = [c for c in h["alerted"] if c != "selectivity_never"]
@@ -85,6 +105,58 @@ def test_scheduled_checkup(client, database, receiver):  # noqa: F811
     # the timeline lists the runs
     tl = client.get(f"/api/servers/{sid}/databases/{dbid}/timeline").json()
     assert any(e.get("title", "").startswith("Scheduled check-up: nightly check-up") for e in tl["events"])
+
+    client.delete(f"/api/schedules/{sched['id']}")
+    for r in client.get("/api/alerts/rules").json():
+        client.delete(f"/api/alerts/rules/{r['id']}")
+    client.delete(f"/api/alerts/channels/{hook['id']}")
+
+
+@requires_server
+def test_scheduled_checkup_with_ai(client, database, receiver, monkeypatch):  # noqa: F811
+    from fbadmin import ai
+
+    from .test_checkup_ai import FakeProvider
+
+    sid, dbid = database
+    execute(client, sid, dbid, "CREATE TABLE LOADED (ID INTEGER NOT NULL, CODE VARCHAR(10))")
+    execute(client, sid, dbid, "CREATE INDEX IX_LOADED_CODE ON LOADED (CODE)")
+    execute(client, sid, dbid, "EXECUTE BLOCK AS DECLARE I INTEGER = 0; BEGIN WHILE (I < 200) DO BEGIN "
+                               "INSERT INTO LOADED VALUES (:I, MOD(:I, 7)); I = I + 1; END END")
+    hook = add_webhook(client, receiver)
+    client.post("/api/alerts/rules", json={"name": "checkup", "event": "checkup.findings", "server_id": sid,
+                                           "database_id": dbid, "channels": [hook["id"]]})
+    sched = client.post("/api/schedules", json={"name": "ai check-up", "kind": "checkup", "server_id": sid,
+                                                "database_id": dbid, "cron": "0 3 * * *",
+                                                "checkup": {"gstat": False, "ai": True}}).json()
+
+    def run():
+        job = wait_job(client, client.post(f"/api/schedules/{sched['id']}/run").json())
+        assert job["status"] == "finished", job["log"]
+        flush()
+        return client.get(f"/api/schedules/{sched['id']}/history").json()[0]
+
+    # the AI assistant is off: the alert goes out without the inspection, saying why
+    monkeypatch.delenv("FBADMIN_AI_PROVIDER", raising=False)
+    h = run()
+    assert h["new"] and h["ai"] is False and "AI assistant is off" in h["ai_error"]
+    assert "The AI inspection failed" in receiver.json(len(receiver.requests) - 1)["message"]
+
+    # on: with something new, the answer is sent with the alert and kept on the report
+    ai.register_provider("fake", FakeProvider)
+    monkeypatch.setenv("FBADMIN_AI_PROVIDER", "fake")
+    FakeProvider.calls.clear()
+    execute(client, sid, dbid, "CREATE INDEX IX_LOADED_ID ON LOADED (ID)")  # created on a loaded table: has stats
+    execute(client, sid, dbid, "CREATE TABLE LOADED2 (ID INTEGER NOT NULL)")
+    execute(client, sid, dbid, "CREATE INDEX IX_LOADED2 ON LOADED2 (ID)")
+    execute(client, sid, dbid, "INSERT INTO LOADED2 SELECT ID FROM LOADED")
+    h = run()
+    assert h["new"] and h["ai"] is True and len(FakeProvider.calls) == 1
+    assert "AI inspection:" in receiver.json(len(receiver.requests) - 1)["message"]
+    rep = client.get(f"/api/servers/{sid}/databases/{dbid}/monitoring/checkup").json()["report"]
+    assert rep["ai"][0]["scheduled"] is True and rep["ai"][0]["answer"].startswith("## Diagnosis")
+    h = run()  # nothing new: no inspection (it costs money)
+    assert h["new"] == [] and h["ai"] is False and len(FakeProvider.calls) == 1
 
     client.delete(f"/api/schedules/{sched['id']}")
     for r in client.get("/api/alerts/rules").json():

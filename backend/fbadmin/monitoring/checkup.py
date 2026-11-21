@@ -667,9 +667,35 @@ def run(server_id: str, db_id: str, *, with_gstat: bool = True, log=lambda _line
         "gstat_tables": gstat_summary(facts.get("gstat")),
     }
     with _lock:
+        prev = _reports.get((server_id, db_id))
+        compare(report, prev)
         _reports[(server_id, db_id)] = report
     log(f"Done: {len(findings)} finding(s)")
     return report
+
+
+def _labels(f: dict) -> set[str]:
+    return {str(e.get("label")) for e in f.get("evidence") or [] if e.get("label")}
+
+
+def compare(report: dict, prev: dict | None) -> None:
+    """Mark what is new since the previous report: a finding that was not there, got more severe or names
+    objects it did not name; and list the findings that are gone."""
+    if not prev:
+        report["compared_with"] = None
+        report["gone"] = []
+        for f in report["findings"]:
+            f["new"] = False
+        return
+    before = {f["code"]: f for f in prev.get("findings") or []}
+    for f in report["findings"]:
+        p = before.get(f["code"])
+        f["new"] = (p is None or SEVERITY[f["severity"]] > SEVERITY.get(p["severity"], 0)
+                    or bool(_labels(f) - _labels(p)))
+    now = {f["code"] for f in report["findings"]}
+    report["compared_with"] = prev.get("generated_at")
+    report["gone"] = [{"code": p["code"], "severity": p["severity"], "title": p["title"], "params": p["params"],
+                       "text": p["text"]} for c, p in before.items() if c not in now]
 
 
 def gstat_summary(stats: dict | None, limit: int = 20) -> list[dict[str, Any]]:

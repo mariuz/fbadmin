@@ -15,6 +15,12 @@ from ..alerts import emit
 from . import checkup
 
 SELECTIVITY_CODES = ("selectivity_never", "selectivity_outdated")
+AI_IN_ALERT = 3000  # characters of the AI answer sent with the alert (the whole answer is on the report)
+
+
+def _clip(text: str | None, n: int) -> str:
+    text = (text or "").strip()
+    return text if len(text) <= n else text[: n - 1].rstrip() + "…"
 
 
 class CheckupOptions(BaseModel):
@@ -22,6 +28,7 @@ class CheckupOptions(BaseModel):
     min_severity: Literal["critical", "warning"] = "warning"  # alert on findings at least this severe
     fix_selectivity: bool = False  # recompute missing or outdated selectivity at once
     ignore: list[str] = Field(default_factory=list, max_length=50)  # finding codes never alerted on
+    ai: bool = False  # when there is something new: an AI inspection, sent with the alert (needs the AI assistant)
 
 
 def _labels(f: dict) -> list[str]:
@@ -88,6 +95,15 @@ def run(s, db, prev: dict | None, log) -> dict[str, Any]:
     before = (prev or {}).get("alerted") or {}
     new = news(before, cur)
     errors = [c["name"] for c in report["checks"] if c["status"] == "error"]
+    ai_answer, ai_error = None, None
+    if new and opts.ai:
+        from .checkup_ai import inspect_now
+
+        try:
+            ai_answer = inspect_now(s.server_id, s.database_id, log)["answer"]
+        except Exception as exc:  # noqa: BLE001 - the alert goes out without it
+            ai_error = " ".join(str(exc).split()) or exc.__class__.__name__
+            log(f"AI inspection failed: {ai_error}")
     if new:
         level = "critical" if any(cur[c]["severity"] == "critical" for c in new) else "warning"
         lines = [f"- {cur[c]['title']} ({cur[c]['severity']})" for c in new]
@@ -96,6 +112,8 @@ def run(s, db, prev: dict | None, log) -> dict[str, Any]:
                + "\n".join(lines)
                + (f"\n\n{len(still)} earlier finding(s) are still there." if still else "")
                + (f"\n\nSelectivity recomputed for {len(fixed)} index(es)." if fixed else "")
+               + (f"\n\nAI inspection:\n{_clip(ai_answer, AI_IN_ALERT)}" if ai_answer else "")
+               + (f"\n\nThe AI inspection failed: {ai_error}" if ai_error else "")
                + "\n\nOpen Performance check-up… on the database for the evidence and the fixes.")
         emit("checkup.findings", level, f"Check-up of {db.name}: {cur[new[0]]['title']}"
              + (f" and {len(new) - 1} more" if len(new) > 1 else ""), msg,
@@ -109,4 +127,4 @@ def run(s, db, prev: dict | None, log) -> dict[str, Any]:
              details={"schedule_id": s.id}, force=True)
     log(f"{len(findings)} finding(s), {len(new)} new" + (f", selectivity recomputed for {len(fixed)}" if fixed else ""))
     return {"status": "findings" if cur else "finished", "summary": report["summary"], "alerted": cur,
-            "new": new, "fixed": fixed, "check_errors": errors}
+            "new": new, "fixed": fixed, "check_errors": errors, "ai": bool(ai_answer), "ai_error": ai_error}

@@ -215,6 +215,26 @@ def preview(server_id: str, db_id: str, question: str | None = None) -> dict[str
     return {"system": system, "prompt": prompt}
 
 
+def inspect_now(server_id: str, db_id: str, log=lambda _l: None) -> dict[str, Any]:
+    """Inspect the last report now (a scheduled check-up); the answer is kept on the report like a job's."""
+    from ..ai import AIUnavailable, get_provider
+
+    provider = get_provider()
+    if provider is None:
+        raise AIUnavailable("The AI assistant is off: set FBADMIN_AI_PROVIDER (for example anthropic)")
+    report = _report(server_id, db_id)
+    system, prompt = build(server_id, db_id, report)
+    meta = provider.describe()
+    log(f"AI inspection: asking {meta.get('provider')}" + (f" · {meta['model']}" if meta.get("model") else ""))
+    item = {"question": None, "answer": provider.complete(system, prompt), "at": time.time(),
+            "provider": meta.get("provider"), "model": meta.get("model"), "scheduled": True}
+    with checkup._lock:
+        cur = checkup._reports.get((server_id, db_id))
+        if cur is not None and cur["generated_at"] == report["generated_at"]:
+            cur["ai"] = [item]
+    return item
+
+
 def start(server_id: str, db_id: str, question: str | None = None) -> dict[str, Any]:
     """Ask the provider about the last report, as a job; the answer is added to the report's ``ai`` list."""
     from ..ai import AIUnavailable, get_provider

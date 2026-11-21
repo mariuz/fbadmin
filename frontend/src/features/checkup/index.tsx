@@ -52,7 +52,7 @@ function Finding(props: { f: CheckupFinding; busy: boolean; onAction: (a: Checku
   const { f } = props;
   return (
     <li className={"cu-item " + SEV[f.severity]}>
-      <h5><span className="cu-rank">{f.rank}.</span><span className="cu-sev">{sevLabel(f.severity)}</span><span>{t(f.title, vars(f.params))}</span></h5>
+      <h5><span className="cu-rank">{f.rank}.</span><span className="cu-sev">{sevLabel(f.severity)}</span><span>{t(f.title, vars(f.params))}</span>{f.new && <span className="pill running cu-new">{t("new")}</span>}</h5>
       <p className="cu-advice">{t(f.advice, vars(f.params))}</p>
       {f.evidence.length > 0 && <ul className="cu-ev">{f.evidence.map((e, i) => (
         <li key={i}><span className="lbl">{t(e.label)}</span>{e.value && <span>{e.value}</span>}
@@ -190,6 +190,10 @@ function CheckupTab(props: { serverId: string; dbId: string; visible: boolean })
             {r.summary.info > 0 && <span className="pill cancelled">{t("{n} note(s)", { n: r.summary.info })}</span>}
             <span className="muted">{t("Checked {time} in {s} s", { time: fmtTime(r.generated_at), s: r.duration })}{r.gstat ? "" : ` · ${t("without gstat")}`}{r.schedule ? ` · ${t("by the scheduled check-up {name}", { name: r.schedule.name })}` : ""}</span>
           </div>
+          {r.compared_with && <div className="muted cu-since">
+            {t("Since the check-up of {time}: {n} new, {m} gone.", { time: fmtTime(r.compared_with), n: r.findings.filter((f) => f.new).length, m: (r.gone ?? []).length })}
+            {(r.gone ?? []).length > 0 && <> {t("Gone:")} {(r.gone ?? []).map((g) => t(g.title, vars(g.params))).join("; ")}</>}
+          </div>}
           {r.fixed && r.fixed.length > 0 && <div className="muted">{t("Selectivity recomputed by the schedule: {names}", { names: r.fixed.join(", ") })}</div>}
           <Facts r={r} />
           {r.checks.filter((c) => c.status === "error").map((c) => (

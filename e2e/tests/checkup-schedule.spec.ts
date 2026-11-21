@@ -91,7 +91,7 @@ test("schedule the check-up and run it", async () => {
 test("the schedule and its history", async ({ request }) => {
   const s = (await (await request.get("/api/schedules")).json()).find((x: { database_id: string }) => x.database_id === dbId);
   expect(s.kind).toBe("checkup");
-  expect(s.checkup).toEqual({ gstat: false, min_severity: "warning", fix_selectivity: false, ignore: ["page_cache"] });
+  expect(s.checkup).toEqual({ gstat: false, min_severity: "warning", fix_selectivity: false, ignore: ["page_cache"], ai: false });
   const h = (await (await request.get(`/api/schedules/${s.id}/history`)).json())[0];
   expect(h.status).toBe("findings");
   expect(h.new).toContain("selectivity_never");
