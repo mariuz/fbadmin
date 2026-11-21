@@ -3,6 +3,9 @@
 import { N_ } from "../../i18n";
 
 export const MESSAGES = [
+  N_("{count} capacity limit(s) are near"),
+  N_("The capacity forecast projects growth to the limits it runs into: the space budget, the transaction counter, the column a sequence fills and the 255 formats of a table. Act before the limit stops the application."),
+  N_("Open the capacity forecast"),
   N_("The oldest active transaction is stuck {gap} transactions behind"),
   N_("Old record versions cannot be garbage collected while a transaction stays open, so reads get slower and the database grows. Commit or end the transaction that holds it; applications should not keep snapshot transactions open for long."),
   N_("Show transactions"),

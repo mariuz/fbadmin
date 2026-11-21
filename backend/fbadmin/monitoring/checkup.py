@@ -45,7 +45,7 @@ SUGGESTED_SWEEP_INTERVAL = 20000
 SEVERITY = {"critical": 3, "warning": 2, "info": 1}
 # order within a severity: what to look at first
 WEIGHT = {
-    "oat_stuck": 100, "lock_waits_now": 95, "nbackup_locked": 90, "selectivity_outdated": 85,
+    "oat_stuck": 100, "lock_waits_now": 95, "nbackup_locked": 90, "capacity": 88, "selectivity_outdated": 85,
     "selectivity_never": 84, "regressions": 80, "record_versions": 75, "page_cache": 70, "oit_stuck": 65,
     "lock_contention": 60, "long_transactions": 55, "inactive_indices": 50, "missing_indices": 45,
     "sweep_off": 30, "storage": 20, "unselective_indices": 15, "nbackup_merge": 12, "history_off": 10,
@@ -223,7 +223,7 @@ def cache_window(server_id: str, db_id: str, hours: float = 1.0) -> dict[str, An
 def analyze(facts: dict[str, Any]) -> list[dict[str, Any]]:
     """Findings, most important first."""
     out: list[dict[str, Any]] = []
-    for fn in (_transactions, _sweep, _cache, _locks, _indices, _gstat, _history, _nbackup):
+    for fn in (_transactions, _sweep, _cache, _locks, _indices, _gstat, _history, _nbackup, _capacity):
         out += fn(facts)
     # a stuck OAT is the cause of the record versions behind it: never rank it below them
     by = {f["code"]: f for f in out}
@@ -524,6 +524,29 @@ def _history(f: dict) -> list[dict]:
     return out
 
 
+def _capacity_label(key: str) -> str:
+    if key.startswith("seq:"):
+        return f"sequence {key[4:]}"
+    if key.startswith("fmt:"):
+        return f"table {key[4:]}"
+    return {"size": "space budget", "transactions": "transaction counter"}.get(key, key)
+
+
+def _capacity(f: dict) -> list[dict]:
+    """Limits the capacity forecast finds near (monitoring/forecast.py): a scheduled check-up alerts on them."""
+    fc = (f.get("forecast") or {}).get("findings") or []
+    if not fc:
+        return []
+    return [finding(
+        "capacity", "critical" if any(x["severity"] == "critical" for x in fc) else "warning",
+        "{count} capacity limit(s) are near",
+        "The capacity forecast projects growth to the limits it runs into: the space budget, the transaction counter, "
+        "the column a sequence fills and the 255 formats of a table. Act before the limit stops the application.",
+        {"count": len(fc)},
+        evidence=[{"label": _capacity_label(x["key"]), "value": x["title"]} for x in fc[:10]],
+        actions=[open_view("Open the capacity forecast", "forecast")])]
+
+
 def _nbackup(f: dict) -> list[dict]:
     state = (f.get("database") or {}).get("backup_state")
     if state == 1:
@@ -570,6 +593,15 @@ def run(server_id: str, db_id: str, *, with_gstat: bool = True, log=lambda _line
             finally:
                 end_transaction(conn, commit=False)
 
+    def capacity() -> None:
+        from . import forecast
+
+        with st.manager.meta(server_id, db_id) as conn:
+            try:
+                facts["forecast"] = forecast.analyze(server_id, db_id, conn)
+            finally:
+                end_transaction(conn, commit=False)
+
     def schedules() -> None:
         from ..maintenance.scheduler import get_scheduler
 
@@ -605,6 +637,7 @@ def run(server_id: str, db_id: str, *, with_gstat: bool = True, log=lambda _line
     if with_gstat:
         step("gstat", stats)
     step("history", hist)
+    step("capacity forecast", capacity)
     step("advisor", advisor)
     findings = analyze(facts)
     d = facts.get("database") or {}

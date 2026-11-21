@@ -20,6 +20,7 @@ import "./messages";
 import { AiInspection } from "./AiInspection";
 import { ScheduleCheckupDialog } from "./schedule";
 import { checkupApi, type CheckupAction, type CheckupFinding, type CheckupReport, type CheckupState, type Severity } from "./api";
+import { openForecast } from "../forecast";
 
 const SEV: Record<Severity, string> = { critical: "critical", warning: "warning", info: "info" };
 const sevLabel = (s: Severity) => (s === "critical" ? t("critical") : s === "warning" ? t("warning") : t("info"));
@@ -122,6 +123,7 @@ function CheckupTab(props: { serverId: string; dbId: string; visible: boolean })
         case "open":
           if (PERF_VIEWS.has(p.target)) openPerformance(app, sid, dbid, p.target);
           else if (p.target === "regressions") openRegressions(app, sid, dbid);
+          else if (p.target === "forecast") openForecast(app, sid, dbid);
           else if (MAINT_VIEWS[p.target]) {
             const db = app.servers.find((s) => s.id === sid)?.databases.find((d) => d.id === dbid);
             app.openTab({ kind: "maintenance", title: t("{name} · maintenance", { name: db?.name ?? "db" }), serverId: sid, dbId: dbid, props: { section: MAINT_VIEWS[p.target], nonce: Date.now() } });

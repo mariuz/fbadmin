@@ -84,6 +84,15 @@ def test_forecast_of_a_database(client, database, receiver, monkeypatch):  # noq
     assert any(x["key"] == "seq:SEQ_ORDERS" and x["severity"] == "critical" and "reaches it in" in x["title"]
                for x in f["findings"])
 
+    # the check-up reports it too (a scheduled check-up then alerts on it)
+    from fbadmin.monitoring import checkup
+
+    rep = checkup.run(sid, dbid, with_gstat=False)
+    cap = next(x for x in rep["findings"] if x["code"] == "capacity")
+    assert cap["severity"] == "critical" and {"label": "sequence SEQ_ORDERS", "value": so and next(
+        x["title"] for x in f["findings"] if x["key"] == "seq:SEQ_ORDERS")} in cap["evidence"]
+    assert any(c["name"] == "capacity forecast" and c["status"] == "done" for c in rep["checks"])
+
     # a space budget: the database is near it
     size = f["size"]["bytes"]
     assert client.put(base + "/monitoring/forecast/budget", json={"budget_bytes": int(size * 1.05)}).status_code == 200

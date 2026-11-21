@@ -285,7 +285,7 @@ Also fixed in this milestone:
 - ⬜ **Propose from the Query Tool:** when DDL is refused for lack of rights, offer *Propose as a change request…* with the SQL filled in
 - ⬜ **Change request follow-ups:** edit migration scripts in the page, required approvals per database, timeline entries that open their request
 - ⬜ **Check-up follow-ups:** *new since the last run* shown in the check-up page, and an opt-in AI inspection of scheduled runs
-- ⬜ **Forecast in the check-up:** a capacity limit that is near (space budget, a sequence's column, table formats) becomes a check-up finding, so scheduled check-ups alert on it
+- ✅ **Forecast in the check-up:** a capacity limit that is near (space budget, transaction counter, a sequence's column, table formats) is a check-up finding, one evidence line per limit, so a scheduled check-up alerts when a new limit comes near ([docs/MONITORING.md](docs/MONITORING.md#performance-check-up))
 - ⬜ **Continuous trace of PSQL:** optionally record procedure and function timings next to statements
 
 ## Milestone 3.0 — Teams and distribution ⬜

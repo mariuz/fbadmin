@@ -114,6 +114,7 @@ restarts.
 | **The oldest active transaction is stuck** (next − OAT ≥ 10,000; critical at 100,000) | `MON$DATABASE`, `MON$TRANSACTIONS`; who holds it | Show transactions; disconnect the holder's attachment |
 | **Statements waiting for a record lock** right now, and who blocks them | `MON$STATEMENTS`, `MON$RECORD_STATS`, `MON$TABLE_STATS` | Show locks; disconnect a blocker |
 | **The database is locked by nbackup** (or the delta is being merged) | `MON$BACKUP_STATE` | Open incremental backup |
+| **Capacity limits are near**: the space budget, the transaction counter, a sequence's column or a table's 255 formats (critical within 30 days or at 95 %) | the [capacity forecast](#capacity-forecast), computed during the check-up | Open the capacity forecast |
 | **Indices without selectivity although their table has rows**: created on an empty table, then loaded | `RDB$INDICES.RDB$STATISTICS` = 0, one row read | Recompute selectivity (`SET STATISTICS INDEX`) |
 | **Outdated selectivity**: stored and actual differ by 3× or more (indices with ≥ 100 entries) | gstat: actual = 1 / (nodes − total dup) | Recompute selectivity |
 | **Statements that got slower** | [query regressions](#query-regressions) | Open query regressions |

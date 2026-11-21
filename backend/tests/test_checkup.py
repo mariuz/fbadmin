@@ -188,6 +188,8 @@ def _all_findings():
         f = _facts(transactions={"gaps": {"next_oat": oat_gap, "oat_oit": C.GAP_WARN * 2 if state != 0 else 1},
                                  "oat_holders": [holder], "long_running": [holder, _tx(id=120)]},
                    locks={"waiting": [w]}, indices=ix, gstat=stats, history=hist, config={"ServerMode": mode})
+        f["forecast"] = {"findings": [{"key": "seq:S", "severity": "critical", "title": "Sequence S feeding T.ID"},
+                                      {"key": "size", "severity": "warning", "title": "Space budget"}]}
         f["database"].update(sweep_interval=sweep, backup_state=state, page_reads=30_000, page_fetches=100_000,
                              record_waits=5000, record_conflicts=500)
         out += C.analyze(f)

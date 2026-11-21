@@ -17,7 +17,7 @@ const CODES: [string, string][] = [
   ["selectivity_never", N_("Indices without selectivity")], ["selectivity_outdated", N_("Outdated selectivity")],
   ["inactive_indices", N_("Inactive indices")], ["record_versions", N_("Many record versions")],
   ["regressions", N_("Query regressions")], ["missing_indices", N_("Missing indices (index advisor)")],
-  ["nbackup_locked", N_("Locked by nbackup")],
+  ["nbackup_locked", N_("Locked by nbackup")], ["capacity", N_("Capacity limits (forecast)")],
 ];
 const PRESETS: [string, string][] = [
   ["0 6 * * *", N_("every day at 6:00")], ["0 */4 * * *", N_("every 4 hours")], ["0 * * * *", N_("every hour")],
