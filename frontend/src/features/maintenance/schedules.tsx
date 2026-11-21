@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { NotebookOptionsForm, defaultNotebookOptions } from "../notebooks/schedule";
 import { CheckupOptionsForm, checkupResult, defaultCheckupOptions } from "../checkup/schedule";
+import { DigestOptionsForm, defaultDigestOptions, digestResult, type DigestOptions } from "../digest/schedule";
 import { errMsg, useApp } from "../../context";
 import { N_, t } from "../../i18n";
 import type { Job } from "../../types";
@@ -21,7 +22,7 @@ const PRESETS: Array<[string, string]> = [
 interface Form {
   id?: string; name: string; kind: Schedule["kind"]; server_id: string; database_id: string; cron: string; enabled: boolean; keep: string; options: BackupOpts;
   verify: boolean; verify_path: string; upload_target: string; upload_prefix: string; upload_keep: string; drift: DriftForm;
-  encrypt: boolean; drill: DrillForm; notebook: NotebookScheduleOptions; checkup: CheckupScheduleOptions;
+  encrypt: boolean; drill: DrillForm; notebook: NotebookScheduleOptions; checkup: CheckupScheduleOptions; digest: DigestOptions;
 }
 
 function toForm(s: Schedule): Form {
@@ -33,6 +34,7 @@ function toForm(s: Schedule): Form {
     drift: toDriftForm(s.drift), encrypt: !!s.encrypt, drill: toDrillForm(s.drill),
     notebook: s.notebook ?? defaultNotebookOptions(),
     checkup: { ...defaultCheckupOptions(), ...(s.checkup ?? {}) },
+    digest: { ...defaultDigestOptions(), ...((s as { digest?: DigestOptions }).digest ?? {}) },
   };
 }
 
@@ -41,6 +43,7 @@ function runResult(h: HistoryItem): string {
   const parts: string[] = [];
   if (h.drill_ok !== undefined) return drillResult(h);
   if (h.kind === "checkup") return checkupResult(h);
+  if (h.kind === "digest") return digestResult(h);
   if (h.kind === "notebook") {
     if (h.cells !== undefined) parts.push(t("{cells} cell(s), {rows} row(s)", { cells: h.cells, rows: h.rows ?? 0 }));
     if (h.sent?.length) parts.push(t("sent to {channels}", { channels: h.sent.join(", ") }));
@@ -98,7 +101,7 @@ export function SchedulesPanel(props: { visible: boolean; serverId?: string; dbI
     const dbName = srv?.databases.find((d) => d.id === dbid)?.name ?? t("database");
     setForm({ name: t("Nightly backup {name}", { name: dbName }), kind: "backup", server_id: sid, database_id: dbid, cron: "0 2 * * *", enabled: true, keep: "7", options: defaultBackupOpts(),
       verify: false, verify_path: "", upload_target: "", upload_prefix: "", upload_keep: "0", drift: defaultDriftForm(),
-      encrypt: false, drill: defaultDrillForm(), notebook: defaultNotebookOptions(), checkup: defaultCheckupOptions() });
+      encrypt: false, drill: defaultDrillForm(), notebook: defaultNotebookOptions(), checkup: defaultCheckupOptions(), digest: defaultDigestOptions() });
   };
   useEffect(() => { if (props.dbId && props.visible && !form) newForm(); }, []);
   const save = () => run(async () => {
@@ -108,7 +111,7 @@ export function SchedulesPanel(props: { visible: boolean; serverId?: string; dbI
       upload: form.kind === "backup" && form.upload_target ? { target_id: form.upload_target, prefix: form.upload_prefix.trim(), keep: Number(form.upload_keep) || 0 } : null,
       drift: form.kind === "schema_drift" ? driftPayload(form.drift) : null,
       encrypt: form.kind === "backup" && form.encrypt, drill: form.kind === "restore_drill" ? drillPayload(form.drill) : null,
-      notebook: form.kind === "notebook" ? form.notebook : null, checkup: form.kind === "checkup" ? form.checkup : null };
+      notebook: form.kind === "notebook" ? form.notebook : null, checkup: form.kind === "checkup" ? form.checkup : null, digest: form.kind === "digest" ? form.digest : null };
     const s = form.id ? await mapi.updateSchedule(form.id, body) : await mapi.createSchedule(body);
     setForm(null);
     setSelected(s.id);
@@ -156,7 +159,7 @@ export function SchedulesPanel(props: { visible: boolean; serverId?: string; dbI
             <input className="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
             <label className="l">{t("Job")}</label>
             <select className="text" value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value as Schedule["kind"] })}>
-              <option value="backup">{t("Backup (gbak, into the fbadmin archive)")}</option><option value="sweep">{t("Sweep")}</option><option value="validate">{t("Online validation")}</option><option value="schema_snapshot">{t("Schema snapshot (commit the DDL to the schema history repository)")}</option><option value="schema_drift">{t("Schema drift check (compare with the schema history or another database)")}</option><option value="restore_drill">{t("Restore drill (restore the newest backup and check it)")}</option><option value="notebook">{t("Notebook (run its SQL cells and send the report)")}</option><option value="checkup">{t("Performance check-up (alert on new findings)")}</option>
+              <option value="backup">{t("Backup (gbak, into the fbadmin archive)")}</option><option value="sweep">{t("Sweep")}</option><option value="validate">{t("Online validation")}</option><option value="schema_snapshot">{t("Schema snapshot (commit the DDL to the schema history repository)")}</option><option value="schema_drift">{t("Schema drift check (compare with the schema history or another database)")}</option><option value="restore_drill">{t("Restore drill (restore the newest backup and check it)")}</option><option value="notebook">{t("Notebook (run its SQL cells and send the report)")}</option><option value="checkup">{t("Performance check-up (alert on new findings)")}</option><option value="digest">{t("Digest (what happened to the database, to e-mail, Slack or a webhook)")}</option>
             </select>
             <label className="l">{t("Server / database")}</label>
             <div className="mt-row">
@@ -210,6 +213,7 @@ export function SchedulesPanel(props: { visible: boolean; serverId?: string; dbI
             <span />
             <label className="check"><input type="checkbox" checked={form.enabled} onChange={(e) => setForm({ ...form, enabled: e.target.checked })} /> {t("Enabled")}</label>
           </div>
+          {form.kind === "digest" && <><h3>{t("Digest")}</h3><DigestOptionsForm value={form.digest} onChange={(d) => setForm({ ...form, digest: d })} /></>}
           {form.kind === "checkup" && <><h3>{t("Check-up")}</h3><CheckupOptionsForm value={form.checkup} onChange={(c) => setForm({ ...form, checkup: c })} /></>}
           {form.kind === "notebook" && <><h3>{t("Notebook")}</h3><NotebookOptionsForm value={form.notebook} onChange={(n) => setForm({ ...form, notebook: n })} serverId={form.server_id} databaseId={form.database_id} /></>}
           {form.kind === "restore_drill" && <><h3>{t("Restore drill")}</h3><DrillOptionsForm value={form.drill} onChange={(d) => setForm({ ...form, drill: d })} schedules={items} targets={targets} serverId={form.server_id} databaseId={form.database_id} /></>}

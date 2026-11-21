@@ -148,8 +148,9 @@ pgAgent-like schedules for **backups** (streamed into `<data dir>/backups/<sched
 with **retention**: keep the last N files), **sweeps**, **online validations**, **schema snapshots**
 ([Schema history](SCHEMA_HISTORY.md)), **schema drift checks** ([Schema drift detection](SCHEMA_DRIFT.md)) and
 **restore drills** ([Backup encryption and restore drills](BACKUP_ENCRYPTION_DRILLS.md)),
-**notebook reports** ([Scheduled notebooks](NOTEBOOKS.md#scheduled-notebooks-and-reports)) and
-**performance check-ups** ([Scheduled check-up](MONITORING.md#scheduled-check-up)).
+**notebook reports** ([Scheduled notebooks](NOTEBOOKS.md#scheduled-notebooks-and-reports)),
+**performance check-ups** ([Scheduled check-up](MONITORING.md#scheduled-check-up)) and
+**digests** of what happened to a database ([Weekly digest](FLEET.md#weekly-digest)).
 
 * Standard 5-field cron expressions (`minute hour day-of-month month day-of-week`) with
   lists, ranges, steps, month/day names and `@hourly`/`@daily`/`@weekly`/`@monthly`/`@yearly`

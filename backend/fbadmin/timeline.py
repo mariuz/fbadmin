@@ -444,6 +444,7 @@ _SCHEDULE_KINDS = {
     "schema_snapshot": ("schema", "Schema snapshot"), "schema_drift": ("schema", "Schema drift check"),
     "notebook": ("data", "Scheduled notebook"),
     "checkup": ("maintenance", "Scheduled check-up"),
+    "digest": ("alert", "Digest"),
 }
 
 

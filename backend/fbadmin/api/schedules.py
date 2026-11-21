@@ -14,6 +14,7 @@ from ..maintenance.drift import DriftOptions
 from ..maintenance.drill import DrillOptions
 from ..notebook_runs import NotebookOptions
 from ..monitoring.checkup_schedule import CheckupOptions
+from ..digest import DigestOptions
 from ..maintenance.cron import Cron
 from ..maintenance.scheduler import Schedule, UploadOptions, get_scheduler
 from ..security import runas
@@ -26,7 +27,7 @@ router = APIRouter(prefix="/api/schedules", tags=["schedules"])
 
 class ScheduleIn(BaseModel):
     name: str
-    kind: Literal["backup", "sweep", "validate", "schema_snapshot", "schema_drift", "restore_drill", "notebook", "checkup"] = "backup"
+    kind: Literal["backup", "sweep", "validate", "schema_snapshot", "schema_drift", "restore_drill", "notebook", "checkup", "digest"] = "backup"
     server_id: str
     database_id: str
     cron: str
@@ -41,11 +42,12 @@ class ScheduleIn(BaseModel):
     drill: DrillOptions | None = None
     notebook: NotebookOptions | None = None
     checkup: CheckupOptions | None = None
+    digest: DigestOptions | None = None
 
 
 class ScheduleUpdate(BaseModel):
     name: str | None = None
-    kind: Literal["backup", "sweep", "validate", "schema_snapshot", "schema_drift", "restore_drill", "notebook", "checkup"] | None = None
+    kind: Literal["backup", "sweep", "validate", "schema_snapshot", "schema_drift", "restore_drill", "notebook", "checkup", "digest"] | None = None
     cron: str | None = None
     enabled: bool | None = None
     keep: int | None = None
@@ -60,6 +62,7 @@ class ScheduleUpdate(BaseModel):
     drill: DrillOptions | None = None
     notebook: NotebookOptions | None = None
     checkup: CheckupOptions | None = None
+    digest: DigestOptions | None = None
 
 
 class VerifyIn(BaseModel):
@@ -155,6 +158,16 @@ def _notebook_allowed(kind: str | None, opts: NotebookOptions | None, server_id:
         raise ValueError("Unknown alert channel(s): " + ", ".join(missing))
 
 
+def _digest_allowed(kind: str | None, opts: DigestOptions | None) -> None:
+    if kind != "digest":
+        return
+    from ..alerts.store import get_store as alert_store
+
+    missing = [c for c in (opts or DigestOptions()).channels if c not in alert_store().channels]
+    if missing:
+        raise ValueError("Unknown alert channel(s): " + ", ".join(missing))
+
+
 def _encrypt_allowed(encrypt: bool | None) -> None:
     from ..maintenance import backupcrypt
 
@@ -192,6 +205,7 @@ def create(body: ScheduleIn):
     _drift_allowed(body.kind, body.drift, body.server_id, body.database_id)
     _drill_allowed(body.kind, body.drill, body.server_id)
     _notebook_allowed(body.kind, body.notebook, body.server_id, body.database_id)
+    _digest_allowed(body.kind, body.digest)
     _encrypt_allowed(body.kind == "backup" and body.encrypt)
     data = body.model_dump(exclude_none=True)
     data["run_as"] = runas.issue(body.server_id, f"schedule: {body.name}")  # server mode: runs as the current user
@@ -228,6 +242,7 @@ def update(schedule_id: str, body: ScheduleUpdate):
     _drill_allowed(kind, dopts, changes.get("server_id") or cur.server_id)
     nopts = NotebookOptions(**changes["notebook"]) if changes.get("notebook") is not None else cur.notebook
     _notebook_allowed(kind, nopts, changes.get("server_id") or cur.server_id, changes.get("database_id") or cur.database_id)
+    _digest_allowed(kind, DigestOptions(**changes["digest"]) if changes.get("digest") is not None else cur.digest)
     if changes.get("encrypt"):
         _encrypt_allowed(kind == "backup")
     new_cred = runas.issue(changes.get("server_id") or cur.server_id, f"schedule: {changes.get('name') or cur.name}")

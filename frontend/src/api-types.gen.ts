@@ -6850,6 +6850,16 @@ export interface components {
             source: components["schemas"]["Side"];
             target: components["schemas"]["Side"];
         };
+        /** DigestOptions */
+        DigestOptions: {
+            /** Channels */
+            channels?: string[];
+            /**
+             * Days
+             * @default 7
+             */
+            days?: number;
+        };
         /** DriftOptions */
         DriftOptions: {
             /**
@@ -7828,6 +7838,7 @@ export interface components {
             cron: string;
             /** Database Id */
             database_id: string;
+            digest?: components["schemas"]["DigestOptions"] | null;
             drift?: components["schemas"]["DriftOptions"] | null;
             drill?: components["schemas"]["DrillOptions"] | null;
             /**
@@ -7850,7 +7861,7 @@ export interface components {
              * @default backup
              * @enum {string}
              */
-            kind?: "backup" | "sweep" | "validate" | "schema_snapshot" | "schema_drift" | "restore_drill" | "notebook" | "checkup";
+            kind?: "backup" | "sweep" | "validate" | "schema_snapshot" | "schema_drift" | "restore_drill" | "notebook" | "checkup" | "digest";
             /** Name */
             name: string;
             notebook?: components["schemas"]["NotebookOptions"] | null;
@@ -7873,6 +7884,7 @@ export interface components {
             cron?: string | null;
             /** Database Id */
             database_id?: string | null;
+            digest?: components["schemas"]["DigestOptions"] | null;
             drift?: components["schemas"]["DriftOptions"] | null;
             drill?: components["schemas"]["DrillOptions"] | null;
             /** Enabled */
@@ -7882,7 +7894,7 @@ export interface components {
             /** Keep */
             keep?: number | null;
             /** Kind */
-            kind?: ("backup" | "sweep" | "validate" | "schema_snapshot" | "schema_drift" | "restore_drill" | "notebook" | "checkup") | null;
+            kind?: ("backup" | "sweep" | "validate" | "schema_snapshot" | "schema_drift" | "restore_drill" | "notebook" | "checkup" | "digest") | null;
             /** Name */
             name?: string | null;
             notebook?: components["schemas"]["NotebookOptions"] | null;
