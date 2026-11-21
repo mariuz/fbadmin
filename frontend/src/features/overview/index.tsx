@@ -12,6 +12,7 @@ import { N_, t } from "../../i18n";
 import { IconActivity, IconRefresh } from "../../components/Icons";
 import { fmtAge, fmtBytes } from "../monitoring/api";
 import { openPerformance } from "../monitoring";
+import { openFleet } from "../fleet";
 import { oapi, type Issue, type Level, type Overview, type OverviewDb, type OverviewServer } from "./api";
 
 const LEVELS: Level[] = ["critical", "warning", "unknown", "ok"];
@@ -187,6 +188,7 @@ export function OverviewPanel(props: { visible: boolean }) {
           {loading ? t("Checking…") : data ? t("Checked at {time} in {ms} ms", { time: new Date(data.generated_at * 1000).toLocaleTimeString(), ms: data.elapsed_ms }) : ""}
         </span>
         <button className="btn small" disabled={loading} onClick={() => load(true)}><IconRefresh size={12} /> {t("Check now")}</button>
+        <button className="btn small" onClick={() => openFleet(app)}>{t("Fleet health")}</button>
       </div>
       <div className="ov-body">
         {error && <div className="err" role="alert">{error}</div>}

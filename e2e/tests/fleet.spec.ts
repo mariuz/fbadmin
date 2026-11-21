@@ -42,7 +42,8 @@ test.afterAll(async ({ request }) => {
 });
 
 test("every database in one table", async () => {
-  await page.locator(".topbar").getByRole("button", { name: "Fleet" }).click();
+  await page.locator(".topbar").getByRole("button", { name: "Overview" }).click();
+  await page.locator(".tab-pane:not(.hidden)").getByRole("button", { name: "Fleet health" }).click();
   const table = page.getByRole("region", { name: "Fleet health" });
   await page.getByLabel("Search").fill("fleet_");
   const rows = table.locator("tbody tr");

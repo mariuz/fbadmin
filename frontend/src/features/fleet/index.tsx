@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { request } from "../../api";
 import { errMsg, useApp, type AppApi } from "../../context";
 import { N_, t } from "../../i18n";
-import { registerTabKind, registerTopbar } from "../../registry";
+import { registerTabKind } from "../../registry";
 import { IconRefresh } from "../../components/Icons";
 import { fmtAge } from "../monitoring/api";
 import { openPerformance } from "../monitoring";
@@ -130,9 +130,4 @@ registerTabKind("fleet", {
   icon: <span aria-hidden="true" style={{ fontSize: 12 }}>▤</span>,
   render: (_tab, visible) => <FleetTab visible={visible} />,
   same: () => true,
-});
-
-registerTopbar({
-  id: "fleet",
-  render: (app) => <button className="tb" onClick={() => openFleet(app)}>▤ {t("Fleet")}</button>,
 });

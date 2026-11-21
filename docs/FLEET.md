@@ -1,7 +1,8 @@
 # Fleet health
 
-**Fleet** (top bar) shows every database you can see in one table, with the newest of what fbadmin
-records about it. The worst databases come first.
+**Fleet health** (a button on the [Overview](OVERVIEW.md) page, ▦ Overview in the top bar) shows every
+database you can see in one table, with the newest of what fbadmin records about it. The worst
+databases come first.
 
 | Column | From |
 |---|---|
