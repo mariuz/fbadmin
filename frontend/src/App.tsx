@@ -372,7 +372,7 @@ export default function App() {
                 </div>
               ))}
               {tabs.map((tab) => (
-                <div key={tab.id} className={"tab-pane" + (active === tab.id ? "" : " hidden")} style={{ overflow: "hidden" }} {...paneProps(tab.id)}>
+                <div key={tab.id} className={"tab-pane feature" + (active === tab.id ? "" : " hidden")} style={{ overflow: "hidden" }} {...paneProps(tab.id)}>
                   <Suspense fallback={<div className="empty">{t("Loading…")}</div>}>
                   {tab.kind === "query" && <QueryTool serverId={tab.serverId!} dbId={tab.dbId!} schema={tab.schema} initialSql={tab.initialSql} autorun={tab.autorun} visible={active === tab.id} />}
                   {tab.kind === "data" && <DataView serverId={tab.serverId!} dbId={tab.dbId!} otype={tab.otype!} name={tab.name!} showFilter={tab.initialSql === "filter"} />}

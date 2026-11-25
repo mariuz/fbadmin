@@ -88,6 +88,10 @@ code, pre, .mono { font-family: var(--mono); font-size: 12px; }
 .tab-body { flex: 1; min-height: 0; position: relative; background: var(--panel); }
 .tab-pane { position: absolute; inset: 0; overflow: auto; }
 .tab-pane.hidden { display: none; }
+/* Feature tabs (Query Tool, schedules, check-up...): the pane clips, its one root fills it and scrolls (issue #4:
+   roots like .mt-body or .pad grew with their content and the bottom of long forms was unreachable). */
+.tab-pane.feature:not(.hidden) { display: flex; flex-direction: column; }
+.tab-pane.feature > * { flex: 1 1 auto; min-height: 0; overflow: auto; margin: 0; }
 .pad { padding: 14px 16px; }
 
 .btn { border: 1px solid var(--border); background: var(--panel); padding: 5px 10px; border-radius: var(--radius); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }

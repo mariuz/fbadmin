@@ -12,7 +12,7 @@ scope.
 
 **Status:** milestones 0.1 to 2.0, the engineering backlog and the phone and tablet layout are
 implemented and verified in CI against real services. Firebird 6.0 final support waits for the
-6.0 release. Milestone 2.2 is done and 2.3 lacks only push notifications; milestones 2.4 and 2.5 are done; milestones 2.1 and 3.0 below are planned. The current release is **2.1.1** ([release notes](docs/release-notes/v2.1.1.md)): on
+6.0 release. Milestone 2.2 is done and 2.3 lacks only push notifications; milestones 2.4 and 2.5 are done; milestones 2.1, 2.6 and 3.0 below are planned. The current release is **2.1.1** ([release notes](docs/release-notes/v2.1.1.md)): on
 [PyPI](https://pypi.org/project/firebird-admin/) (`pip install firebird-admin`), on
 [GitHub Releases](https://github.com/mariuz/fbadmin/releases) with desktop installers for Windows,
 macOS and Linux, as a Docker image, and documented at https://mariuz.github.io/fbadmin/.
@@ -287,6 +287,19 @@ Also fixed in this milestone:
 - ✅ **Check-up follow-ups:** the report marks findings *new* since the previous run and lists the ones that are gone; a scheduled check-up can send an AI inspection with its alert when something is new ([docs/MONITORING.md](docs/MONITORING.md#scheduled-check-up))
 - ✅ **Forecast in the check-up:** a capacity limit that is near (space budget, transaction counter, a sequence's column, table formats) is a check-up finding, one evidence line per limit, so a scheduled check-up alerts when a new limit comes near ([docs/MONITORING.md](docs/MONITORING.md#performance-check-up))
 - ✅ **Continuous trace of PSQL:** optionally, procedures, functions and triggers that finish above the threshold are recorded as runs in query regressions, so a routine that got slower is flagged and alerts like a statement ([docs/MONITORING.md](docs/MONITORING.md#continuous-trace))
+
+## Milestone 2.6 — Safety, release and follow-ups ⬜
+
+- ⬜ **Reported issues:** fix the issues reported on GitHub ([mariuz/fbadmin issues](https://github.com/mariuz/fbadmin/issues)): Disconnect that really disconnects (#9), restore uploads over 32 MB (#10), autocompletion quoting, aliases and `$` (#2, #7, #8), Fetch all and complete exports in the Query Tool (#5, #6), tabs that do not scroll (#4), trace output one statement behind (#1)
+- ⬜ **Release 2.2.0:** release notes for milestones 2.2 to 2.5, the version bump, and fresh documentation screenshots of the new pages
+- ⬜ **Production guard and database tags:** tag databases (production, staging, test), show the tag in the tree and the Query Tool, confirm DML and DDL on production, optionally allow DDL there only through change requests; tags filter the fleet page, maintenance windows and digests
+- ⬜ **@mentions and personal notifications:** `@user` in comments and change requests notifies that user; authors hear when their request is approved, rejected or applied
+- ⬜ **Incident view:** pick a time and see the timeline, alerts, trace errors, slow statements and lock waits around it on one time axis
+- ⬜ **Explain a regression:** for a statement that got slower, the plan diff, the changes to its tables (DDL from the timeline, selectivity) and an optional AI suggestion
+- ⬜ **Errors next to regressions:** an error group links to its statement's regression history; the fleet page counts errors
+- ⬜ **Fleet follow-ups:** a "since yesterday" column and saved filters
+- ⬜ **Unused index follow-up:** with partial evidence, offer to turn on the continuous trace with a low threshold for a week, and remind when the week is over
+- ⬜ **Translation review:** native speakers review the terms added in 2.4 and 2.5 (through Weblate)
 
 ## Milestone 3.0 — Teams and distribution ⬜
 
