@@ -66,11 +66,11 @@ test("a folder with hundreds of tables renders only the rows in view", async () 
 test("keyboard: End and Home reach the last and first rows", async () => {
   await treeRow(page, "T00001").click();
   await page.keyboard.press("End");
-  await expect.poll(() => page.evaluate(() => document.activeElement?.closest(".tree-row")?.querySelector(".label")?.textContent))
-    .not.toBe("T00001");
-  const last = await page.evaluate(() => document.activeElement?.closest(".tree-row")?.querySelector(".label")?.textContent);
-  const lastLabel = await page.locator(".tree-row .label").last().textContent();
-  expect(last).toBe(lastLabel);
+  // the focus moves while the virtual list re-renders: wait until it settles on the last row
+  await expect.poll(async () => {
+    const focused = await page.evaluate(() => document.activeElement?.closest(".tree-row")?.querySelector(".label")?.textContent);
+    return focused === await page.locator(".tree-row .label").last().textContent() ? "last" : focused;
+  }).toBe("last");
   await page.keyboard.press("Home");
   await expect.poll(() => page.evaluate(() => document.activeElement?.closest(".tree-row")?.querySelector(".label")?.textContent))
     .toBe(await page.locator(".tree-row .label").first().textContent());

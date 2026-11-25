@@ -26,14 +26,15 @@ export function setPasswordHandler(fn: (serverId: string) => Promise<boolean>) {
 }
 
 /** Called when the user disconnected the server/database a request needs (issue #9); true = connected again. */
-let disconnectedHandler: ((serverId: string, dbId: string | null) => Promise<boolean>) | null = null;
-export function setDisconnectedHandler(fn: (serverId: string, dbId: string | null) => Promise<boolean>) {
+type DisconnectedHandler = (serverId: string, dbId: string | null, asked?: boolean) => Promise<boolean>;
+let disconnectedHandler: DisconnectedHandler | null = null;
+export function setDisconnectedHandler(fn: DisconnectedHandler) {
   disconnectedHandler = fn;
 }
 
 /** Ask the user to connect a disconnected server / database (the Connect dialog); false = cancelled. */
 export async function askConnect(serverId: string, dbId: string | null): Promise<boolean> {
-  return disconnectedHandler ? disconnectedHandler(serverId, dbId) : false;
+  return disconnectedHandler ? disconnectedHandler(serverId, dbId, true) : false;
 }
 
 function serverIdFromPath(path: string): string | null {

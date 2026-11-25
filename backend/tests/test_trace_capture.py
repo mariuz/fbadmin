@@ -4,6 +4,7 @@ a failure with a backoff, and stops with the history."""
 
 from __future__ import annotations
 
+import re
 import time
 import uuid
 
@@ -158,7 +159,9 @@ def test_continuous_capture_of_psql(client, database):
         found = None
         for _ in range(60):
             items = client.get(base + "/regressions", params={"only": "all"}).json()["statements"]
-            found = next((i for i in items if "execute procedure p_loop" in (i.get("normalized") or "").lower()), None)
+            # Firebird 6 names it with its schema, quoted: EXECUTE PROCEDURE "PUBLIC"."P_LOOP"
+            found = next((i for i in items if re.search(r'execute procedure ("public"\.)?"?p_loop',
+                                                        (i.get("normalized") or "").lower())), None)
             if found:
                 break
             time.sleep(0.25)

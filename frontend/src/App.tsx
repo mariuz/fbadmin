@@ -49,6 +49,9 @@ export default function App() {
   const closeDrawer = nav.closeDrawer;
   const serversRef = useRef(servers);
   serversRef.current = servers;
+  // what the user is working on: the Connect dialog of a disconnected server is shown only for that (issue #9)
+  const focusRef = useRef<{ serverId?: string }[]>([]);
+  focusRef.current = [selection ?? {}, tabs.find((tb) => tb.id === active) ?? {}];
   const prefs = usePrefs();
   const theme = prefs.theme;
   const setTheme = (th: string) => setPrefs({ theme: th as typeof prefs.theme });
@@ -163,9 +166,11 @@ export default function App() {
     // per server at a time; after Cancel, requests of that server fail quietly for a while (polling tabs).
     const asking = new Map<string, Promise<boolean>>();
     const declined = new Map<string, number>();
-    setDisconnectedHandler((serverId, dbId) => {
+    setDisconnectedHandler((serverId, dbId, asked) => {
+      // other pages (overviews, forms listing every server) just get the error: no dialogs out of nowhere
+      if (!asked && !focusRef.current.some((f) => f.serverId === serverId)) return Promise.resolve(false);
       const key = `${serverId}/${dbId ?? ""}`;
-      if ((declined.get(key) ?? 0) > Date.now()) return Promise.resolve(false);
+      if (!asked && (declined.get(key) ?? 0) > Date.now()) return Promise.resolve(false);
       const pending = asking.get(key);
       if (pending) return pending;
       const p = new Promise<boolean>((resolve) => {

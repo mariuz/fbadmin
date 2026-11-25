@@ -173,7 +173,8 @@ to localhost. Make sure clients cannot reach fbadmin directly.
   and the UI shows a Connect dialog: it asks for the password unless the password is saved;
 * disconnecting a server forgets a password typed for this session (a saved password stays saved).
 
-fbadmin starts with every server disconnected. When the last fbadmin browser tab is closed, everything is
+fbadmin starts with every server disconnected (except the embedded engine's *Local databases*, which has no
+credentials). When the last fbadmin browser tab is closed, everything is
 disconnected after `FBADMIN_DISCONNECT_ON_CLOSE` seconds (default 15; a reload of the page comes back in
 time). Closing the page while a Query Tool has an open transaction asks first. In server mode the state is
 kept per fbadmin user.

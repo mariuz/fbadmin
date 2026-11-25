@@ -8,6 +8,7 @@ answers that with a Connect dialog.
 - Every server starts disconnected when fbadmin starts. A server becomes connected for the UI when the user
   connects it (``POST /api/servers/{id}/connect``, or the Connect dialog), connects one of its databases
   (``POST .../databases/{db}/connect``) or registers it.
+  The embedded engine ("Local databases", no credentials) starts connected; Disconnect applies to it too.
 - Disconnecting a server also forgets its password typed for this session (a saved password stays saved).
 - Closing the last fbadmin browser tab disconnects everything after ``FBADMIN_DISCONNECT_ON_CLOSE`` seconds
   (default 15; ``0`` turns it off). A reload says hello again in time, so it does not disconnect.
@@ -33,6 +34,7 @@ UI_HEADER = "x-fbadmin-client"
 _lock = threading.RLock()
 _connected: dict[str, set[str]] = {}               # owner -> connected server ids
 _db_off: dict[str, set[tuple[str, str]]] = {}      # owner -> disconnected (server, database)
+_server_off: dict[str, set[str]] = {}              # owner -> servers disconnected explicitly
 _tabs: dict[str, dict[str, float]] = {}            # owner -> open browser tab id -> last hello
 _timers: dict[str, threading.Timer] = {}
 
@@ -62,10 +64,26 @@ def grace() -> float:
 
 
 # --- state ------------------------------------------------------------------------------
+def _embedded(server_id: str) -> bool:
+    """The embedded engine ("Local databases") has no credentials: it starts connected (Disconnect still applies)."""
+    try:
+        from .api.deps import get_state
+
+        return bool(get_state().store.get(server_id).embedded)
+    except Exception:  # noqa: BLE001 - unknown server: the caller reports it
+        return False
+
+
+def _server_on(who: str, server_id: str) -> bool:
+    if server_id in _connected.get(who, set()):
+        return True
+    return server_id not in _server_off.get(who, set()) and _embedded(server_id)
+
+
 def is_connected(server_id: str, db_id: str | None = None, who: str | None = None) -> bool:
     who = owner() if who is None else who
     with _lock:
-        if server_id not in _connected.get(who, set()):
+        if not _server_on(who, server_id):
             return False
         return db_id is None or (server_id, db_id) not in _db_off.get(who, set())
 
@@ -76,7 +94,7 @@ def check(server_id: str | None, db_id: str | None = None) -> None:
         return
     who = owner()
     with _lock:
-        if server_id not in _connected.get(who, set()):
+        if not _server_on(who, server_id):
             raise Disconnected(server_id, None)
         if db_id is not None and (server_id, db_id) in _db_off.get(who, set()):
             raise Disconnected(server_id, db_id)
@@ -87,6 +105,7 @@ def connect(server_id: str, db_id: str | None = None) -> None:
     who = owner()
     with _lock:
         _connected.setdefault(who, set()).add(server_id)
+        _server_off.get(who, set()).discard(server_id)
         if db_id is not None:
             _db_off.get(who, set()).discard((server_id, db_id))
 
@@ -96,6 +115,7 @@ def disconnect(server_id: str, db_id: str | None = None) -> None:
     with _lock:
         if db_id is None:
             _connected.get(who, set()).discard(server_id)
+            _server_off.setdefault(who, set()).add(server_id)
             _db_off[who] = {k for k in _db_off.get(who, set()) if k[0] != server_id}
         else:
             _db_off.setdefault(who, set()).add((server_id, db_id))
@@ -106,6 +126,7 @@ def disconnect_all(who: str) -> list[str]:
     with _lock:
         was = sorted(_connected.pop(who, set()))
         _db_off.pop(who, None)
+        _server_off[who] = set(was)  # the embedded engine too, when it was connected explicitly
         return was
 
 
@@ -170,6 +191,7 @@ def reset() -> None:
     with _lock:
         _connected.clear()
         _db_off.clear()
+        _server_off.clear()
         _tabs.clear()
         for t in _timers.values():
             t.cancel()
