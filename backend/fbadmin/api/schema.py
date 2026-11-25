@@ -204,12 +204,22 @@ def erd(server_id: str, db_id: str):
 @router.post("/api/schema/uploads", status_code=201)
 async def upload(request: Request, filename: str = Query("upload.csv")):
     """Raw request body streamed to disk (no multipart, so any size works)."""
+    from .. import uploads
+
     uid, path = dataio.new_upload_path(filename)
-    size = 0
-    with open(path, "wb") as f:
-        async for chunk in request.stream():
-            size += len(chunk)
-            f.write(chunk)
+    uploads.check(path.parent, uploads.declared_size(request.headers))
+    size = checked = 0
+    try:
+        with open(path, "wb") as f:
+            async for chunk in request.stream():
+                size += len(chunk)
+                f.write(chunk)
+                if size - checked >= 64 * 1024 * 1024:
+                    checked = size
+                    uploads.check_running(path.parent, size)
+    except BaseException:
+        path.unlink(missing_ok=True)
+        raise
     return dataio.upload_info(uid)
 
 

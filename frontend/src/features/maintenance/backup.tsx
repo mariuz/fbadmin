@@ -4,6 +4,7 @@ import { t } from "../../i18n";
 import type { Job } from "../../types";
 import { IconDownload, IconRefresh, IconTrash, IconUpload } from "../../components/Icons";
 import { browserDownload, fmtBytes, fmtTime, mapi, uploadRestore, type ArchiveItem } from "./api";
+import { request } from "../../api";
 import {
   BackupOptionsForm, JobLog, RestoreOptionsForm, Section, backupPayload, defaultBackupOpts, defaultRestoreOpts,
   restorePayload, useBusy, useCaps,
@@ -74,6 +75,15 @@ export function RestorePanel(props: { serverId: string; defaultPath?: string; ar
     if (source === "upload") {
       if (!file) throw new Error(t("Choose a .fbk file to upload"));
       await mapi.capabilities(props.serverId); // asks for the password first if needed
+      // before uploading (issue #10): the size limit and the free space where the upload is written
+      const lim = await request<{ max_upload_bytes: number; free_bytes: number; margin_bytes: number }>(
+        "GET", `/api/servers/${encodeURIComponent(props.serverId)}/maintenance/upload-limits`);
+      if (lim.max_upload_bytes > 0 && file.size > lim.max_upload_bytes) {
+        throw new Error(t("The file is {size}; uploads are limited to {max} (FBADMIN_MAX_UPLOAD_BYTES).", { size: fmtBytes(file.size), max: fmtBytes(lim.max_upload_bytes) }));
+      }
+      if (file.size + lim.margin_bytes > lim.free_bytes) {
+        throw new Error(t("The file is {size} but fbadmin's data directory has {free} free: free some space, or copy the backup to the database server and use File on the server.", { size: fmtBytes(file.size), free: fmtBytes(lim.free_bytes) }));
+      }
       setProgress(0);
       const j = await uploadRestore(props.serverId, file, { database_path: target, register_as: registerAs || null, keep, ...o as Record<string, any> }, setProgress);
       setJob(j);
@@ -104,6 +114,7 @@ export function RestorePanel(props: { serverId: string; defaultPath?: string; ar
               onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
             {progress !== null && <div className="progress"><div style={{ width: `${Math.round(progress * 100)}%` }} /></div>}
           </div>
+          {file && <><span /><div className="muted" style={{ fontSize: 12 }}>{t("The restored database is usually larger than the backup ({size}): make sure the database server has room for it.", { size: fmtBytes(file.size) })}</div></>}
           <span />
           <label className="check"><input type="checkbox" checked={keep} onChange={(e) => setKeep(e.target.checked)} /> {t("Keep the uploaded file in the fbadmin archive")}</label>
         </>}

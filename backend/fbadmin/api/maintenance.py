@@ -248,13 +248,20 @@ async def restore_upload(server_id: str, request: Request, database_path: str, f
     else:
         dest = settings.data_dir / "uploads" / f"{uuid.uuid4().hex}.fbk"
     dest.parent.mkdir(parents=True, exist_ok=True)
+    from .. import uploads
+
+    uploads.check(dest.parent, uploads.declared_size(request.headers))  # before a byte is written (issue #10)
     size = 0
+    checked = 0
     f = open(dest, "wb")  # noqa: SIM115
     try:
         async for chunk in request.stream():
             if chunk:
                 await run_in_threadpool(f.write, chunk)
                 size += len(chunk)
+                if size - checked >= 64 * 1024 * 1024:
+                    checked = size
+                    uploads.check_running(dest.parent, size)
     except BaseException:
         f.close()
         dest.unlink(missing_ok=True)
@@ -703,3 +710,14 @@ def config(server_id: str, db_id: str):
         rows = [{"id": r[0], "name": r[1], "value": r[2], "default": r[3], "is_set": bool(r[4]),
                  "source": r[5]} for r in cur.fetchall()]
     return {"available": True, "rows": rows, "message": None}
+
+
+@router.get("/maintenance/upload-limits")
+def upload_limits(server_id: str):
+    """What an upload can be: the limit (0 = none) and the free space where uploads are written (issue #10)."""
+    from .. import uploads
+
+    get_state().store.get(server_id)
+    folder = settings.data_dir / "uploads"
+    return {"max_upload_bytes": uploads.max_upload(), "free_bytes": uploads.free_bytes(folder),
+            "margin_bytes": uploads.margin()}

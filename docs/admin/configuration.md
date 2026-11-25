@@ -23,7 +23,10 @@ fbadmin-desktop [--port PORT] [--browser] [--log-level LEVEL]
 | `FBADMIN_ACCESS_LOG` | `1` | `0` turns off the per-request log |
 | `FBADMIN_RATE_LIMIT` | `0` (off) | API requests per minute per client IP (token bucket, same burst) |
 | `FBADMIN_RATE_LIMIT_TRUST_PROXY` | `0` | `1`: identify clients by `X-Forwarded-For` (only behind a trusted proxy) |
-| `FBADMIN_MAX_REQUEST_BYTES` | `33554432` (32 MiB) | Maximum request body; larger requests get HTTP 413. `0` = unlimited |
+| `FBADMIN_MAX_REQUEST_BYTES` | `33554432` (32 MiB) | Maximum request body; larger requests get HTTP 413. `0` = unlimited. Uploads streamed to disk (restore from an upload, data import files) are exempt |
+| `FBADMIN_MAX_REQUEST_SIZE` | `16777216` (16 MiB) | Server mode only: maximum body of API requests, checked by the security layer (see [Security](../SECURITY.md)). Uploads streamed to disk are exempt |
+| `FBADMIN_MAX_UPLOAD_BYTES` | `0` (no limit) | Maximum size of a restore upload or a data import file. Without a limit, the free space in the data directory bounds them |
+| `FBADMIN_UPLOAD_FREE_MARGIN` | `268435456` (256 MiB) | Free space to keep in the data directory: an upload that would leave less is refused before it starts (HTTP 507), and stopped if the disk fills while it runs |
 | `FBADMIN_META_POOL_SIZE` | `3` | Metadata connections per database (see below) |
 | `FBADMIN_DRIVER` | `auto` | Database driver for server connections: `auto` (native `firebird-driver` when a Firebird 4+ client library is available, else pure-Python `firebirdsql`), `native` or `firebirdsql`. Overrides the setting in the UI (see [Drivers](../DRIVERS.md)) |
 | `FBADMIN_FBCLIENT` | | Path of `libfbclient` for the native driver (default: the embedded engine's, else the system library path). Overrides the setting in the UI |

@@ -115,9 +115,9 @@ run (`-v` for every line), and **Ctrl+C cancels the job** on the server (press i
 waiting). What a command may do follows the token: a read-only token can run `check`, `extract`,
 `diff` and `SELECT`s, but not change data or restore (exit code 3, "Not allowed").
 
-Uploads count toward the server's request size limit (16 MB by default in server mode; set
-`FBADMIN_MAX_REQUEST_SIZE` on the server). For larger restores, copy the backup to the Firebird
-server and use `--server-file`.
+Uploads are streamed to disk on the server, so the request size limits do not apply to them; they are
+bounded by `FBADMIN_MAX_UPLOAD_BYTES` (no limit by default) and the free space in the server's data
+directory. A backup can also be copied to the Firebird server and restored with `--server-file`.
 
 ## Output and exit codes
 

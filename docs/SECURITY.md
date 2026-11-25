@@ -68,7 +68,7 @@ file.
 |---|---|---|
 | `FBADMIN_LOGIN_RATE` | `5/300` | failed logins per client IP and per user name in 300 s; then HTTP 429 with `Retry-After` |
 | `FBADMIN_RATE_LIMIT` | `1200/60` | API requests per user per minute (`0` disables) |
-| `FBADMIN_MAX_REQUEST_SIZE` | `16777216` | maximum request body in bytes (HTTP 413) |
+| `FBADMIN_MAX_REQUEST_SIZE` | `16777216` | maximum request body in bytes (HTTP 413); restore uploads and data import files are streamed to disk and exempt (they are bounded by `FBADMIN_MAX_UPLOAD_BYTES` and the free space, see [Configuration](admin/configuration.md)) |
 
 Password verification takes the same time whether or not the user name exists.
 

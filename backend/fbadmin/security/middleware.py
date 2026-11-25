@@ -147,9 +147,12 @@ class SecurityMiddleware:
             return
 
         principal: Principal | None = None
+        from ..uploads import is_streamed
+
+        streamed = is_streamed(req.path)  # restore uploads, import files: streamed to disk, not read here
         if sec.server_mode and is_api:
             length = req.headers.get("content-length")
-            if length and length.isdigit() and int(length) > sec.settings.max_request_size:
+            if not streamed and length and length.isdigit() and int(length) > sec.settings.max_request_size:
                 await self._reply(send, _json(413, "Request too large", "too_large"), extra_headers)
                 return
             auth = req.headers.get("authorization", "")
@@ -211,8 +214,8 @@ class SecurityMiddleware:
         audit_ctx: dict[str, Any] | None = None
         body = b""
         body_read = False
-        if is_api and unsafe and (req.path.startswith("/api/servers/") or req.path.startswith("/api/query/")
-                                  or (restricted and needs_body(req.path))):
+        if is_api and unsafe and not streamed and (req.path.startswith("/api/servers/") or req.path.startswith("/api/query/")
+                                                   or (restricted and needs_body(req.path))):
             body, too_large = await _read_body(receive, sec.settings.max_request_size if sec.server_mode else None)
             body_read = True
             if too_large:
@@ -251,7 +254,7 @@ class SecurityMiddleware:
                 return await receive()
 
             app_receive = replay
-        elif sec.server_mode and is_api and unsafe:
+        elif sec.server_mode and is_api and unsafe and not streamed:
             app_receive = _limited_receive(receive, sec.settings.max_request_size)
         else:
             app_receive = receive

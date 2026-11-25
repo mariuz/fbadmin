@@ -11,7 +11,8 @@ server mode lives with the auth code). Configuration (environment):
     trusted reverse proxy).
 ``FBADMIN_MAX_REQUEST_BYTES``
     Maximum request body size in bytes (default 32 MiB, ``0`` = unlimited). Requests
-    above it get HTTP 413.
+    above it get HTTP 413. Uploads streamed to disk (restore from an upload, data import files) are exempt:
+    see ``uploads.py``.
 """
 
 from __future__ import annotations
@@ -105,6 +106,10 @@ class BodySizeLimitMiddleware:
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http" or self.max_bytes <= 0:
             return await self.app(scope, receive, send)
+        from .uploads import is_streamed
+
+        if is_streamed(scope.get("path", "")):  # streamed to disk: bounded by free space instead (uploads.py)
+            return await self.app(scope, receive, send)
         for k, v in scope.get("headers") or []:
             if k == b"content-length":
                 try:
@@ -112,8 +117,8 @@ class BodySizeLimitMiddleware:
                 except ValueError:
                     too_big = False
                 if too_big:
-                    return await _reject(send, 413, f"Request body larger than {self.max_bytes} bytes",
-                                         "request_too_large")
+                    return await _reject(send, 413, f"Request body larger than {self.max_bytes} bytes "
+                                         "(FBADMIN_MAX_REQUEST_BYTES)", "request_too_large")
         # Chunked bodies have no Content-Length: count while streaming. When the limit is
         # exceeded we answer 413 ourselves and drop whatever the app sends afterwards.
         state = {"received": 0, "started": False, "rejected": False}
@@ -131,8 +136,8 @@ class BodySizeLimitMiddleware:
                 state["received"] += len(message.get("body", b""))
                 if state["received"] > self.max_bytes and not state["started"]:
                     state["rejected"] = True
-                    await _reject(send, 413, f"Request body larger than {self.max_bytes} bytes",
-                                  "request_too_large")
+                    await _reject(send, 413, f"Request body larger than {self.max_bytes} bytes "
+                                  "(FBADMIN_MAX_REQUEST_BYTES)", "request_too_large")
                     raise RequestTooLarge
             return message
 

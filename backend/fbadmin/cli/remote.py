@@ -116,9 +116,10 @@ class Client:
             return CliError(f"Not allowed by {self.base}: {msg}", CONNECT)
         if exc.code == 404:
             return CliError(f"Not found on {self.base}: {msg}", USAGE)
-        if exc.code == 413:
-            return CliError(f"{msg}: the upload is larger than the server accepts (FBADMIN_MAX_REQUEST_SIZE on the "
-                            "server); restore from a file on the Firebird server with --server-file instead", FAILED)
+        if exc.code in (413, 507):
+            return CliError(f"{msg}: the upload is larger than the server accepts (FBADMIN_MAX_UPLOAD_BYTES, or the "
+                            "free space in its data directory); restore from a file on the Firebird server with "
+                            "--server-file instead", FAILED)
         return CliError(msg, FAILED)
 
     def json(self, method: str, path: str, body: Any = None, **kw) -> Any:

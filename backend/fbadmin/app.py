@@ -93,6 +93,12 @@ def create_app() -> FastAPI:
     async def _lookup(request: Request, exc: LookupError):
         return JSONResponse(status_code=404, content={"detail": str(exc)})
 
+    from .uploads import NoSpace
+
+    @app.exception_handler(NoSpace)
+    async def _nospace(request: Request, exc: NoSpace):
+        return JSONResponse(status_code=507, content={"detail": str(exc), "code": "insufficient_storage"})
+
     @app.exception_handler(ValueError)
     async def _value(request: Request, exc: ValueError):
         return JSONResponse(status_code=400, content={"detail": str(exc)})
