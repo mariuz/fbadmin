@@ -8,7 +8,7 @@ import { defaultKeymap, history, historyKeymap, indentWithTab, toggleComment } f
 import { sql, SQLDialect } from "@codemirror/lang-sql";
 import { syntaxHighlighting, defaultHighlightStyle, bracketMatching, indentOnInput, HighlightStyle } from "@codemirror/language";
 import {
-  autocompletion, closeBrackets, closeBracketsKeymap, completeFromList, completionKeymap, type Completion as CmCompletion,
+  autocompletion, closeBrackets, closeBracketsKeymap, completeFromList, completionKeymap, type Completion as CmCompletion, type CompletionContext, type CompletionResult,
 } from "@codemirror/autocomplete";
 import { lintGutter, setDiagnostics } from "@codemirror/lint";
 import { format as formatSqlText } from "sql-formatter";
@@ -17,6 +17,7 @@ import { tags } from "@lezer/highlight";
 import { showMinimap } from "@replit/codemirror-minimap";
 import { getPrefs, usePrefs } from "../prefs";
 import { N_, t } from "../i18n";
+import { nameOptions } from "./sqlComplete";
 
 /** Configurable editor actions and their default key bindings (CodeMirror key syntax). */
 export const EDITOR_ACTIONS: Array<{ id: string; label: string; keys: string[] }> = [
@@ -161,9 +162,29 @@ function extraSource(extra?: ExtraCompletions) {
   return completeFromList(opts);
 }
 
+/** Tables, columns and aliases, the Firebird way (components/sqlComplete.ts; issues #2, #7, #8). */
+function schemaSource(schema?: Record<string, string[]>) {
+  return (ctx: CompletionContext): CompletionResult | null => {
+    if (!schema) return null;
+    const text = ctx.state.doc.toString();
+    const r = nameOptions(text, ctx.pos, schema);
+    if (!r) return null;
+    const typed = text.slice(r.from, ctx.pos);
+    if (!typed && !ctx.explicit && text[ctx.pos - 1] !== ".") return null;
+    const closing = r.quoted && ctx.state.sliceDoc(ctx.pos, ctx.pos + 1) === '"'; // closeBrackets added it
+    return {
+      from: r.from,
+      to: closing ? ctx.pos + 1 : undefined,
+      options: r.options.map((o) => ({ label: r.quoted ? `"${o.label}"` : o.label, apply: o.apply, type: o.type, detail: o.detail })),
+      validFor: r.quoted ? /^"[^"]*$/ : /^[\w$]*$/,
+    };
+  };
+}
+
 function sqlExtensions(schema?: Record<string, string[]>, extra?: ExtraCompletions) {
-  const lang = sql({ dialect: firebirdDialect, upperCaseKeywords: true, schema });
-  return [lang, lang.language.data.of({ autocomplete: extraSource(extra) })];
+  // lang-sql's own schema completion quotes every upper-case name and stops at "$": ours replaces it
+  const lang = sql({ dialect: firebirdDialect, upperCaseKeywords: true });
+  return [lang, lang.language.data.of({ autocomplete: extraSource(extra) }), lang.language.data.of({ autocomplete: schemaSource(schema) })];
 }
 
 export interface SqlEditorProps {

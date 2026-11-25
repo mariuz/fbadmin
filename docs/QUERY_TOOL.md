@@ -8,7 +8,7 @@
 | Comment or uncomment lines | **Ctrl/Cmd+/** |
 | Format the selection or the whole script | **Shift+Alt+F** or **Format** |
 | Find / replace | **Ctrl/Cmd+F** |
-| Autocomplete | **Ctrl+Space**. Type `alias.` to get that table's columns |
+| Autocomplete | **Ctrl+Space**. Type `alias.` to get that table's columns (`from artikel a` and `from "ARTIKEL" a` both work). Names are quoted only when they must be: `ARTIKEL` and `MON$DATABASE` are inserted as they are, a reserved word or a case-sensitive name such as `"MixedCase"` in quotes |
 
 ## Parameters
 
