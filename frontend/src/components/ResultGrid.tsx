@@ -153,6 +153,10 @@ export function ResultGrid(props: {
   hasMore?: boolean;
   loadingMore?: boolean;
   onLoadMore?: () => void;
+  /** Fetch the rest of the result set; resolves to every row, or null when stopped (issues #5, #6). */
+  onFetchAll?: () => Promise<unknown[][] | null>;
+  fetchingAll?: boolean;
+  onStopFetchAll?: () => void;
 }) {
   const { columns, rows } = props;
   const scroller = useRef<HTMLDivElement | null>(null);
@@ -199,7 +203,7 @@ export function ResultGrid(props: {
     return Object.keys(w).length ? w : undefined;
   };
 
-  const sorted = useMemo(() => {
+  const arrange = (rows: unknown[][]) => {
     let out = rows.map((r, i) => ({ r, i }));
     const f = filter.trim().toLowerCase();
     if (f) out = out.filter(({ r }) => r.some((v) => v !== null && v !== undefined && cellText(v).toLowerCase().includes(f)));
@@ -213,21 +217,28 @@ export function ResultGrid(props: {
       return sort.desc ? -c : c;
     });
     return out;
-  }, [rows, sort, columns, filter]);
+  };
+  const sorted = useMemo(() => arrange(rows), [rows, sort, columns, filter]);
 
   const first = Math.max(0, Math.floor(scrollTop / ROW_H) - 10);
   const count = Math.ceil(height / ROW_H) + 20;
   const visible = sorted.slice(first, first + count);
   const shownRows = () => sorted.map((x) => x.r);
   const base = props.name ?? "result";
-  const exports: Array<[string, () => void]> = [
-    ["CSV", () => download(`${base}.csv`, toDelimited(columns, shownRows()))],
-    ["TSV", () => download(`${base}.tsv`, toDelimited(columns, shownRows(), "\t"), "text/tab-separated-values")],
-    ["JSON", () => download(`${base}.json`, JSON.stringify(shownRows().map((r) => Object.fromEntries(columns.map((c, i) => [c.name, r[i]]))), null, 2), "application/json")],
-    ["SQL INSERT", () => download(`${base}.sql`, toInserts(props.name && /^[A-Z_][A-Z0-9_$]*$/i.test(props.name) ? props.name : "TABLE_NAME", columns, shownRows()), "text/sql")],
-    ["Markdown", () => download(`${base}.md`, toMarkdown(columns, shownRows()), "text/markdown")],
-    ["Excel (XLSX)", () => download(`${base}.xlsx`, buildXlsx(columns, shownRows(), base) as Uint8Array<ArrayBuffer>, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")],
+  const exports: Array<[string, (rows: unknown[][]) => void]> = [
+    ["CSV", (rs) => download(`${base}.csv`, toDelimited(columns, rs))],
+    ["TSV", (rs) => download(`${base}.tsv`, toDelimited(columns, rs, "\t"), "text/tab-separated-values")],
+    ["JSON", (rs) => download(`${base}.json`, JSON.stringify(rs.map((r) => Object.fromEntries(columns.map((c, i) => [c.name, r[i]]))), null, 2), "application/json")],
+    ["SQL INSERT", (rs) => download(`${base}.sql`, toInserts(props.name && /^[A-Z_][A-Z0-9_$]*$/i.test(props.name) ? props.name : "TABLE_NAME", columns, rs), "text/sql")],
+    ["Markdown", (rs) => download(`${base}.md`, toMarkdown(columns, rs), "text/markdown")],
+    ["Excel (XLSX)", (rs) => download(`${base}.xlsx`, buildXlsx(columns, rs, base) as Uint8Array<ArrayBuffer>, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")],
   ];
+  // while the cursor is open, an export of "all rows" fetches the rest first (issue #6): never silently partial
+  const canFetchAll = !!(props.hasMore && props.onFetchAll);
+  const exportAll = async (fn: (rows: unknown[][]) => void) => {
+    const all = await props.onFetchAll!();
+    if (all) fn(arrange(all).map((x) => x.r));
+  };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
@@ -237,11 +248,18 @@ export function ResultGrid(props: {
             ? t("{shown} of {count} rows", { shown: sorted.length.toLocaleString(), count: rows.length.toLocaleString() + (props.hasMore ? "+" : "") })
             : t("{count} rows", { count: rows.length.toLocaleString() + (props.hasMore ? "+" : "") })}
         </span>
-        {props.hasMore && (
+        {props.hasMore && !props.fetchingAll && (
           <button className="btn small" disabled={props.loadingMore} onClick={props.onLoadMore} title={t("Fetch the next rows from the open cursor")}>
             {props.loadingMore ? <IconSpinner size={13} className="spin" /> : null} {t("Load more")}
           </button>
         )}
+        {canFetchAll && !props.fetchingAll && (
+          <button className="btn small" disabled={props.loadingMore} onClick={() => void props.onFetchAll!()} title={t("Fetch every remaining row from the open cursor")}>{t("Fetch all")}</button>
+        )}
+        {props.fetchingAll && <>
+          <span className="muted" role="status"><IconSpinner size={13} className="spin" /> {t("Fetching all rows…")}</span>
+          <button className="btn small" onClick={props.onStopFetchAll} title={t("Stop, keeping the rows fetched so far")}>{t("Stop")}</button>
+        </>}
         <span className="grow" />
         <button className={"btn small" + (showFilter ? " on" : "")} onClick={() => setShowFilter(!showFilter)} title={t("Filter rows")}><IconFilter size={13} /></button>
         {showFilter && <input className="text" autoFocus placeholder={t("filter rows…")} value={filter} onChange={(e) => setFilter(e.target.value)} style={{ width: 180, padding: "2px 6px" }} />}
@@ -258,7 +276,12 @@ export function ResultGrid(props: {
           <button className="btn small" onClick={() => setExportOpen(!exportOpen)}><IconDownload size={13} /> {t("Export")} ▾</button>
           {exportOpen && (
             <div className="ctx" style={{ position: "absolute", right: 0, top: "100%", minWidth: 150 }} onMouseLeave={() => setExportOpen(false)}>
-              {exports.map(([label, fn]) => <button key={label} onClick={() => { setExportOpen(false); fn(); }}>{label}</button>)}
+              {canFetchAll && <div className="ctx-head">{t("All rows (fetches the rest first)")}</div>}
+              {exports.map(([label, fn]) => <button key={label} disabled={props.fetchingAll} onClick={() => { setExportOpen(false); if (canFetchAll) void exportAll(fn); else fn(shownRows()); }}>{label}</button>)}
+              {canFetchAll && <>
+                <div className="ctx-head">{t("Only the {n} loaded rows", { n: rows.length.toLocaleString() })}</div>
+                {exports.map(([label, fn]) => <button key={`loaded-${label}`} onClick={() => { setExportOpen(false); fn(shownRows()); }}>{label}</button>)}
+              </>}
             </div>
           )}
         </div>

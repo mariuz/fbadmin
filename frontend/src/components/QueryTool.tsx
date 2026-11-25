@@ -20,6 +20,9 @@ import { getQueryToolActions, type QueryToolContext } from "../registry";
 // ----------------------------------------------------------- persistence
 interface HistoryEntry { sql: string; at: number; ok: boolean; ms: number }
 interface Snippet { name: string; sql: string }
+/** Rows per page while fetching a whole result set (Fetch all, Rows = all). */
+const FETCH_ALL_PAGE = 10000;
+
 const HISTORY_KEY = "fbadmin.history";
 const SNIPPETS_KEY = "fbadmin.snippets";
 const PARAMS_KEY = "fbadmin.params";
@@ -203,7 +206,8 @@ export function QueryTool(props: { serverId: string; dbId: string; schema?: stri
   const [cancelling, setCancelling] = useState(false);
   const [autocommit, setAutocommit] = useState(true);
   const [txOpen, setTxOpen] = useState(false);
-  const [maxRows, setMaxRows] = useState(1000);
+  const [maxRows, setMaxRows] = useState(1000); // 0: execute and fetch all (issue #5)
+  const [fetchingAll, setFetchingAll] = useState(false);
   const [withPlan, setWithPlan] = useState(false);
   const [withStats, setWithStats] = useState(false);
   const [pane, setPane] = useState<string>("data");
@@ -299,7 +303,7 @@ export function QueryTool(props: { serverId: string; dbId: string; schema?: stri
     const started = performance.now();
     try {
       let sid = await ensureSession();
-      const body = { sql: q, autocommit, with_plan: withPlan, with_stats: withStats, max_rows: maxRows, params };
+      const body = { sql: q, autocommit, with_plan: withPlan, with_stats: withStats, max_rows: maxRows || FETCH_ALL_PAGE, params };
       let r: ScriptResult;
       try {
         r = await api.runQuery(sid, body);
@@ -312,6 +316,10 @@ export function QueryTool(props: { serverId: string; dbId: string; schema?: stri
       }
       setResult(r);
       setTxOpen(r.transaction_open);
+      if (maxRows === 0 && r.cursor_open && !r.error) {
+        const last = r.results.filter((x) => x.kind === "select").slice(-1)[0];
+        void fetchAll(last?.rows ?? [], sid);
+      }
       const selects = r.results.filter((x) => x.kind === "select");
       setActiveResult(Math.max(0, selects.length - 1));
       setPane(r.error ? "messages" : selects.length ? "data" : "messages");
@@ -354,20 +362,50 @@ export function QueryTool(props: { serverId: string; dbId: string; schema?: stri
     }
   };
 
+  /** One page of the open cursor, appended to the last result set. */
+  const fetchPage = async (sid: string, rows: number) => {
+    const f = await api.fetchMore(sid, rows);
+    setResult((r) => {
+      if (!r) return r;
+      const results = r.results.map((x) => (x.kind === "select" && x === r.results.filter((y) => y.kind === "select").slice(-1)[0]
+        ? { ...x, rows: [...(x.rows ?? []), ...f.rows], row_count: (x.row_count ?? 0) + f.rows.length, truncated: f.has_more }
+        : x));
+      return { ...r, results, cursor_open: f.has_more, transaction_open: f.transaction_open };
+    });
+    setTxOpen(f.transaction_open);
+    return f;
+  };
+
+  /** Fetch all: page by page (``FETCH_ALL_PAGE`` rows) until the cursor is exhausted or Stop (issue #5). Returns
+   *  every row of the result set, or null when stopped or failed (the rows fetched so far stay). */
+  const fetchAllStop = useRef(false);
+  const fetchAll = async (have: unknown[][], sid = session): Promise<unknown[][] | null> => {
+    if (!sid) return null;
+    fetchAllStop.current = false;
+    setFetchingAll(true);
+    const all = [...have];
+    try {
+      for (;;) {
+        if (fetchAllStop.current) return null;
+        const f = await fetchPage(sid, FETCH_ALL_PAGE);
+        all.push(...f.rows);
+        if (!f.has_more) return all;
+      }
+    } catch (e) {
+      app.toast(errMsg(e), "error");
+      setResult((r) => (r ? { ...r, cursor_open: false } : r));
+      return null;
+    } finally {
+      setFetchingAll(false);
+    }
+  };
+
   /** Fetch more rows of the open cursor (``rows`` defaults to the Rows setting). Used by the grid and result views. */
   const loadMore = async (rows?: number): Promise<{ fetched: number; hasMore: boolean }> => {
     if (!session || !result) return { fetched: 0, hasMore: false };
     setLoadingMore(true);
     try {
-      const f = await api.fetchMore(session, rows ?? maxRows);
-      setResult((r) => {
-        if (!r) return r;
-        const results = r.results.map((x) => (x.kind === "select" && x === r.results.filter((y) => y.kind === "select").slice(-1)[0]
-          ? { ...x, rows: [...(x.rows ?? []), ...f.rows], row_count: (x.row_count ?? 0) + f.rows.length, truncated: f.has_more }
-          : x));
-        return { ...r, results, cursor_open: f.has_more, transaction_open: f.transaction_open };
-      });
-      setTxOpen(f.transaction_open);
+      const f = await fetchPage(session, rows ?? (maxRows || FETCH_ALL_PAGE));
       return { fetched: f.rows.length, hasMore: f.has_more };
     } catch (e) {
       app.toast(errMsg(e), "error");
@@ -544,6 +582,7 @@ export function QueryTool(props: { serverId: string; dbId: string; schema?: stri
         <label>{t("Rows")}
           <select className="text" value={maxRows} onChange={(e) => setMaxRows(Number(e.target.value))}>
             {[100, 1000, 10000, 100000].map((n) => <option key={n} value={n}>{n.toLocaleString()}</option>)}
+            <option value={0}>{t("all")}</option>
           </select>
         </label>
         <label className="check" title={t("Fetch the PLAN of every executed statement")}><input type="checkbox" checked={withPlan} onChange={(e) => setWithPlan(e.target.checked)} /> {t("Plans")}</label>
@@ -624,7 +663,9 @@ export function QueryTool(props: { serverId: string; dbId: string; schema?: stri
                 )}
                 <div style={{ flex: 1, minHeight: 0, display: resultView === "grid" ? undefined : "none" }}>
                   <ResultGrid key={`${result?.elapsed_ms}-${activeResult}`} columns={current.columns!} rows={current.rows!}
-                    hasMore={!!(isLastSelect && result?.cursor_open)} loadingMore={loadingMore} onLoadMore={() => loadMore()} />
+                    hasMore={!!(isLastSelect && result?.cursor_open)} loadingMore={loadingMore} onLoadMore={() => loadMore()}
+                    onFetchAll={isLastSelect ? () => fetchAll(current.rows ?? []) : undefined} fetchingAll={fetchingAll}
+                    onStopFetchAll={() => { fetchAllStop.current = true; }} />
                 </div>
                 {resultViews.filter((rv) => openedViews.includes(rv.id)).map((rv) => (
                   <div key={`${rv.id}-${result?.elapsed_ms}-${activeResult}`} style={{ flex: 1, minHeight: 0, display: resultView === rv.id ? undefined : "none" }}>

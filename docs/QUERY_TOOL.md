@@ -39,6 +39,14 @@ more rows, its cursor stays open and **Load more** fetches the next page. The op
 cursor keeps its transaction alive. It is closed (and committed in auto-commit mode)
 when you run another statement, commit or roll back.
 
+**Fetch all** (next to **Load more**) fetches every remaining row, 10,000 at a time; the row count
+grows as it goes, and **Stop** keeps the rows fetched so far. **Rows: all** executes and fetches all
+in one step. All fetched rows are kept in the browser, so mind the size of very large results.
+
+**Exports are never silently partial.** While the cursor is still open, the **Export** menu offers
+**All rows**, which fetches the rest first and then writes the complete result, or **Only the N
+loaded rows**. The grid's filter and sort apply to both.
+
 ## Statistics
 
 With **Stats** ticked, each statement shows the change in its attachment's counters in
