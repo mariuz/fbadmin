@@ -453,12 +453,12 @@ def test_trace_session_captures_statement(client, database):
         for _ in range(50):
             ev = client.get(f"/api/servers/{sid}/trace/sessions/{sess['id']}/events",
                             params={"q": marker}).json()
-            found = [e for e in ev["events"] if e["sql"] and marker in e["sql"]]
+            found = [e for e in ev["events"] if e["sql"] and marker in e["sql"]
+                     and e["type"].startswith("EXECUTE_STATEMENT_FINISH")]
             if found:
                 break
             time.sleep(0.2)
         assert found, "statement not captured"
-        assert found[0]["type"].startswith("EXECUTE_STATEMENT_FINISH")
         assert found[0]["plan"] and "RDB$DATABASE" in found[0]["plan"]
     finally:
         r = client.post(f"/api/servers/{sid}/trace/sessions/{sess['id']}/stop")
@@ -472,6 +472,31 @@ def test_trace_session_captures_statement(client, database):
     log = client.get(f"/api/servers/{sid}/trace/sessions/{sess['id']}/download")
     assert log.status_code == 200 and marker in log.text
     assert client.delete(f"/api/servers/{sid}/trace/sessions/{sess['id']}").status_code == 204
+
+
+def test_trace_shows_open_cursor_statement(client, database):
+    """Issue #1: a SELECT whose cursor stays open (the Query Tool's first page) is in the trace right away."""
+    sid, dbid = database
+    sess = client.post(f"/api/servers/{sid}/trace/sessions",
+                       json={"template": "all_statements", "database_id": dbid}).json()
+    qs = client.post("/api/query/sessions", json={"server_id": sid, "database_id": dbid}).json()["session_id"]
+    try:
+        marker = f"m{uuid.uuid4().hex[:6]}"
+        r = client.post(f"/api/query/sessions/{qs}/execute",
+                        json={"sql": f"SELECT a.RDB$RELATION_ID AS {marker} FROM RDB$RELATIONS a "
+                                     "CROSS JOIN RDB$RELATIONS b", "max_rows": 5}).json()
+        assert r["error"] is None and r["cursor_open"]
+        found = []
+        for _ in range(50):
+            ev = client.get(f"/api/servers/{sid}/trace/sessions/{sess['id']}/events", params={"q": marker}).json()
+            found = [e["type"] for e in ev["events"]]
+            if found:
+                break
+            time.sleep(0.2)
+        assert found and found[0].startswith("EXECUTE_STATEMENT_START"), found
+    finally:
+        client.delete(f"/api/query/sessions/{qs}")
+        client.post(f"/api/servers/{sid}/trace/sessions/{sess['id']}/stop")
 
 
 @pytest.mark.parametrize("template", ["slow_queries", "errors", "connections", "psql"])

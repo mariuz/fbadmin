@@ -25,9 +25,10 @@ TEMPLATES: dict[str, dict] = {
     },
     "all_statements": {
         "label": "All statements",
-        "description": "Every finished statement with its plan (time threshold 0).",
+        "description": "Every statement when it starts, and when it finishes with its plan (time threshold 0).",
         "params": {"time_threshold": 0},
-        "body": ["log_statement_finish = true", "print_plan = true", "time_threshold = {time_threshold}"],
+        "body": ["log_statement_start = true", "log_statement_finish = true", "print_plan = true",
+                 "time_threshold = {time_threshold}"],
     },
     "errors": {
         "label": "Errors and warnings",

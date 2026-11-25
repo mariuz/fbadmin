@@ -99,6 +99,12 @@ tail, inspect an event, **stop** the session, **save the full log** (written to
 `isc_action_svc_trace_list`) and can be stopped. Configuration errors are reported by the
 server per database when it is attached and show up as `TRACE_CONFIG_ERROR` events.
 
+**All statements** logs each statement when it starts as well as when it finishes. Firebird
+writes `EXECUTE_STATEMENT_FINISH` (with the time and plan) only when the statement's cursor
+is closed: a SELECT whose rows are not all fetched yet, such as one in the Query Tool that
+shows its first page, finishes when it is fetched to the end or the next statement runs.
+Its `EXECUTE_STATEMENT_START` event shows it right away.
+
 An always-on session that feeds the slow statement log and query regressions is the
 [continuous trace](MONITORING.md#continuous-trace) of the History tab.
 
