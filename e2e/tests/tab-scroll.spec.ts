@@ -28,13 +28,14 @@ test("other feature tabs scroll too", async ({ page }) => {
   await page.goto("/");
   for (const label of ["Alerts", "Library", "Overview"]) {
     await page.locator(".topbar button", { hasText: label }).click();
-    const root = page.locator(".tab-pane:not(.hidden) > *").first();
-    const box = await root.evaluate((el) => {
+    // the new tab becomes active a moment after the click: measure once its pane is the visible one
+    await expect.poll(() => page.evaluate(() => {
+      const el = document.querySelector(".tab-pane.feature:not(.hidden) > *");
+      if (!el || !el.parentElement) return "not yet";
       const r = el.getBoundingClientRect();
-      const pane = el.parentElement!.getBoundingClientRect();
-      return { bottom: r.bottom, paneBottom: pane.bottom, overflowY: getComputedStyle(el).overflowY };
-    });
-    expect(box.bottom, label).toBeLessThanOrEqual(box.paneBottom + 1); // fits the pane: scrolls rather than clips
-    expect(["auto", "scroll"], label).toContain(box.overflowY);
+      const pane = el.parentElement.getBoundingClientRect();
+      if (r.bottom > pane.bottom + 1) return "clipped"; // fits the pane: scrolls rather than clips
+      return ["auto", "scroll"].includes(getComputedStyle(el).overflowY) ? "ok" : "no scroll";
+    }), label).toBe("ok");
   }
 });

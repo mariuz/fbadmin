@@ -41,9 +41,9 @@ test.afterAll(async ({ request }) => {
 
 const qt = () => page.locator(".tab-pane:not(.hidden) .qt");
 
-async function run(rows: string) {
+async function run(rows: string, sql = "SELECT I FROM N ORDER BY I") {
   await qt().locator("label", { hasText: "Rows" }).locator("select").selectOption(rows);
-  await setEditor(page, qt(), "SELECT I FROM N ORDER BY I");
+  await setEditor(page, qt(), sql);
   await qt().locator("button", { hasText: "Execute" }).click();
 }
 
@@ -66,6 +66,9 @@ test("Fetch all, and Rows = all", async () => {
   await expect(qt().getByText("1,000+ rows").first()).toBeVisible();
   await qt().getByRole("button", { name: "Fetch all" }).click();
   await expect(qt().getByText("12,345 rows").first()).toBeVisible();
-  await run("0");
+  // another query, so the test waits for its own result (12344 first), not the previous one
+  await run("0", "SELECT I FROM N ORDER BY I DESC");
+  await expect(qt().locator("td", { hasText: /^12,?344$/ }).first()).toBeVisible();
   await expect(qt().getByText("12,345 rows").first()).toBeVisible();
+  await expect(qt().getByRole("button", { name: "Fetch all" })).toHaveCount(0); // every row fetched
 });

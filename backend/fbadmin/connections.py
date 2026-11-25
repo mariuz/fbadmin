@@ -219,9 +219,55 @@ class ConnectionManager:
             for k in keys:
                 for fbc in self._meta.pop(k):
                     fbc.close()
-            for sid in [s for s, v in self._sessions.items()
-                        if v.server_id == server_id and (db_id is None or v.db_id == db_id)]:
-                _close_quietly(self._sessions.pop(sid).conn)
+            ended = [self._sessions.pop(s) for s, v in list(self._sessions.items())
+                     if v.server_id == server_id and (db_id is None or v.db_id == db_id)]
+        for sess in ended:
+            self._end_session(sess)
+
+    def _end_session(self, sess: QuerySession, wait: float = 15.0) -> None:
+        """Close a Query Tool session's connection, never while a request is using it: closing a connection
+        that another thread is fetching from crashes the native client. A busy session gets its statement
+        cancelled and is closed when it lets go (waiting up to ``wait`` seconds, then in the background)."""
+        def close() -> None:
+            try:
+                _safe_rollback(sess.conn)
+                _close_quietly(sess.conn)
+            finally:
+                sess.lock.release()
+
+        if sess.lock.acquire(blocking=False):
+            close()
+            return
+        self._cancel_attachment(sess)
+        if sess.lock.acquire(timeout=wait):
+            close()
+            return
+
+        def later() -> None:
+            sess.lock.acquire()
+            close()
+
+        threading.Thread(target=later, name="close-query-session", daemon=True).start()
+
+    def _cancel_attachment(self, sess: QuerySession) -> None:
+        """Cancel the running statement of ``sess`` through a short-lived connection of its own (the pools may be
+        closing, and the user may have disconnected the database: this is fbadmin's own cleanup)."""
+        from . import connstate
+
+        token = connstate.ui_request.set(False)
+        try:
+            fbc = self._open(sess.server_id, sess.db_id)
+            try:
+                cur = fbc.conn.cursor()
+                cur.execute("DELETE FROM MON$STATEMENTS WHERE MON$ATTACHMENT_ID = ? AND MON$STATE <> 0",
+                            [sess.attachment_id])
+                fbc.conn.commit()
+            finally:
+                fbc.close()
+        except Exception:  # noqa: BLE001 - best effort: the session is closed when it lets go anyway
+            pass
+        finally:
+            connstate.ui_request.reset(token)
 
     # --- services API --------------------------------------------------
     @contextmanager
@@ -316,8 +362,7 @@ class ConnectionManager:
         with self._lock:
             sess = self._sessions.pop(sid, None)
         if sess:
-            _safe_rollback(sess.conn)
-            _close_quietly(sess.conn)
+            self._end_session(sess)
 
     def reap_idle(self, max_idle: int) -> int:
         now = time.time()

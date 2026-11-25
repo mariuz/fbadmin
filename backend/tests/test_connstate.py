@@ -98,3 +98,34 @@ def test_closing_the_last_tab_disconnects(client, database, monkeypatch):
     time.sleep(0.6)
     assert client.get(base + "/info", headers=UI).json()["code"] == "disconnected"
     assert client.get(base + "/info").status_code == 200  # background / CLI still work
+
+
+@requires_server
+def test_disconnect_waits_for_a_busy_query_session(client, database):
+    """Closing a connection that another request is fetching from crashes the native client: Disconnect (and
+    dropping a database) wait for the session to let go."""
+    import threading
+
+    from fbadmin.api.deps import get_state
+
+    sid, dbid = database
+    mgr = get_state().manager
+    qs = client.post("/api/query/sessions", json={"server_id": sid, "database_id": dbid}).json()["session_id"]
+    sess = mgr.session(qs)
+    busy = threading.Event()
+    released: list[float] = []
+
+    def fetching():
+        with sess.lock:
+            busy.set()
+            time.sleep(1.0)
+            released.append(time.time())
+
+    t = threading.Thread(target=fetching)
+    t.start()
+    busy.wait(5)
+    mgr.disconnect(sid, dbid)
+    done = time.time()
+    t.join()
+    assert released and done >= released[0]  # closed only after the "fetch" let go
+    assert qs not in mgr._sessions
