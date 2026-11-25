@@ -5,6 +5,7 @@ export interface DatabaseEntry {
   name: string;
   path: string;
   connected?: boolean;
+  disconnected?: boolean;
 }
 
 export interface Server {
@@ -27,6 +28,8 @@ export interface Server {
   has_password: boolean;
   password_known: boolean;
   connected: boolean;
+  /** The user disconnected it (issue #9): used again only after Connect. */
+  disconnected?: boolean;
   databases: DatabaseEntry[];
 }
 

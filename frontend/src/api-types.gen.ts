@@ -1197,6 +1197,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/client/bye": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Bye
+         * @description A tab is closing (sent with keepalive from pagehide).
+         */
+        post: operations["bye_api_client_bye_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/client/hello": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Hello
+         * @description A tab opened or reloaded.
+         */
+        post: operations["hello_api_client_hello_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/comments": {
         parameters: {
             query?: never;
@@ -5645,7 +5685,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Disconnect Server */
+        /**
+         * Disconnect Server
+         * @description Close its connections and end access until Connect (issue #9); forgets a password typed this session.
+         */
         post: operations["disconnect_server_api_servers__server_id__disconnect_post"];
         delete?: never;
         options?: never;
@@ -8232,6 +8275,11 @@ export interface components {
         SwitchoverIn: {
             /** Target */
             target: string;
+        };
+        /** TabIn */
+        TabIn: {
+            /** Tab */
+            tab: string;
         };
         /** TableIn */
         TableIn: {
@@ -11597,6 +11645,72 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    bye_api_client_bye_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TabIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    hello_api_client_hello_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TabIn"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactElement, type ReactNode } from "react";
-import { api, withSchema } from "../api";
+import { api, askConnect, withSchema } from "../api";
 import { errMsg, keys, selectionKey, useApp } from "../context";
 import { OBJECT_TYPES, type Selection, type Server } from "../types";
 import {
@@ -10,6 +10,7 @@ import { buildMenu } from "./menus";
 import { getTreeNodes } from "../registry";
 import { t } from "../i18n";
 import { useCoarsePointer, useLongPress } from "../features/mobile/responsive";
+import { affected, onDisconnected } from "../connstate";
 
 export interface NodeSpec {
   key: string;
@@ -78,6 +79,15 @@ function TreeNode(props: {
     else if (version !== firstVersion.current) setChildren(null);
     firstVersion.current = version;
   }, [version]);
+
+  // Disconnect (issue #9): collapse the server / database node and forget what it showed
+  useEffect(() => onDisconnected((e) => {
+    const sel = spec.selection;
+    if (!affected(e, sel.serverId, sel.dbId) || (e.dbId && sel.kind === "server")) return;
+    setOpen(false);
+    setChildren(null);
+    props.store?.delete(spec.key);
+  }), [spec.key]);
 
   const toggle = async () => {
     if (!spec.load) return;
@@ -324,7 +334,11 @@ export function Tree() {
     icon: IconServer,
     selection: { kind: "server", serverId: srv.id },
     load: async () => {
-      await api.connectServer(srv.id);
+      // a disconnected server (issue #9) is connected again only by the user's choice in the Connect dialog
+      const now = (await api.servers()).find((s) => s.id === srv.id);
+      if (now?.disconnected) {
+        if (!(await askConnect(srv.id, null))) throw new Error(t("Disconnected: choose Connect to use it again"));
+      } else await api.connectServer(srv.id);
       const fresh = (await app.reloadServers()).find((s) => s.id === srv.id) ?? srv;
       return fresh.databases.map((d) => ({
         key: keys.db(srv.id, d.id),
@@ -333,6 +347,12 @@ export function Tree() {
         icon: IconDatabase,
         selection: { kind: "database", serverId: srv.id, dbId: d.id },
         load: async () => {
+          const now = (await api.servers()).find((s) => s.id === srv.id);
+          if (now?.disconnected || now?.databases.find((x) => x.id === d.id)?.disconnected) {
+            if (!(await askConnect(srv.id, now.disconnected ? null : d.id))) {
+              throw new Error(t("Disconnected: choose Connect to use it again"));
+            }
+          }
           await api.connectDatabase(srv.id, d.id);
           const extra = (await Promise.all(getTreeNodes("database").map((p) => p.build(srv.id, d.id).catch(() => [])))).flat();
           const sc = await api.schemas(srv.id, d.id).catch(() => ({ supported: false, schemas: [] }));

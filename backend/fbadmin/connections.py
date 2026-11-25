@@ -67,6 +67,9 @@ def connect(
     ``driver="firebirdsql"`` forces the pure-Python driver, for features built on its wire
     internals (the event monitor). Local (embedded) registrations always use the native driver.
     """
+    from . import connstate
+
+    connstate.check(srv.id, None if create else connstate.database_of(srv, db_path))  # issue #9
     if srv.embedded:  # local file through the embedded engine (native driver)
         from .embedded import connect_local
 
@@ -178,6 +181,9 @@ class ConnectionManager:
 
     @contextmanager
     def meta(self, server_id: str, db_id: str) -> Iterator[firebirdsql.Connection]:
+        from . import connstate
+
+        connstate.check(server_id, db_id)  # a pooled connection may serve another user (server mode)
         key = (server_id, db_id)
         fbc = self._acquire_meta(key)
         try:
@@ -220,6 +226,9 @@ class ConnectionManager:
     # --- services API --------------------------------------------------
     @contextmanager
     def service(self, server_id: str):
+        from . import connstate
+
+        connstate.check(server_id)
         srv = self.store.get(server_id)
         if srv.embedded:  # the embedded service manager (backup/restore, gstat, validation...)
             from .embedded import services as embedded_services

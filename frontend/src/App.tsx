@@ -1,5 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { activeSchemaOf, api, setActiveSchema, setPasswordHandler } from "./api";
+import { activeSchemaOf, api, setActiveSchema, setDisconnectedHandler, setPasswordHandler } from "./api";
+import { affected, onDisconnected, startTabTracking } from "./connstate";
 import { AppCtx, errMsg, selectionKey, type AppApi, type WorkTab } from "./context";
 import type { ObjectDetail, Selection, Server } from "./types";
 import { Tree } from "./components/Tree";
@@ -109,6 +110,17 @@ export default function App() {
     });
   }, []);
 
+  // Disconnect (issue #9): close the tabs of that server / database and leave its objects
+  useEffect(() => onDisconnected((e) => {
+    setTabs((cur) => {
+      const next = cur.filter((tb) => !affected(e, tb.serverId, tb.dbId));
+      setActive((a) => (next.some((tb) => tb.id === a) || !cur.some((tb) => tb.id === a) ? a : "dashboard"));
+      return next;
+    });
+    // (selecting the server would load its dashboard, which needs a connection)
+    setSelection((sel) => (sel && affected(e, sel.serverId, sel.dbId) ? null : sel));
+  }), []);
+
   const openQueryTool = useCallback((serverId: string, dbId: string, sql?: string, autorun?: boolean) => {
     const srv = serversRef.current.find((s) => s.id === serverId);
     const db = srv?.databases.find((d) => d.id === dbId);
@@ -147,6 +159,29 @@ export default function App() {
       if (!srv) return resolve(false);
       setDialog(<PasswordDialog server={srv} resolve={resolve} />);
     }));
+    // issue #9: a disconnected server/database is used again only after the user chooses Connect. One dialog
+    // per server at a time; after Cancel, requests of that server fail quietly for a while (polling tabs).
+    const asking = new Map<string, Promise<boolean>>();
+    const declined = new Map<string, number>();
+    setDisconnectedHandler((serverId, dbId) => {
+      const key = `${serverId}/${dbId ?? ""}`;
+      if ((declined.get(key) ?? 0) > Date.now()) return Promise.resolve(false);
+      const pending = asking.get(key);
+      if (pending) return pending;
+      const p = new Promise<boolean>((resolve) => {
+        const srv = serversRef.current.find((s) => s.id === serverId);
+        if (!srv) return resolve(false);
+        setDialog(<PasswordDialog server={srv} dbId={dbId} disconnected resolve={resolve} />);
+      }).then((ok) => {
+        asking.delete(key);
+        if (ok) reloadServers().catch(() => undefined);
+        else declined.set(key, Date.now() + 30000);
+        return ok;
+      });
+      asking.set(key, p);
+      return p;
+    });
+    startTabTracking();
     reloadServers()
       .then((s) => {
         // phones land on the multi-server overview (features/overview)

@@ -164,6 +164,25 @@ FBADMIN_PROXY_ADMIN_GROUPS=dba               # optional, matched against X-Forwa
 fbadmin trusts the header only when the TCP peer is in `FBADMIN_TRUSTED_PROXIES`, which defaults
 to localhost. Make sure clients cannot reach fbadmin directly.
 
+## Disconnect
+
+**Disconnect** on a server or database ends access to it from the browser until you choose **Connect**:
+
+* its connections and Query Tool sessions are closed, its tabs are closed and its tree node is collapsed;
+* requests from the UI that need it are refused (HTTP 409, `disconnected`) instead of reconnecting silently,
+  and the UI shows a Connect dialog: it asks for the password unless the password is saved;
+* disconnecting a server forgets a password typed for this session (a saved password stays saved).
+
+fbadmin starts with every server disconnected. When the last fbadmin browser tab is closed, everything is
+disconnected after `FBADMIN_DISCONNECT_ON_CLOSE` seconds (default 15; a reload of the page comes back in
+time). Closing the page while a Query Tool has an open transaction asks first. In server mode the state is
+kept per fbadmin user.
+
+This protects the next person at the same browser. It is not an access control against someone who can
+send requests to fbadmin themselves: background work (schedules, alerts, monitoring history) and the command
+line / API tokens are not affected. In desktop mode, anyone who can reach the page is the local user; use a
+master password with locking (below) or server mode to protect saved passwords.
+
 ## Master password: encrypted saved passwords
 
 Saved Firebird passwords are encrypted with **AES-256-GCM** using a random 256-bit data key, and

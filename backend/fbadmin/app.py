@@ -93,6 +93,21 @@ def create_app() -> FastAPI:
     async def _lookup(request: Request, exc: LookupError):
         return JSONResponse(status_code=404, content={"detail": str(exc)})
 
+    from . import connstate
+
+    @app.middleware("http")
+    async def _ui_request(request: Request, call_next):  # issue #9: the UI's disconnected state applies
+        token = connstate.ui_request.set(request.headers.get(connstate.UI_HEADER) == "ui")
+        try:
+            return await call_next(request)
+        finally:
+            connstate.ui_request.reset(token)
+
+    @app.exception_handler(connstate.Disconnected)
+    async def _disconnected(request: Request, exc: connstate.Disconnected):
+        return JSONResponse(status_code=409, content={"detail": str(exc), "code": "disconnected",
+                                                      "server_id": exc.server_id, "database_id": exc.db_id})
+
     from .uploads import NoSpace
 
     @app.exception_handler(NoSpace)

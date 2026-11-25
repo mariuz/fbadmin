@@ -141,6 +141,11 @@ class ServerStore:
         with self._lock:
             self._session_passwords[server_id] = password
 
+    def forget_password(self, server_id: str) -> None:
+        """Forget the password typed for this session (Disconnect); a saved password stays."""
+        with self._lock:
+            self._session_passwords.pop(server_id, None)
+
     # --- databases -----------------------------------------------------
     def add_database(self, server_id: str, db: DatabaseEntry) -> DatabaseEntry:
         with self._lock:

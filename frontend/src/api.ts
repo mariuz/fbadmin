@@ -25,6 +25,17 @@ export function setPasswordHandler(fn: (serverId: string) => Promise<boolean>) {
   passwordHandler = fn;
 }
 
+/** Called when the user disconnected the server/database a request needs (issue #9); true = connected again. */
+let disconnectedHandler: ((serverId: string, dbId: string | null) => Promise<boolean>) | null = null;
+export function setDisconnectedHandler(fn: (serverId: string, dbId: string | null) => Promise<boolean>) {
+  disconnectedHandler = fn;
+}
+
+/** Ask the user to connect a disconnected server / database (the Connect dialog); false = cancelled. */
+export async function askConnect(serverId: string, dbId: string | null): Promise<boolean> {
+  return disconnectedHandler ? disconnectedHandler(serverId, dbId) : false;
+}
+
 function serverIdFromPath(path: string): string | null {
   const m = path.match(/^\/api\/servers\/([^/]+)/);
   return m ? m[1] : null;
@@ -76,6 +87,7 @@ export async function request<T>(method: string, path: string, body?: unknown, r
     method,
     headers: {
       ...(body !== undefined ? { "Content-Type": "application/json" } : {}), ...csrfHeaders(method), ...schemaHeaders(path, body),
+      "X-Fbadmin-Client": "ui",
     },
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
@@ -85,6 +97,9 @@ export async function request<T>(method: string, path: string, body?: unknown, r
     if (res.status === 401 && data.code === "password_required" && retry && passwordHandler) {
       const sid = serverIdFromPath(path) ?? (body as any)?.server_id;
       if (sid && (await passwordHandler(sid))) return request<T>(method, path, body, false);
+    }
+    if (res.status === 409 && data.code === "disconnected" && retry && disconnectedHandler && data.server_id) {
+      if (await disconnectedHandler(data.server_id, data.database_id ?? null)) return request<T>(method, path, body, false);
     }
     if (retry && data.code && errorHandlers[data.code] && (await errorHandlers[data.code]())) {
       return request<T>(method, path, body, false);

@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from .. import jobs
+from .. import connstate, jobs
 from ..connections import connect
 from ..metadata.types import quote_ident
 from ..store import DatabaseEntry, ServerEntry
@@ -85,8 +85,10 @@ def _server_view(srv: ServerEntry) -> dict:
     st = get_state()
     data = srv.public()
     data["connected"] = any(st.manager.is_connected(srv.id, d.id) for d in srv.databases)
+    data["disconnected"] = not connstate.is_connected(srv.id)  # issue #9: the user disconnected it
     for d in data["databases"]:
         d["connected"] = st.manager.is_connected(srv.id, d["id"])
+        d["disconnected"] = not connstate.is_connected(srv.id, d["id"])
     data["password_known"] = bool(st.store.password_for(srv.id))
     return data
 
@@ -99,6 +101,7 @@ def list_servers():
 @router.post("", status_code=201)
 def add_server(body: ServerIn):
     srv = get_state().store.add(ServerEntry(**body.model_dump()))
+    connstate.connect(srv.id)  # just registered: connected
     return _server_view(srv)
 
 
@@ -128,16 +131,25 @@ def connect_server(server_id: str, body: ConnectIn):
     st = get_state()
     if body.password:
         st.store.remember_password(server_id, body.password)
-    with st.manager.service(server_id) as svc:
-        return {
-            "server_version": svc.getServerVersion(),
-            "architecture": svc.getArchitecture(),
-        }
+    connstate.connect(server_id)
+    try:
+        with st.manager.service(server_id) as svc:
+            return {
+                "server_version": svc.getServerVersion(),
+                "architecture": svc.getArchitecture(),
+            }
+    except Exception:
+        connstate.disconnect(server_id)
+        raise
 
 
 @router.post("/{server_id}/disconnect")
 def disconnect_server(server_id: str):
-    get_state().manager.disconnect(server_id)
+    """Close its connections and end access until Connect (issue #9); forgets a password typed this session."""
+    st = get_state()
+    connstate.disconnect(server_id)
+    st.manager.disconnect(server_id)
+    st.store.forget_password(server_id)
     return {"ok": True}
 
 
@@ -212,6 +224,7 @@ def remove_database(server_id: str, db_id: str):
 
 @router.post("/{server_id}/databases/{db_id}/disconnect")
 def disconnect_database(server_id: str, db_id: str):
+    connstate.disconnect(server_id, db_id)
     get_state().manager.disconnect(server_id, db_id)
     return {"ok": True}
 

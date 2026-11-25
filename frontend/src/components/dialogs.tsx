@@ -186,7 +186,9 @@ export function DatabaseDialog(props: { server: Server; mode: "register" | "crea
 }
 
 // -------------------------------------------------------------- password
-export function PasswordDialog(props: { server: Server; resolve: (ok: boolean) => void }) {
+/** Connect to a server: asks for the password unless it is known. With `disconnected`, the user had
+ * disconnected the server or `dbId` (issue #9) and connecting is an explicit choice. */
+export function PasswordDialog(props: { server: Server; resolve: (ok: boolean) => void; dbId?: string | null; disconnected?: boolean }) {
   const app = useApp();
   const [pw, setPw] = useState("");
   const { busy, error, run } = useSubmit();
@@ -196,7 +198,8 @@ export function PasswordDialog(props: { server: Server; resolve: (ok: boolean) =
   };
   const submit = () =>
     run(async () => {
-      await api.connectServer(props.server.id, pw);
+      await api.connectServer(props.server.id, pw || undefined);
+      if (props.dbId) await api.connectDatabase(props.server.id, props.dbId);
       props.resolve(true);
       app.showDialog(null);
     });
@@ -208,15 +211,23 @@ export function PasswordDialog(props: { server: Server; resolve: (ok: boolean) =
         <>
           {error && <span className="err">{error}</span>}
           <button className="btn" onClick={cancel}>{t("Cancel")}</button>
-          <button className="btn primary" disabled={busy} onClick={submit}>{t("Connect")}</button>
+          <button className="btn primary" disabled={busy} onClick={submit}
+            autoFocus={props.disconnected && props.server.password_known}>{t("Connect")}</button>
         </>
       }
     >
+      {props.disconnected && (
+        <p className="muted">{props.dbId
+          ? t("{name} is disconnected. Connect to it again?", { name: props.server.databases.find((d) => d.id === props.dbId)?.name ?? props.dbId })
+          : t("{name} is disconnected. Connect to it again?", { name: props.server.name })}</p>
+      )}
       <div className="form">
         <label className="l">{t("User")}</label>
         <span>{props.server.user}</span>
-        <label className="l">{t("Password")}</label>
-        <input className="text" type="password" autoFocus value={pw} onChange={(e) => setPw(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submit()} />
+        {(!props.disconnected || !props.server.password_known) && <>
+          <label className="l">{t("Password")}</label>
+          <input className="text" type="password" autoFocus value={pw} onChange={(e) => setPw(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submit()} />
+        </>}
       </div>
     </Modal>
   );

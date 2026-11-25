@@ -1,4 +1,5 @@
 import { api } from "../api";
+import { emitDisconnected } from "../connstate";
 import { errMsg, keys, type AppApi } from "../context";
 import { typeInfo, type Selection } from "../types";
 import type { MenuItem } from "./ContextMenu";
@@ -45,13 +46,19 @@ function buildBaseMenu(app: AppApi, sel: Selection): MenuItem[] {
       { label: t("Refresh"), icon: <IconRefresh />, onClick: () => app.invalidate(keys.server(sid)) },
       { separator: true },
       { label: t("Edit server…"), onClick: () => app.showDialog(<ServerDialog server={srv} />) },
-      {
+      srv.disconnected ? {
+        label: t("Connect"),
+        onClick: async () => {
+          await api.connectServer(sid); // asks for the password when it is not known
+          await app.reloadServers();
+        },
+      } : {
         label: t("Disconnect"),
         icon: <IconX />,
         onClick: async () => {
           await api.disconnectServer(sid);
+          emitDisconnected(sid); // closes its tabs and collapses it (issue #9)
           await app.reloadServers();
-          app.invalidate(keys.server(sid));
         },
       },
       {
@@ -88,12 +95,20 @@ function buildBaseMenu(app: AppApi, sel: Selection): MenuItem[] {
       { label: t("Recompute index selectivity"), onClick: () => runJob(app, api.recomputeSelectivity(sid, dbid), t("Index statistics")) },
       { separator: true },
       { label: t("Edit registration…"), onClick: () => app.showDialog(<DatabaseDialog server={srv} mode="edit" database={db} />) },
-      {
+      db.disconnected || srv.disconnected ? {
+        label: t("Connect"),
+        onClick: async () => {
+          await api.connectDatabase(sid, dbid);
+          await app.reloadServers();
+          app.invalidate(keys.db(sid, dbid));
+        },
+      } : {
         label: t("Disconnect"),
         icon: <IconX />,
         onClick: async () => {
           await api.disconnectDatabase(sid, dbid);
-          app.invalidate(keys.db(sid, dbid));
+          emitDisconnected(sid, dbid);
+          await app.reloadServers();
         },
       },
       {

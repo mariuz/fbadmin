@@ -43,7 +43,7 @@ export default defineConfig({
         url: `${baseURL}/api/health`,
         reuseExistingServer: false,
         timeout: 60_000,
-        env: { FBADMIN_DATA_DIR: dataDir },
+        env: { FBADMIN_DATA_DIR: dataDir, FBADMIN_DISCONNECT_ON_CLOSE: "0" }, // tests open and close many pages
         stdout: "pipe",
         stderr: "pipe",
       },

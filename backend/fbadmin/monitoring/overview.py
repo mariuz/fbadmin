@@ -347,7 +347,10 @@ def build(refresh: bool = False, timeout: float | None = None) -> dict[str, Any]
         else:
             from ..connections import PasswordRequired
 
-            code = "password_not_saved" if isinstance(val, PasswordRequired) else "unreachable"
+            from ..connstate import Disconnected
+
+            code = ("password_not_saved" if isinstance(val, PasswordRequired)
+                    else "disconnected" if isinstance(val, Disconnected) else "unreachable")
             s["databases"].append(_db_view(srv.id, db, alerts, sched, status="critical" if code == "unreachable"
                                            else "unknown", code=code, error=None if code != "unreachable"
                                            else _err(val)))

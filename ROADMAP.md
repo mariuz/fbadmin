@@ -290,7 +290,7 @@ Also fixed in this milestone:
 
 ## Milestone 2.6 — Safety, release and follow-ups ⬜
 
-- ⬜ **Reported issues:** fix the issues reported on GitHub ([mariuz/fbadmin issues](https://github.com/mariuz/fbadmin/issues)): Disconnect that really disconnects (#9), restore uploads over 32 MB (#10), autocompletion quoting, aliases and `$` (#2, #7, #8), Fetch all and complete exports in the Query Tool (#5, #6), tabs that do not scroll (#4), trace output one statement behind (#1)
+- ✅ **Reported issues:** fixed the issues reported on GitHub ([mariuz/fbadmin issues](https://github.com/mariuz/fbadmin/issues)): Disconnect really disconnects: tabs closed, node collapsed, no silent reconnect until Connect, everything disconnected when the last tab closes and at start (#9); restore uploads over 32 MB are streamed, limited by `FBADMIN_MAX_UPLOAD_BYTES` and free space (#10); autocompletion quotes only when needed, resolves aliases and `$` names (#2, #7, #8); Fetch all and complete exports in the Query Tool (#5, #6); tabs that scroll (#4); the All statements trace shows statements when they start (#1)
 - ⬜ **Release 2.2.0:** release notes for milestones 2.2 to 2.5, the version bump, and fresh documentation screenshots of the new pages
 - ⬜ **Production guard and database tags:** tag databases (production, staging, test), show the tag in the tree and the Query Tool, confirm DML and DDL on production, optionally allow DDL there only through change requests; tags filter the fleet page, maintenance windows and digests
 - ⬜ **@mentions and personal notifications:** `@user` in comments and change requests notifies that user; authors hear when their request is approved, rejected or applied

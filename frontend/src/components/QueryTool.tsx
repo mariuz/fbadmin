@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { EditorView } from "@codemirror/view";
+import { setOpenTransaction } from "../connstate";
 import { api, setActiveSchema } from "../api";
 import { errMsg, keys, useApp } from "../context";
 import type { ScriptResult, SessionOptions, StatementResult } from "../types";
@@ -206,6 +207,10 @@ export function QueryTool(props: { serverId: string; dbId: string; schema?: stri
   const [cancelling, setCancelling] = useState(false);
   const [autocommit, setAutocommit] = useState(true);
   const [txOpen, setTxOpen] = useState(false);
+  // leaving the page with an open transaction asks first (connstate, issue #9)
+  const txKey = useRef(`qt-${Math.random().toString(36).slice(2)}`).current;
+  useEffect(() => { setOpenTransaction(txKey, txOpen); }, [txOpen]);
+  useEffect(() => () => setOpenTransaction(txKey, false), []);
   const [maxRows, setMaxRows] = useState(1000); // 0: execute and fetch all (issue #5)
   const [fetchingAll, setFetchingAll] = useState(false);
   const [withPlan, setWithPlan] = useState(false);

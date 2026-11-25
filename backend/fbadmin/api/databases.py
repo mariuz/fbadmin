@@ -44,9 +44,18 @@ def database_info(server_id: str, db_id: str):
 
 @router.post("/connect")
 def connect_database(server_id: str, db_id: str):
-    with get_state().manager.meta(server_id, db_id) as conn:
-        cat = Catalog(conn)
-        return {"engine_version": cat.engine_version, "charset": cat.default_charset}
+    from .. import connstate
+
+    was = connstate.is_connected(server_id)
+    connstate.connect(server_id, db_id)  # an explicit Connect (issue #9)
+    try:
+        with get_state().manager.meta(server_id, db_id) as conn:
+            cat = Catalog(conn)
+            return {"engine_version": cat.engine_version, "charset": cat.default_charset}
+    except Exception:
+        if not was:
+            connstate.disconnect(server_id)
+        raise
 
 
 @router.get("/schemas")
