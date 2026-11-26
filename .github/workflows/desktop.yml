@@ -356,18 +356,22 @@ jobs:
         shell: pwsh
         run: |
           function Show-Diagnostics {
-            Write-Host "=== service"; sc.exe qc fbadmin; sc.exe query fbadmin
-            Write-Host "=== WinSW status"; & "$env:ProgramFiles\fbadmin-server\fbadmin-service.exe" status
-            Write-Host "=== data directory"; Get-ChildItem "$env:ProgramData\fbadmin" -Recurse -Force -ErrorAction SilentlyContinue | Select-Object FullName, Length
-            icacls "$env:ProgramData\fbadmin"
-            Get-ChildItem "$env:ProgramData\fbadmin\logs" -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "--- $($_.Name)"; Get-Content $_.FullName -Tail 60 }
+            # Out-Host: output of a function that then throws would be lost
+            Write-Host "=== service"; sc.exe qc fbadmin | Out-Host; sc.exe query fbadmin | Out-Host
+            Write-Host "=== WinSW status"; & "$env:ProgramFiles\fbadmin-server\fbadmin-service.exe" status | Out-Host
+            Write-Host "=== data directory"
+            Get-ChildItem "$env:ProgramData\fbadmin" -Recurse -Force -ErrorAction SilentlyContinue | Select-Object FullName, Length | Out-Host
+            icacls "$env:ProgramData\fbadmin" | Out-Host
+            Write-Host "=== fbadmin.toml"; Get-Content "$env:ProgramData\fbadmin\fbadmin.toml" -ErrorAction SilentlyContinue | Out-Host
+            Get-ChildItem "$env:ProgramData\fbadmin\logs" -ErrorAction SilentlyContinue | ForEach-Object {
+              Write-Host "--- $($_.Name)"; Get-Content $_.FullName -Tail 60 | Out-Host }
             Write-Host "=== System log (Service Control Manager)"
             Get-WinEvent -FilterHashtable @{ LogName = 'System'; ProviderName = 'Service Control Manager'; StartTime = (Get-Date).AddMinutes(-20) } -ErrorAction SilentlyContinue |
-              Select-Object -First 20 | Format-List TimeCreated, Id, Message
+              Select-Object -First 20 | Format-List TimeCreated, Id, Message | Out-Host
             Write-Host "=== Application log"
             Get-WinEvent -FilterHashtable @{ LogName = 'Application'; StartTime = (Get-Date).AddMinutes(-20) } -ErrorAction SilentlyContinue |
               Where-Object { $_.ProviderName -in 'fbadmin', '.NET Runtime', 'Application Error', 'MsiInstaller' } |
-              Select-Object -First 25 | Format-List TimeCreated, ProviderName, Id, Message
+              Select-Object -First 25 | Format-List TimeCreated, ProviderName, Id, Message | Out-Host
           }
           function Wait-Health($port) {
             for ($i = 0; $i -lt 90; $i++) {
