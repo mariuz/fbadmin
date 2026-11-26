@@ -340,15 +340,40 @@ jobs:
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
             Remove-Item "$env:RUNNER_TEMP\cert.pfx"
           }
+      - name: Smoke test (the frozen server in a console)
+        timeout-minutes: 5
+        shell: pwsh
+        run: |
+          $env:FBADMIN_DATA_DIR = "$env:RUNNER_TEMP\fbsrv"
+          $app = Start-Process dist\fbadmin-server\fbadmin-server.exe -ArgumentList "serve --no-browser --port 5109" `
+            -PassThru -RedirectStandardOutput srv.out -RedirectStandardError srv.err
+          $ok = $false
+          for ($i = 0; $i -lt 60; $i++) { try { Invoke-RestMethod http://127.0.0.1:5109/api/health | Out-Null; $ok = $true; break } catch { Start-Sleep 1 } }
+          Stop-Process -Id $app.Id -Force -ErrorAction SilentlyContinue
+          if (-not $ok) { Get-Content srv.out, srv.err -ErrorAction SilentlyContinue; throw "the frozen server did not start" }
       - name: Silent install, service, health, restart, uninstall
         timeout-minutes: 15
         shell: pwsh
         run: |
+          function Show-Diagnostics {
+            Write-Host "=== service"; sc.exe qc fbadmin; sc.exe query fbadmin
+            Write-Host "=== WinSW status"; & "$env:ProgramFiles\fbadmin-server\fbadmin-service.exe" status
+            Write-Host "=== data directory"; Get-ChildItem "$env:ProgramData\fbadmin" -Recurse -Force -ErrorAction SilentlyContinue | Select-Object FullName, Length
+            icacls "$env:ProgramData\fbadmin"
+            Get-ChildItem "$env:ProgramData\fbadmin\logs" -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "--- $($_.Name)"; Get-Content $_.FullName -Tail 60 }
+            Write-Host "=== System log (Service Control Manager)"
+            Get-WinEvent -FilterHashtable @{ LogName = 'System'; ProviderName = 'Service Control Manager'; StartTime = (Get-Date).AddMinutes(-20) } -ErrorAction SilentlyContinue |
+              Select-Object -First 20 | Format-List TimeCreated, Id, Message
+            Write-Host "=== Application log"
+            Get-WinEvent -FilterHashtable @{ LogName = 'Application'; StartTime = (Get-Date).AddMinutes(-20) } -ErrorAction SilentlyContinue |
+              Where-Object { $_.ProviderName -in 'fbadmin', '.NET Runtime', 'Application Error', 'MsiInstaller' } |
+              Select-Object -First 25 | Format-List TimeCreated, ProviderName, Id, Message
+          }
           function Wait-Health($port) {
             for ($i = 0; $i -lt 90; $i++) {
               try { return Invoke-RestMethod "http://127.0.0.1:$port/api/health" } catch { Start-Sleep 1 }
             }
-            Get-ChildItem "$env:ProgramData\fbadmin\logs" -ErrorAction SilentlyContinue | ForEach-Object { Get-Content $_.FullName -Tail 40 }
+            Show-Diagnostics
             throw "no health answer on port $port"
           }
           $msi = (Get-ChildItem dist/packages/fbadmin-server-*.msi | Select-Object -First 1).FullName
