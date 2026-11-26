@@ -26,7 +26,10 @@ fbadmin --host 0.0.0.0 --port 5050 --no-browser
 
 On the first visit, fbadmin asks you to create the initial administrator. To create it without
 the web form (for containers, for example), set `FBADMIN_ADMIN_EMAIL` (or `FBADMIN_ADMIN_USERNAME`)
-and `FBADMIN_ADMIN_PASSWORD`. The account is created at startup if no user exists yet.
+and `FBADMIN_ADMIN_PASSWORD`. The account is created at startup if no user exists yet. Or point
+`FBADMIN_ADMIN_FILE` at a file with `username=`, `email=` and `password=` lines (values in double quotes are taken
+literally): fbadmin creates the account from it and **deletes the file** once an account exists. The
+[Windows server MSI](admin/service.md) writes such a file from its `ADMIN_USER` / `ADMIN_PASSWORD` properties.
 
 If the data directory already contains a desktop `servers.json`, the first administrator
 inherits it. The file is moved to `users/1/servers.json`, and the saved passwords are encrypted

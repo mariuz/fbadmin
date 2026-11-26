@@ -14,8 +14,13 @@
   kept on upgrade and on uninstall; only SYSTEM, Administrators and the service can open them.
 
   Silent install, e.g. with GPO / Intune / SCCM:
-    msiexec /i fbadmin-server-2.2.0-x64.msi /qn PORT=5050 HOST=0.0.0.0 FIREWALL=1
-  PORT, HOST: written into fbadmin.toml when given (an upgrade without them keeps the file as it is).
+    msiexec /i fbadmin-server-2.2.0-x64.msi /qn PORT=5050 HOST=0.0.0.0 FIREWALL=1 ^
+        SERVER_MODE=1 ADMIN_USER=admin ADMIN_PASSWORD=... CERTFILE=C:\tls\fbadmin.crt KEYFILE=C:\tls\fbadmin.key
+  PORT, HOST, SERVER_MODE (1 or 0), CERTFILE, KEYFILE: written into fbadmin.toml when given (an upgrade without
+  them keeps the file as it is).
+  ADMIN_USER (default admin), ADMIN_EMAIL, ADMIN_PASSWORD: the first administrator of server mode. They go into a
+  one-time file, initial-admin.ini in the data directory, which fbadmin reads at its first start and deletes once
+  the account exists; an install where accounts exist already changes nothing. ADMIN_PASSWORD is hidden in MSI logs.
   FIREWALL=1: an inbound Windows Firewall rule "fbadmin" for the port (removed on uninstall).
   It is not code-signed unless the release workflow has a certificate (docs/PACKAGING.md).
 -->
@@ -28,6 +33,23 @@
     <Property Id="ARPPRODUCTICON" Value="fbadmin.ico" />
     <Property Id="ARPURLINFOABOUT" Value="https://github.com/mariuz/fbadmin" />
     <Property Id="ARPCOMMENTS" Value="Web administration for Firebird SQL, as a Windows service" />
+
+    <!-- command-line properties (Secure: also passed on to the installing service in managed installs) -->
+    <Property Id="PORT" Secure="yes" />
+    <Property Id="HOST" Secure="yes" />
+    <Property Id="FIREWALL" Secure="yes" />
+    <Property Id="SERVER_MODE" Secure="yes" />
+    <Property Id="CERTFILE" Secure="yes" />
+    <Property Id="KEYFILE" Secure="yes" />
+    <Property Id="ADMIN_USER" Secure="yes" />
+    <Property Id="ADMIN_EMAIL" Secure="yes" />
+    <Property Id="ADMIN_PASSWORD" Secure="yes" Hidden="yes" />
+    <!-- server_mode as TOML: 1, true or yes turn it on, anything else off -->
+    <Property Id="SERVERMODEVAL" Value="false" />
+    <SetProperty Id="SERVERMODEVAL" Value="true" After="CostFinalize" Sequence="execute"
+                 Condition="SERVER_MODE=&quot;1&quot; OR SERVER_MODE~=&quot;true&quot; OR SERVER_MODE~=&quot;yes&quot;" />
+    <Property Id="ADMINUSERVAL" Value="admin" />
+    <SetProperty Id="ADMINUSERVAL" Value="[ADMIN_USER]" After="CostFinalize" Condition="ADMIN_USER" Sequence="execute" />
 
     <!-- the firewall rule's port: PORT when given, else the default -->
     <Property Id="FWPORT" Value="5050" />
@@ -65,6 +87,31 @@
           <IniFile Id="HostValue" Action="addLine" Directory="DATAFOLDER" Name="fbadmin.toml" Section="server" Key="host" Value="&quot;[HOST]&quot;" />
           <RegistryValue Root="HKLM" Key="Software\fbadmin-server" Name="host" Type="string" Value="[HOST]" KeyPath="yes" />
         </Component>
+        <Component Id="ConfigServerMode" Condition="SERVER_MODE" Permanent="yes">
+          <IniFile Id="ServerModeValue" Action="addLine" Directory="DATAFOLDER" Name="fbadmin.toml" Section="server" Key="server_mode" Value="[SERVERMODEVAL]" />
+          <RegistryValue Root="HKLM" Key="Software\fbadmin-server" Name="server_mode" Type="string" Value="[SERVERMODEVAL]" KeyPath="yes" />
+        </Component>
+        <!-- TOML literal strings ('...'): backslashes of Windows paths stay as they are -->
+        <Component Id="ConfigCertFile" Condition="CERTFILE" Permanent="yes">
+          <IniFile Id="CertFileValue" Action="addLine" Directory="DATAFOLDER" Name="fbadmin.toml" Section="server" Key="ssl_certfile" Value="'[CERTFILE]'" />
+          <RegistryValue Root="HKLM" Key="Software\fbadmin-server" Name="ssl_certfile" Type="string" Value="[CERTFILE]" KeyPath="yes" />
+        </Component>
+        <Component Id="ConfigKeyFile" Condition="KEYFILE" Permanent="yes">
+          <IniFile Id="KeyFileValue" Action="addLine" Directory="DATAFOLDER" Name="fbadmin.toml" Section="server" Key="ssl_keyfile" Value="'[KEYFILE]'" />
+          <RegistryValue Root="HKLM" Key="Software\fbadmin-server" Name="ssl_keyfile" Type="string" Value="[KEYFILE]" KeyPath="yes" />
+        </Component>
+        <!-- the first administrator: a one-time file fbadmin deletes once the account exists (no secret in the
+             registry or in fbadmin.toml) -->
+        <Component Id="AdminFile" Condition="ADMIN_PASSWORD" Permanent="yes">
+          <IniFile Id="AdminUserValue" Action="addLine" Directory="DATAFOLDER" Name="initial-admin.ini" Section="admin" Key="username" Value="&quot;[ADMINUSERVAL]&quot;" />
+          <IniFile Id="AdminPasswordValue" Action="addLine" Directory="DATAFOLDER" Name="initial-admin.ini" Section="admin" Key="password" Value="&quot;[ADMIN_PASSWORD]&quot;" />
+          <IniFile Id="AdminFileSetting" Action="addLine" Directory="DATAFOLDER" Name="fbadmin.toml" Section="server" Key="admin_file" Value="&quot;initial-admin.ini&quot;" />
+          <RegistryValue Root="HKLM" Key="Software\fbadmin-server" Name="admin_file" Type="integer" Value="1" KeyPath="yes" />
+        </Component>
+        <Component Id="AdminEmail" Condition="ADMIN_PASSWORD AND ADMIN_EMAIL" Permanent="yes">
+          <IniFile Id="AdminEmailValue" Action="addLine" Directory="DATAFOLDER" Name="initial-admin.ini" Section="admin" Key="email" Value="&quot;[ADMIN_EMAIL]&quot;" />
+          <RegistryValue Root="HKLM" Key="Software\fbadmin-server" Name="admin_email" Type="integer" Value="1" KeyPath="yes" />
+        </Component>
       </Directory>
     </StandardDirectory>
 
@@ -73,6 +120,10 @@
          holds saved passwords and keys (ProgramData lets every user read by default). Set on the folder only:
          Windows passes the inheritable entries on to the files in it (fbadmin.toml) and to new ones; /T would
          also strip the files' inherited entries, leaving fbadmin.toml readable by nobody. -->
+    <!-- Before the settings (and the administrator file) are written: SYSTEM and Administrators only; a new
+         folder in ProgramData would otherwise be readable by every user for a moment. -->
+    <CustomAction Id="LockDataFolder" Directory="DATAFOLDER" Execute="deferred" Impersonate="no" Return="check"
+                  ExeCommand="&quot;[System64Folder]icacls.exe&quot; &quot;[DATAFOLDER].&quot; /inheritance:r /grant:r *S-1-5-18:(OI)(CI)F *S-1-5-32-544:(OI)(CI)F /Q" />
     <CustomAction Id="SecureDataFolder" Directory="DATAFOLDER" Execute="deferred" Impersonate="no" Return="check"
                   ExeCommand="&quot;[System64Folder]icacls.exe&quot; &quot;[DATAFOLDER].&quot; /inheritance:r /grant:r *S-1-5-18:(OI)(CI)F *S-1-5-32-544:(OI)(CI)F &quot;NT SERVICE\fbadmin:(OI)(CI)M&quot; /Q" />
     <CustomAction Id="AddFirewallRule" Directory="DATAFOLDER" Execute="deferred" Impersonate="no" Return="ignore"
@@ -80,6 +131,7 @@
     <CustomAction Id="RemoveFirewallRule" Directory="DATAFOLDER" Execute="deferred" Impersonate="no" Return="ignore"
                   ExeCommand="&quot;[System64Folder]netsh.exe&quot; advfirewall firewall delete rule name=fbadmin" />
     <InstallExecuteSequence>
+      <Custom Action="LockDataFolder" Before="WriteIniValues" Condition="NOT REMOVE" />
       <Custom Action="SecureDataFolder" After="InstallServices" Condition="NOT REMOVE" />
       <!-- before adding it again (no duplicates), and on uninstall; not when an upgrade removes the old version -->
       <Custom Action="RemoveFirewallRule" After="SecureDataFolder"

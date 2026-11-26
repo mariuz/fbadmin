@@ -22,7 +22,9 @@ kept on upgrade and on removal.
 Install interactively, or silently with your software distribution (Group Policy, Intune, SCCM):
 
 ```bat
-msiexec /i fbadmin-server-2.2.0-x64.msi /qn PORT=5050 HOST=0.0.0.0 FIREWALL=1
+msiexec /i fbadmin-server-2.2.0-x64.msi /qn PORT=5050 HOST=0.0.0.0 FIREWALL=1 ^
+    SERVER_MODE=1 ADMIN_USER=admin ADMIN_PASSWORD="..." ^
+    CERTFILE=C:\tls\fbadmin.crt KEYFILE=C:\tls\fbadmin.key
 ```
 
 | Property | Meaning |
@@ -30,9 +32,19 @@ msiexec /i fbadmin-server-2.2.0-x64.msi /qn PORT=5050 HOST=0.0.0.0 FIREWALL=1
 | `PORT` | Port to listen on, written into `fbadmin.toml` (default 5050) |
 | `HOST` | Address to listen on, written into `fbadmin.toml` (default `127.0.0.1`: this machine only) |
 | `FIREWALL=1` | Adds an inbound Windows Firewall rule `fbadmin` for the port (removed on uninstall) |
+| `SERVER_MODE=1` | Multi-user [server mode](../SECURITY.md) with logins (`0` turns it off) |
+| `ADMIN_USER`, `ADMIN_EMAIL`, `ADMIN_PASSWORD` | The first administrator of server mode (`ADMIN_USER` defaults to `admin`; the password needs 8 characters or more) |
+| `CERTFILE`, `KEYFILE` | Serve HTTPS with these PEM files; the service must be able to read them |
 
-`PORT` and `HOST` are written only when given, so an upgrade without them keeps your settings. The service
-starts at the end of the install; open `http://<server>:5050/`.
+The settings are written into `fbadmin.toml` only when given, so an upgrade without them keeps your settings.
+The service starts at the end of the install; open `http://<server>:5050/` (`https://` with a certificate).
+
+**The first administrator.** The account properties go into a one-time file, `initial-admin.ini` in the data
+directory, which fbadmin reads at its first start in server mode and **deletes once the account exists**. They
+are not stored in the registry or in `fbadmin.toml`, and `ADMIN_PASSWORD` is hidden in MSI logs. When accounts
+exist already (an upgrade), the file is deleted and nothing changes. Without `ADMIN_PASSWORD`, the first visitor
+of the page creates the administrator: install with `HOST=127.0.0.1` until you have done that yourself, or
+give the password at install time.
 
 - Manage it like any service: `Get-Service fbadmin`, `Restart-Service fbadmin` (after changing
   `fbadmin.toml`), or *Services* (`services.msc`).

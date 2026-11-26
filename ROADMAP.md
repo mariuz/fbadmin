@@ -303,6 +303,20 @@ Also fixed in this milestone:
 - ⬜ **Unused index follow-up:** with partial evidence, offer to turn on the continuous trace with a low threshold for a week, and remind when the week is over
 - ⬜ **Translation review:** native speakers review the terms added in 2.4 and 2.5 (through Weblate)
 
+## Milestone 2.7 — Server edition and follow-ups ⬜
+
+- 🚧 **Server MSI: server mode, first administrator and HTTPS at install:** `SERVER_MODE`, `ADMIN_USER` / `ADMIN_EMAIL` / `ADMIN_PASSWORD` (a one-time file deleted once the account exists, hidden in MSI logs) and `CERTFILE` / `KEYFILE`, so a silent install is ready for other machines without editing `fbadmin.toml` ([docs/admin/service.md](docs/admin/service.md))
+- ⬜ **Upgrade test for the server packages:** CI installs the previous release, upgrades to the new build and checks that `fbadmin.toml`, the data, the service account and the firewall rule survive (MSI, deb, rpm)
+- ⬜ **Release from the Actions UI:** a manual *Cut release* workflow that checks the version and release notes, creates the tag and starts the release, so a release needs no local git
+- ⬜ **Disconnect follow-ups:** an idle timeout on the server that disconnects a browser session that never said goodbye (a crashed browser), and an opt-in *reconnect on start* per server for desktop users
+- ⬜ **Trace: one row per statement:** pair each statement's start and finish events, so a statement shows as *running* until it finishes
+- ⬜ **Server-side export of very large results:** stream CSV or XLSX from the server straight to a download, without going through the browser
+- ⬜ **Resumable uploads:** chunked restore uploads that continue after a dropped connection (multi-GB backups over a VPN)
+- ⬜ **Smarter autocompletion:** columns of CTEs and derived tables, procedure and function parameters, keywords that fit the clause
+- ⬜ **Readiness endpoint:** `/api/health/ready` also checks fbadmin's own storage and that the scheduler is alive (Kubernetes probes, load balancers, the Windows service)
+- ⬜ **Screenshot check in CI:** a weekly job regenerates the documentation screenshots (`E2E_SHOTS`) and opens a pull request when they changed
+- ⬜ **Concurrency stress test for the native driver:** disconnect, cancel and drop while fetching, in a loop, to catch use-after-free crashes early
+
 ## Milestone 3.0 — Teams and distribution ⬜
 
 - ⬜ **SAML sign-in** and **SCIM** user provisioning from a company directory

@@ -23,6 +23,7 @@ fbadmin-desktop [--port PORT] [--browser] [--log-level LEVEL]
 | `FBADMIN_OPEN_BROWSER` | `1` | `0`: do not open a browser window at start (`--no-browser`) |
 | `FBADMIN_SSL_CERTFILE` / `FBADMIN_SSL_KEYFILE` | | Serve HTTPS with these PEM files (`--ssl-certfile`, `--ssl-keyfile`) |
 | `FBADMIN_PROXY_HEADERS` / `FBADMIN_FORWARDED_ALLOW_IPS` | `0` / `127.0.0.1` | Trust `X-Forwarded-*` from these proxies (`--proxy-headers`) |
+| `FBADMIN_ADMIN_FILE` | | Server mode: a one-time file with the first administrator (`username=`, `password=` lines), deleted once an account exists ([Security](../SECURITY.md)) |
 | `FBADMIN_SHUTDOWN_TIMEOUT` | `10` | Seconds a stop (SIGTERM, Ctrl+C, service stop) waits for running requests |
 | `FBADMIN_MAX_ROWS` | `1000` | Default row limit per query result |
 | `FBADMIN_SESSION_IDLE_TIMEOUT` | `3600` | Seconds before an idle Query Tool connection is closed |

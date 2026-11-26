@@ -129,6 +129,9 @@ class SecuritySettings:
     admin_username: str = ""
     admin_email: str = ""
     admin_password: str = ""
+    # a one-time file with username= / email= / password= lines (the Windows server MSI writes it); deleted once
+    # an account exists
+    admin_file: str = ""
     auto_create_users: bool = True
     login_rate: tuple[int, int] = (5, 300)
     api_rate: tuple[int, int] = (1200, 60)
@@ -197,6 +200,10 @@ def load(data_dir: Path) -> SecuritySettings:
     s.admin_email = str(_env("ADMIN_EMAIL", file_cfg) or "")
     s.admin_username = str(_env("ADMIN_USERNAME", file_cfg) or s.admin_email or "")
     s.admin_password = str(_env("ADMIN_PASSWORD", file_cfg) or "")
+    admin_file = str(_env("ADMIN_FILE", file_cfg) or "")
+    if admin_file and not Path(admin_file).is_absolute():
+        admin_file = str(data_dir / admin_file)
+    s.admin_file = admin_file
     s.auto_create_users = _bool(_env("AUTO_CREATE_USERS", file_cfg), True)
     s.login_rate = _rate(_env("LOGIN_RATE", file_cfg), s.login_rate)
     s.api_rate = _rate(_env("RATE_LIMIT", file_cfg), s.api_rate)

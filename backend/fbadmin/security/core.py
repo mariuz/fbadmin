@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import shutil
 import time
+from pathlib import Path
 from typing import Any
 
 from . import ldap as ldap_backend
@@ -27,6 +29,26 @@ from .settings import SecuritySettings
 
 MIN_PASSWORD = 8
 INTERNAL = "internal"
+
+log = logging.getLogger("fbadmin.security")
+
+
+def read_admin_file(path: Path) -> dict[str, str]:
+    """``username=``, ``email=`` and ``password=`` lines (``[section]`` headers and ``#`` comments are skipped).
+    A value in double quotes is taken literally between the first and the last quote: a password may contain
+    quotes, backslashes or ``=``."""
+    out: dict[str, str] = {}
+    for line in path.read_text("utf-8-sig").splitlines():
+        line = line.strip()
+        if not line or line.startswith(("#", ";", "[")) or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key, value = key.strip().lower(), value.strip()
+        if len(value) >= 2 and value[0] == value[-1] == '"':
+            value = value[1:-1]
+        if key in ("username", "email", "password"):
+            out[key] = value
+    return out
 
 
 class Security:
@@ -64,11 +86,29 @@ class Security:
         return self.server_mode and self.db.user_count() == 0
 
     def bootstrap(self) -> None:
-        """Create the initial admin from FBADMIN_ADMIN_EMAIL / FBADMIN_ADMIN_PASSWORD. Safe when several
-        processes (workers, replicas on one volume) start at once: only the first one creates it."""
+        """Create the initial admin from FBADMIN_ADMIN_EMAIL / FBADMIN_ADMIN_PASSWORD, or from FBADMIN_ADMIN_FILE.
+        Safe when several processes (workers, replicas on one volume) start at once: only the first one creates it."""
         s = self.settings
-        if self.server_mode and s.admin_username and s.admin_password and self.db.user_count() == 0:
-            self.create_first_admin(s.admin_username, email=s.admin_email or None, password=s.admin_password)
+        username, email, password = s.admin_username, s.admin_email, s.admin_password
+        file = Path(s.admin_file) if s.admin_file else None
+        if file is not None and file.is_file() and self.server_mode:
+            values = read_admin_file(file)
+            password = values.get("password") or password
+            email = values.get("email") or email
+            username = values.get("username") or email or username or ("admin" if password else "")
+        if self.server_mode and username and password and self.db.user_count() == 0:
+            try:
+                self.create_first_admin(username, email=email or None, password=password)
+                log.info("created the administrator %r", username)
+            except SecurityError as exc:
+                log.error("the initial administrator was not created: %s", exc.detail)
+        # the file holds a password: once an account exists it has done its job
+        if file is not None and file.is_file() and self.server_mode and self.db.user_count() > 0:
+            try:
+                file.unlink()
+                log.info("deleted %s (the initial administrator exists)", file)
+            except OSError as exc:
+                log.warning("could not delete %s: %s", file, exc)
 
     def create_first_admin(self, username: str, *, email: str | None, password: str) -> dict[str, Any] | None:
         """The first administrator (bootstrap or the setup page); None if a user exists already."""

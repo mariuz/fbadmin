@@ -375,13 +375,18 @@ jobs:
           }
           function Wait-Health($port) {
             for ($i = 0; $i -lt 90; $i++) {
-              try { return Invoke-RestMethod "http://127.0.0.1:$port/api/health" } catch { Start-Sleep 1 }
+              try { return Invoke-RestMethod "https://127.0.0.1:$port/api/health" -SkipCertificateCheck } catch { Start-Sleep 1 }
             }
             Show-Diagnostics
             throw "no health answer on port $port"
           }
           $msi = (Get-ChildItem dist/packages/fbadmin-server-*.msi | Select-Object -First 1).FullName
-          $p = Start-Process msiexec -ArgumentList "/i `"$msi`" /qn /l*v install.log PORT=5110 HOST=127.0.0.1 FIREWALL=1" -Wait -PassThru
+          # a self-signed certificate for CERTFILE / KEYFILE (C:\fbtls: readable by the service account)
+          New-Item -ItemType Directory -Force C:\fbtls | Out-Null
+          python -c "import datetime as d; from cryptography import x509; from cryptography.x509.oid import NameOID; from cryptography.hazmat.primitives import hashes, serialization; from cryptography.hazmat.primitives.asymmetric import ec; k=ec.generate_private_key(ec.SECP256R1()); n=x509.Name([x509.NameAttribute(NameOID.COMMON_NAME,'localhost')]); now=d.datetime.now(d.timezone.utc); c=x509.CertificateBuilder().subject_name(n).issuer_name(n).public_key(k.public_key()).serial_number(x509.random_serial_number()).not_valid_before(now).not_valid_after(now+d.timedelta(days=2)).sign(k,hashes.SHA256()); open(r'C:\fbtls\fbadmin.crt','wb').write(c.public_bytes(serialization.Encoding.PEM)); open(r'C:\fbtls\fbadmin.key','wb').write(k.private_bytes(serialization.Encoding.PEM,serialization.PrivateFormat.PKCS8,serialization.NoEncryption()))"
+          $pw = "Ci=Install-Pw1"
+          $props = "PORT=5110 HOST=127.0.0.1 FIREWALL=1 SERVER_MODE=1 ADMIN_USER=ops ADMIN_PASSWORD=$pw CERTFILE=C:\fbtls\fbadmin.crt KEYFILE=C:\fbtls\fbadmin.key"
+          $p = Start-Process msiexec -ArgumentList "/i `"$msi`" /qn /l*v install.log $props" -Wait -PassThru
           if ($p.ExitCode -ne 0) { Get-Content install.log -Tail 80; exit $p.ExitCode }
 
           $svc = Get-CimInstance Win32_Service -Filter "Name='fbadmin'"
@@ -390,12 +395,22 @@ jobs:
           if ($svc.StartMode -ne 'Auto') { throw "the service does not start automatically" }
           $h = Wait-Health 5110
           Write-Host "health: $($h.status) $($h.version)"
-          (Invoke-WebRequest http://127.0.0.1:5110/ -UseBasicParsing).Content | Select-String 'id="root"' | Out-Null
+          (Invoke-WebRequest https://127.0.0.1:5110/ -UseBasicParsing -SkipCertificateCheck).Content | Select-String 'id="root"' | Out-Null
           if (-not $?) { throw "UI not served" }
-          if ((Invoke-RestMethod http://127.0.0.1:5110/api/version).update_check) { throw "the update check should be off" }
+          if ((Invoke-RestMethod https://127.0.0.1:5110/api/version -SkipCertificateCheck).update_check) { throw "the update check should be off" }
+
+          # server mode with the administrator from ADMIN_USER / ADMIN_PASSWORD; the one-time file is gone
+          $st = Invoke-RestMethod https://127.0.0.1:5110/api/auth/status -SkipCertificateCheck
+          if (-not $st.server_mode -or $st.needs_setup) { $st | ConvertTo-Json | Write-Host; throw "server mode with an administrator expected" }
+          $login = @{ username = "ops"; password = $pw } | ConvertTo-Json
+          Invoke-RestMethod https://127.0.0.1:5110/api/auth/login -Method Post -ContentType application/json -Body $login -SkipCertificateCheck | Out-Null
+          if (Test-Path "$env:ProgramData\fbadmin\initial-admin.ini") { throw "initial-admin.ini (with the password) was not deleted" }
+          if (Select-String -Path install.log -SimpleMatch $pw -Quiet) { throw "the password is in the MSI log" }
 
           $toml = Get-Content "$env:ProgramData\fbadmin\fbadmin.toml" -Raw
           if ($toml -notmatch '(?m)^port=5110') { Write-Host $toml; throw "PORT was not written to fbadmin.toml" }
+          if ($toml -notmatch '(?m)^server_mode=true' -or $toml -notmatch "(?m)^ssl_certfile='C:\\fbtls\\fbadmin.crt'") { Write-Host $toml; throw "SERVER_MODE / CERTFILE missing in fbadmin.toml" }
+          if ($toml -match 'Ci=Install') { throw "the password is in fbadmin.toml" }
           $acl = icacls "$env:ProgramData\fbadmin"
           Write-Host ($acl -join "`n")
           if (-not ($acl -match 'NT SERVICE\\fbadmin')) { throw "the service has no access to its data directory" }
