@@ -61,6 +61,8 @@ Without `--key`, `backup-decrypt` uses `FBADMIN_BACKUP_KEY` and the keys in fbad
 
 ## Restore drills
 
+![Restore drill report of an encrypted backup](screenshots/restore-drill.png)
+
 A test restore right after the backup proves that the file is fine. A **restore drill** proves more:
 that the backup you'd actually use can be restored, with what you'd have then. A drill is a schedule
 (kind *Restore drill*, for example weekly) that:

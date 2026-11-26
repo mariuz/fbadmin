@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
-import { FB, expand, treeRow } from "./fixtures";
+import { FB, expand, treeRow, shot } from "./fixtures";
 
 /**
  * Roadmap 2.3: database timeline. Changes made through fbadmin (DDL from a dialog, a failing statement,
@@ -84,6 +84,7 @@ test("one history of the database", async () => {
     await audit(`timeline (${theme} theme)`);
   }
   await page.evaluate(() => { delete document.documentElement.dataset.theme; });
+  await shot(page, "timeline"); // docs/screenshots/timeline.png
 
   // category filter and search
   await pane().getByRole("button", { name: /^Maintenance \d+$/ }).click();

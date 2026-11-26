@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
-import { FB, expand, treeRow } from "./fixtures";
+import { FB, expand, treeRow, shot } from "./fixtures";
 
 /**
  * Roadmap 2.4: change requests. Propose a SQL change, run the dry run (the schema diff on a copy), approve it and
@@ -82,6 +82,7 @@ test("propose, dry run, approve and apply a change", async () => {
   await expect(changes).toContainText("altered");
   await expect(changes).toContainText("SHIPPED");
   await themes("change request with its dry run");
+  await shot(page, "change-request"); // docs/screenshots/change-request.png
 
   await pane().getByLabel("Review comment").fill("Looks right");
   await pane().getByRole("button", { name: "Approve", exact: true }).click();

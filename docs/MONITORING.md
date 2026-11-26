@@ -79,6 +79,8 @@ seconds between two samples a minute apart is never seen. **Continuous trace** (
 once the history is recorded) keeps a [trace session](MAINTENANCE.md#trace-api) running for the database.
 The session reports each statement when it finishes, with its exact duration and plan.
 
+![Continuous trace and the errors it recorded](screenshots/continuous-trace.png)
+
 * Statements slower than the threshold you set (200 ms by default) are recorded as runs for
   [query regressions](#query-regressions). The ones slower than *slow_seconds* also go to the slow
   statement list. Plans are captured with `explain_plan`, the same format as `MON$EXPLAINED_PLAN`, so
@@ -119,6 +121,8 @@ The session reports each statement when it finishes, with its exact duration and
 **Performance check-up…** (database context menu) answers "why is it slow?" with one ranked report.
 It reads what fbadmin already collects and turns it into findings, most important first. Each finding
 says what was found, the numbers behind it, what to do, and has buttons that do it.
+
+![Performance check-up: ranked findings with a fix each](screenshots/checkup.png)
 
 The check-up runs as a job. With **Include gstat** (the default) it also reads the whole database with
 gstat. That finds record versions and the real index selectivity, and takes as long as a gstat run.
@@ -222,6 +226,8 @@ inspection runs as a job and needs the admin level on the database.
 **Query regressions…** (database context menu) shows statements that got slower, or changed their plan
 and got slower, over time. It needs the history to be recorded for the database.
 
+![Query regressions: a statement with its runs and plan](screenshots/query-regressions.png)
+
 **What is tracked.** Two sources feed it:
 
 * **The history sampler.** Statements it sees running for longer than *slow_seconds*, with their
@@ -271,6 +277,8 @@ Settings (the screen's **Settings…**, or `PUT /api/monitoring/settings`):
 | `regression_keep_days` | 30 | runs are kept this long (at most 2000 per statement) |
 
 ## Capacity forecast
+
+![Capacity forecast of a database](screenshots/capacity-forecast.png)
 
 **Capacity forecast…** (database context menu) projects the growth of a database to the limits it
 runs into, so they show up weeks or months before they stop the application:
@@ -381,6 +389,8 @@ profiler needs Firebird 5.
 **Unused indices…** (database context menu) lists the indices that appear in no plan fbadmin recorded
 in the last 7, 30, 90 or 180 days: candidates to drop. Every insert, update and delete of their table
 still maintains them, and they take space and backup time.
+
+![Unused indices with the evidence](screenshots/unused-indices.png)
 
 * **The plans** are those of [query regressions](#query-regressions): the [continuous trace](#continuous-trace)
   (every statement above its threshold), the history sampler (statements running long enough to be

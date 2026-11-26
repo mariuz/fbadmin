@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
-import { FB } from "./fixtures";
+import { FB, shot } from "./fixtures";
 
 /**
  * Roadmap 2.2: backup encryption and restore drills. A backup key is created (and shown once), an encrypted
@@ -113,4 +113,5 @@ test("restore drill: report with its checks, accessible in every theme", async (
     await audit(`drill report (${theme} theme)`);
   }
   await page.evaluate(() => { delete document.documentElement.dataset.theme; });
+  await shot(page, "restore-drill"); // docs/screenshots/restore-drill.png
 });

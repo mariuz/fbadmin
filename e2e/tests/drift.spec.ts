@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
-import { FB } from "./fixtures";
+import { FB, shot } from "./fixtures";
 
 /**
  * Roadmap 2.2: schema drift detection. A schema_drift schedule compares a database with its schema
@@ -97,6 +97,7 @@ test("drift against the schema history: report, both DDL versions and the script
     await audit(`drift report (${theme} theme)`);
   }
   await page.evaluate(() => { delete document.documentElement.dataset.theme; });
+  await shot(page, "schema-drift"); // docs/screenshots/schema-drift.png
   await report.getByRole("tab", { name: "Script" }).click();
   await expect(report.locator(".cm-content")).toContainText("DROP TABLE TMP_IMPORT");
   // the history row shows the summary

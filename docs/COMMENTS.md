@@ -4,6 +4,8 @@ Comments are short notes on a database object or a notebook. For example: "this 
 nightly report", or "partitioned by month, don't add columns without asking". They are shown where the
 object is, so the next person to look at it reads them.
 
+![Comments on a table](screenshots/comments.png)
+
 * **On an object:** select a table, view, index, procedure or any other object in the tree, then open
   its **Comments** tab.
 * **On a notebook:** the comments are below the notebook's cells.

@@ -13,6 +13,8 @@ available (the `replication.conf` helper still works for planning).
 
 ## Setup wizard
 
+![Set up a replica: the plan and its checks](screenshots/replication-setup.png)
+
 **Set up a replica…** (database context menu, or the Replication tab) sets up a primary and its
 replica end to end and then checks that changes arrive. It runs in five steps:
 

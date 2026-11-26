@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
-import { FB } from "./fixtures";
+import { FB, shot } from "./fixtures";
 
 /**
  * Roadmap 2.5: fleet health. Every database in one table from fbadmin's records: a database with its history
@@ -62,6 +62,7 @@ test("every database in one table", async () => {
     expect(r.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(" | ")}`), theme).toEqual([]);
   }
   await page.evaluate(() => { delete document.documentElement.dataset.theme; });
+  await shot(page, "fleet-health"); // docs/screenshots/fleet-health.png
   await page.getByLabel("Show").selectOption("attention");
   await expect(page.getByText("No database matches.")).toBeVisible();
   await page.getByLabel("Show").selectOption("");

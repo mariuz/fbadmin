@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
-import { FB, expand, treeRow } from "./fixtures";
+import { FB, expand, treeRow, shot } from "./fixtures";
 
 /**
  * Roadmap 2.4: comments on objects and notebooks. A table's Comments tab holds a thread: add, edit, delete;
@@ -67,6 +67,7 @@ test("a thread on a table", async () => {
   await expect(thread.locator(".cmt-text").first()).toHaveText("Needed by the nightly and the weekly report");
   await expect(thread.locator(".cmt-meta").first()).toContainText("edited");
   await audit("comments tab");
+  await shot(page, "comments"); // docs/screenshots/comments.png
 
   page.once("dialog", (d) => d.accept());
   await thread.locator(".cmt-item").nth(1).getByRole("button", { name: "Delete" }).click();

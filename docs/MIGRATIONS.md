@@ -4,6 +4,8 @@ Numbered SQL scripts in git, applied to a database in order, with a record in th
 applied and a **dry run on a copy first**. It works like Flyway, from the UI (**Migrations…** in a
 database's context menu) and from the command-line tool (`fbadmin migrate`).
 
+![Migration scripts with a dry run report](screenshots/migrations.png)
+
 ## Scripts
 
 A migration script is named `V<version>__<description>.sql`:

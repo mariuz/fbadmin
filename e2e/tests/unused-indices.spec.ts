@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
-import { FB, expand, treeRow } from "./fixtures";
+import { FB, expand, treeRow, shot } from "./fixtures";
 
 /**
  * Roadmap 2.5: unused index finder. With the history recorded and no plan using it, an index is a candidate
@@ -65,6 +65,7 @@ test("candidates to drop, proposed as a change request", async () => {
     expect(r.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(" | ")}`), theme).toEqual([]);
   }
   await page.evaluate(() => { delete document.documentElement.dataset.theme; });
+  await shot(page, "unused-indices"); // docs/screenshots/unused-indices.png
   await pane.getByRole("button", { name: "Propose as a change request…" }).click();
   await expect(page.locator(".tab-pane:not(.hidden) .cr-editor .cm-content")).toHaveText("DROP INDEX IX_ORD_NOTE;");
 });

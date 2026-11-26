@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
-import { FB, expand, treeRow } from "./fixtures";
+import { FB, expand, treeRow, shot } from "./fixtures";
 
 /**
  * Roadmap 2.3: guided performance check-up. Indices created on an empty table and then loaded have no
@@ -77,6 +77,7 @@ test("a ranked report with a fix per finding", async () => {
     await audit(`check-up (${theme} theme)`);
   }
   await page.evaluate(() => { delete document.documentElement.dataset.theme; });
+  await shot(page, "checkup"); // docs/screenshots/checkup.png
 
   await never.getByRole("button", { name: /Recompute selectivity of 2 index/ }).click();
   await expect(page.locator(".toast").last()).toContainText("Selectivity recomputed", { timeout: 30_000 });

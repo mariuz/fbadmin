@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
-import { FB, expand, treeRow } from "./fixtures";
+import { FB, expand, treeRow, shot } from "./fixtures";
 
 /**
  * Roadmap 2.4: continuous trace capture. In the History view, the continuous trace needs the history; turned on,
@@ -98,6 +98,7 @@ test("turn the continuous trace on and see it record", async ({ request }) => {
     await audit(`continuous trace (${theme} theme)`);
   }
   await page.evaluate(() => { delete document.documentElement.dataset.theme; });
+  await shot(page, "continuous-trace"); // docs/screenshots/continuous-trace.png
 
   await toggle.click();
   await expect(page.getByText("Continuous trace turned off")).toBeVisible();

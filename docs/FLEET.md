@@ -4,6 +4,8 @@
 database you can see in one table, with the newest of what fbadmin records about it. The worst
 databases come first.
 
+![Fleet health: every database in one table](screenshots/fleet-health.png)
+
 | Column | From |
 |---|---|
 | **Status** | the worst signal of the row: *critical*, *warning*, *OK*, or *unknown* when nothing is recorded yet; the problems that set it are listed under it |

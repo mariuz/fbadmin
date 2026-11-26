@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
-import { FB, expand, treeRow } from "./fixtures";
+import { FB, expand, treeRow, shot } from "./fixtures";
 
 /**
  * Roadmap 2.4: capacity and transaction-ID forecasting. The forecast tab of a database shows its size, the
@@ -78,6 +78,7 @@ test("the capacity forecast of a database", async () => {
   await pane().getByRole("button", { name: "Save", exact: true }).click();
   await expect(pane().getByText("Budget reached in")).toBeVisible();
   await expect(pane().locator(".fc-kv").first()).toContainText("10.0 GB");
+  await shot(page, "capacity-forecast"); // docs/screenshots/capacity-forecast.png
 
   for (const theme of ["light", "dark", "contrast"]) {
     await page.evaluate((th) => { document.documentElement.dataset.theme = th; }, theme);

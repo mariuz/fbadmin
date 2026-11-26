@@ -3,6 +3,8 @@
 **Timeline…** (database context menu) shows one history of the database, newest first and grouped by
 day, to answer "what changed before it broke?".
 
+![Database timeline](screenshots/timeline.png)
+
 | Category | What | From |
 |---|---|---|
 | **Schema** | DDL run from the Query Tool and the object dialogs (failed statements too), dropped objects, schema imports, [change requests](CHANGE_REQUESTS.md) (proposed, reviewed, applied) | fbadmin's event log |

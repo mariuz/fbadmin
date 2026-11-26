@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
-import { FB, expand, setEditor, treeRow } from "./fixtures";
+import { FB, expand, setEditor, treeRow, shot } from "./fixtures";
 
 /**
  * Roadmap 2.3: SQL notebooks. A notebook is created from a database's context menu; a SQL cell runs through a
@@ -98,6 +98,7 @@ test("write, run, chart, note and reopen a notebook", async () => {
   const note = pane().getByRole("region", { name: "Cell 2: Note" });
   await note.getByLabel("Note (Markdown)").fill("## Findings\n- **north** sells the most");
   await note.getByRole("button", { name: "Done" }).click();
+  await shot(page, "notebooks"); // docs/screenshots/notebooks.png
   await expect(note.getByRole("heading", { name: "Findings" })).toBeVisible();
   await note.getByRole("button", { name: "Move up" }).click();
   await expect(pane().getByRole("region", { name: "Cell 1: Note" })).toBeVisible();

@@ -3,6 +3,8 @@
 **Anonymised copy…** (database context menu) copies a database to a development or test server with
 personal data masked. Rules are set per column, and the copy stays consistent across foreign keys.
 
+![Anonymised copy: target and masking rules](screenshots/anonymised-copy.png)
+
 ## How a copy is made
 
 1. The source is backed up through the Services API into a temporary file on the fbadmin host (mode

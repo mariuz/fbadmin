@@ -1,5 +1,7 @@
 # Schema drift detection
 
+![Drift report: a changed table with both DDL versions](screenshots/schema-drift.png)
+
 A *drift check* compares the live schema of a database with a **baseline** on a schedule, and tells you
 when they differ. The baseline is either:
 

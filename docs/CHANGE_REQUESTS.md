@@ -4,6 +4,8 @@ A change request lets someone who may not change a database propose a change to 
 of the database reviews what the change does to the schema, approves or rejects it, and fbadmin
 applies it. Every step is recorded.
 
+![A change request with its dry run](screenshots/change-request.png)
+
 Open **Change requests…** in a database's context menu.
 
 ## Proposing a change

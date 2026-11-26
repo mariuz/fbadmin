@@ -4,6 +4,8 @@ A notebook keeps SQL cells, notes, results and charts in one saved document. Use
 ("monthly health check", "month-end close") or to hand over an investigation. Notebooks are saved by
 fbadmin. In server mode they can be shared with every fbadmin user.
 
+![A notebook with a SQL cell, its chart and result](screenshots/notebooks.png)
+
 Open the list with **📓 Notebooks** in the [Library](QUERY_LIBRARY.md), or with **Notebooks…** in a
 database's context menu. **New notebook…** in that menu creates one on the database.
 

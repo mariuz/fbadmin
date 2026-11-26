@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, request as pwRequest, test, type Page } from "@playwright/test";
+import { shot } from "./fixtures";
 import { spawn, type ChildProcess } from "node:child_process";
 import { createServer, type Server } from "node:http";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -82,6 +83,7 @@ test("a webhook destination receives the audit log", async () => {
   await expect(row.locator("td").nth(3)).toHaveText("0");
   await row.getByRole("button", { name: "Test" }).click();
   await expect(page.locator(".toast").last()).toContainText("Test message sent");
+  await shot(page, "audit-forwarding"); // docs/screenshots/audit-forwarding.png
   for (const theme of ["light", "dark", "contrast"]) {
     await page.evaluate((th) => { document.documentElement.dataset.theme = th; }, theme);
     await audit(`forwarding (${theme} theme)`);

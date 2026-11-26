@@ -244,6 +244,8 @@ shows per destination how many entries were sent, how many are waiting, and the 
 **Test** sends one test entry, **Resend…** sends again from any entry number, and **Pause** stops a
 destination without losing its place.
 
+![Audit log forwarding to a webhook](screenshots/audit-forwarding.png)
+
 * **syslog**: RFC 5424 messages over UDP (default port 514), TCP or TLS (6514). TCP and TLS use
   octet-counting framing (RFC 6587), and TLS verifies the server's certificate (with the system's CAs or
   a CA file). The facility is configurable (`local0` by default), the severity is *notice* for

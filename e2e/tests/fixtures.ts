@@ -77,3 +77,60 @@ export async function setEditor(page: Page, scope: Locator, sql: string) {
   await page.keyboard.press("Delete");
   await page.keyboard.insertText(sql);
 }
+
+/**
+ * A documentation screenshot, docs/screenshots/<name>.png, when E2E_SHOTS names the directory (otherwise nothing):
+ *   E2E_SHOTS=$PWD/../docs/screenshots npx playwright test tests/fleet.spec.ts
+ * 1440x900 like the other screenshots, light theme, scrolled to the top (unless keepScroll), without toasts, focus
+ * ring or hover; test server names ("E2E Fleet k3j2h1") read "Firebird 5". Everything is put back afterwards, so the
+ * test continues as before.
+ */
+export async function shot(page: Page, name: string, opts: { keepScroll?: boolean } = {}) {
+  const dir = process.env.E2E_SHOTS;
+  if (!dir) return;
+  const size = page.viewportSize();
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.evaluate((keepScroll) => {
+    const undo: (() => void)[] = [];
+    const root = document.documentElement;
+    root.dataset.theme = "light";
+    (document.activeElement as HTMLElement | null)?.blur?.();
+    const style = document.createElement("style");
+    style.textContent = ".toast, .toasts { display: none !important; }";
+    document.head.appendChild(style);
+    undo.push(() => style.remove());
+    // "E2E Trace capture k3j2h1" (a random suffix, maybe without digits) or "E2E Drift"
+    const name = /\bE2E [A-Z][A-Za-z ]*(?: [a-z0-9]{6,10})\b|\bE2E [A-Z][a-z]+\b/g;
+    const walk = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    for (let n = walk.nextNode(); n; n = walk.nextNode()) {
+      const text = n.nodeValue ?? "";
+      if (name.test(text)) {
+        const node = n;
+        node.nodeValue = text.replace(name, "Firebird 5");
+        undo.push(() => { node.nodeValue = text; });
+      }
+      name.lastIndex = 0;
+    }
+    if (!keepScroll) {
+      const pane = document.querySelector(".tab-pane:not(.hidden)");
+      for (const el of [pane, ...(pane ? Array.from(pane.querySelectorAll("*")) : [])]) {
+        if (el && el.scrollTop > 0) {
+          const top = el.scrollTop;
+          el.scrollTop = 0;
+          undo.push(() => { el.scrollTop = top; });
+        }
+      }
+    }
+    (window as unknown as { __shotUndo: (() => void)[] }).__shotUndo = undo;
+  }, !!opts.keepScroll);
+  await page.mouse.move(0, 0);
+  await page.waitForTimeout(400); // layout and charts settle at the new size
+  await page.screenshot({ path: `${dir}/${name}.png` });
+  await page.evaluate(() => {
+    const w = window as unknown as { __shotUndo?: (() => void)[] };
+    for (const fn of (w.__shotUndo ?? []).reverse()) fn();
+    delete w.__shotUndo;
+    delete document.documentElement.dataset.theme;
+  });
+  if (size) await page.setViewportSize(size);
+}

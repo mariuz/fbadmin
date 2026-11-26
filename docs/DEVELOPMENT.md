@@ -139,6 +139,14 @@ npx playwright test --headed             # watch it
 npx playwright show-report               # after a failure: traces and screenshots
 ```
 
+**Documentation screenshots** (`docs/screenshots/`) are taken by the feature tests themselves, at
+1440×900 in the light theme, when `E2E_SHOTS` names a directory (`shot(page, name)` in
+`e2e/tests/fixtures.ts`): test server names show as "Firebird 5", toasts are hidden. To refresh them:
+
+```bash
+E2E_SHOTS=$PWD/../docs/screenshots npx playwright test tests/fleet.spec.ts tests/checkup.spec.ts ...
+```
+
 Playwright starts `python -m fbadmin` from `backend/` on port `E2E_PORT` (default 5106)
 with a temporary data directory. Variables: `FB_HOST`, `FB_PORT` (3050), `FB_PASSWORD`,
 `FB_DB_DIR` (a directory on the Firebird server), `E2E_BASE_URL` (test an already running

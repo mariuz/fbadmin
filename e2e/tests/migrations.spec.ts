@@ -4,7 +4,7 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { FB, expand, field, treeRow } from "./fixtures";
+import { FB, expand, field, treeRow, shot } from "./fixtures";
 
 /**
  * Roadmap 2.2: versioned migrations. Scripts in a git repository; the tab shows them pending, apply waits for a
@@ -90,6 +90,7 @@ test("git source, dry run first, apply, recorded", async () => {
     await audit(`dry run report (${theme} theme)`);
   }
   await page.evaluate(() => { delete document.documentElement.dataset.theme; });
+  await shot(page, "migrations"); // docs/screenshots/migrations.png
 
   await pane().getByRole("button", { name: "Apply 2 pending" }).click();
   await expect(scripts.locator("tbody tr").nth(1)).toContainText("applied", { timeout: 60_000 });

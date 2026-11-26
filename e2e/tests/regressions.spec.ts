@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
-import { FB, expand, treeRow } from "./fixtures";
+import { FB, expand, treeRow, shot } from "./fixtures";
 
 /**
  * Roadmap 2.2: query regression tracking. The tab turns history recording on, statements run in the Query
@@ -77,6 +77,7 @@ test("tracked statements with their runs and plan", async ({ request }) => {
   const detail = pane().locator(".mt-section", { hasText: "Open in Query Tool" });
   await expect(detail.getByRole("img", { name: "Duration of each run over time, by plan" })).toBeVisible();
   await expect.poll(async () => (await detail.textContent()) ?? "", { timeout: 15_000 }).toContain("plan 1");
+  await shot(page, "query-regressions"); // docs/screenshots/query-regressions.png
   await pane().getByRole("button", { name: "Regressions", exact: true }).click();
   await expect(pane()).toContainText("Nothing got worse.");
   await pane().getByRole("button", { name: "All statements" }).click();

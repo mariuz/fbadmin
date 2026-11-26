@@ -4,7 +4,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { FB, field, expand, treeRow } from "./fixtures";
+import { FB, field, expand, treeRow, shot } from "./fixtures";
 
 /**
  * Roadmap 2.2: the replication setup wizard. On the usual test server the plan, the replication.conf block
@@ -99,6 +99,7 @@ test("plan, replication.conf block written into a file, and a primary that write
     await audit(`replica setup plan (${theme} theme)`);
   }
   await page.evaluate(() => { delete document.documentElement.dataset.theme; });
+  await shot(page, "replication-setup"); // docs/screenshots/replication-setup.png
 
   // fbadmin writes the block into a replication.conf it can reach
   const conf = join(mkdtempSync(join(tmpdir(), "fbadmin-e2e-")), "replication.conf");

@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
-import { FB, expand, treeRow } from "./fixtures";
+import { FB, expand, treeRow, shot } from "./fixtures";
 
 /**
  * Roadmap 2.3: anonymised copies of production. Suggestions are applied, a rule on a key column reaches the
@@ -84,6 +84,7 @@ test("mask, preview and copy", async () => {
 
   await pane().getByLabel("Database file on the target server").fill(COPY);
   await pane().getByLabel("Register it as").fill("devdb");
+  await shot(page, "anonymised-copy"); // docs/screenshots/anonymised-copy.png
   for (const theme of ["light", "dark", "contrast"]) {
     await page.evaluate((th) => { document.documentElement.dataset.theme = th; }, theme);
     await audit(`anonymised copy (${theme} theme)`);

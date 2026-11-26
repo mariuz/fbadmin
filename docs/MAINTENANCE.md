@@ -201,6 +201,8 @@ backup, from the archive or from cloud storage, possibly on another server, and 
 
 ## Maintenance windows
 
+![Maintenance windows of a database](screenshots/maintenance-windows.png)
+
 **Maintenance windows…** (database context menu) lists the windows that cover the database and adds new
 ones. A maintenance window is a period when work on a database is expected:
 

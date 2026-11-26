@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
-import { FB, expand, treeRow } from "./fixtures";
+import { FB, expand, treeRow, shot } from "./fixtures";
 
 /**
  * Roadmap 2.5: maintenance windows. A recurring window for a database is created from its menu and listed with
@@ -58,6 +58,7 @@ test("a recurring window for a database", async ({ request }) => {
   const grid = pane.getByRole("region", { name: "Maintenance windows" });
   await expect(grid).toContainText("Sunday night");
   await expect(grid).toContainText("0 23 * * 0, 90 min");
+  await shot(page, "maintenance-windows"); // docs/screenshots/maintenance-windows.png
   const ws = (await (await request.get("/api/maintenance-windows")).json()).filter((w: { server_id: string }) => w.server_id === serverId);
   expect(ws.length).toBe(1);
   expect(new Date(ws[0].next_start * 1000).getDay()).toBe(0);
