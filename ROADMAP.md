@@ -305,7 +305,7 @@ Also fixed in this milestone:
 
 ## Milestone 2.7 — Server edition and follow-ups ⬜
 
-- 🚧 **Server MSI: server mode, first administrator and HTTPS at install:** `SERVER_MODE`, `ADMIN_USER` / `ADMIN_EMAIL` / `ADMIN_PASSWORD` (a one-time file deleted once the account exists, hidden in MSI logs) and `CERTFILE` / `KEYFILE`, so a silent install is ready for other machines without editing `fbadmin.toml` ([docs/admin/service.md](docs/admin/service.md))
+- ✅ **Server MSI: server mode, first administrator and HTTPS at install:** `SERVER_MODE`, `ADMIN_USER` / `ADMIN_EMAIL` / `ADMIN_PASSWORD` (a one-time file deleted once the account exists, hidden in MSI logs) and `CERTFILE` / `KEYFILE`, so a silent install is ready for other machines without editing `fbadmin.toml` ([docs/admin/service.md](docs/admin/service.md))
 - ⬜ **Upgrade test for the server packages:** CI installs the previous release, upgrades to the new build and checks that `fbadmin.toml`, the data, the service account and the firewall rule survive (MSI, deb, rpm)
 - ⬜ **Release from the Actions UI:** a manual *Cut release* workflow that checks the version and release notes, creates the tag and starts the release, so a release needs no local git
 - ⬜ **Disconnect follow-ups:** an idle timeout on the server that disconnects a browser session that never said goodbye (a crashed browser), and an opt-in *reconnect on start* per server for desktop users
