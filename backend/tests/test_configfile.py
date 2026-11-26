@@ -118,3 +118,12 @@ def test_service_run_logs_to_file_and_stops_on_sigterm(tmp_path):
     log = (tmp_path / "logs" / "fbadmin.log").read_text("utf-8")
     assert "Application startup complete" in log and "Shutting down" in log
     assert "Application shutdown complete" in log and "Finished server process" in log
+
+
+@pytest.mark.skipif(sys.platform == "win32" or os.geteuid() == 0, reason="root reads any file")
+def test_unreadable_file(tmp_path):
+    f = tmp_path / "fbadmin.toml"
+    f.write_text("port = 1\n", "utf-8")
+    f.chmod(0)
+    with pytest.raises(configfile.ConfigError, match="Cannot read"):
+        configfile.read(f)

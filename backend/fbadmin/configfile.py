@@ -62,6 +62,8 @@ def read(path: Path) -> dict[str, str]:
         data = _toml.loads(path.read_text("utf-8-sig"))  # utf-8-sig: Notepad may add a BOM
     except FileNotFoundError:
         raise ConfigError(f"Configuration file not found: {path}") from None
+    except OSError as exc:  # e.g. a service account that may not read it
+        raise ConfigError(f"Cannot read the configuration file {path}: {exc.strerror or exc}") from None
     except _toml.TOMLDecodeError as exc:
         raise ConfigError(f"{path}: {exc}") from None
     out: dict[str, str] = {}

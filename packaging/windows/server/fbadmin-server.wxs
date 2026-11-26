@@ -43,6 +43,10 @@
                           Description="fbadmin web administration for Firebird SQL. Settings: %ProgramData%\fbadmin\fbadmin.toml"
                           Type="ownProcess" Start="auto" ErrorControl="normal" Account="NT SERVICE\fbadmin" Vital="yes" />
           <ServiceControl Id="fbadminServiceControl" Name="fbadmin" Start="install" Stop="both" Remove="uninstall" Wait="yes" />
+          <!-- the event log source WinSW writes to (a virtual account may not create one) -->
+          <RegistryKey Root="HKLM" Key="SYSTEM\CurrentControlSet\Services\EventLog\Application\fbadmin">
+            <RegistryValue Name="EventMessageFile" Type="expandable" Value="%SystemRoot%\Microsoft.NET\Framework64\v4.0.30319\EventLogMessages.dll" />
+          </RegistryKey>
         </Component>
       </Directory>
     </StandardDirectory>
@@ -66,9 +70,11 @@
 
     <!-- After the service exists (its virtual account can be named only then) and before it starts: only
          SYSTEM (S-1-5-18), Administrators (S-1-5-32-544) and the service may open the data directory, which
-         holds saved passwords and keys (ProgramData lets every user read by default). -->
+         holds saved passwords and keys (ProgramData lets every user read by default). Set on the folder only:
+         Windows passes the inheritable entries on to the files in it (fbadmin.toml) and to new ones; /T would
+         also strip the files' inherited entries, leaving fbadmin.toml readable by nobody. -->
     <CustomAction Id="SecureDataFolder" Directory="DATAFOLDER" Execute="deferred" Impersonate="no" Return="check"
-                  ExeCommand="&quot;[System64Folder]icacls.exe&quot; &quot;[DATAFOLDER].&quot; /inheritance:r /grant:r *S-1-5-18:(OI)(CI)F *S-1-5-32-544:(OI)(CI)F &quot;NT SERVICE\fbadmin:(OI)(CI)M&quot; /T /C /Q" />
+                  ExeCommand="&quot;[System64Folder]icacls.exe&quot; &quot;[DATAFOLDER].&quot; /inheritance:r /grant:r *S-1-5-18:(OI)(CI)F *S-1-5-32-544:(OI)(CI)F &quot;NT SERVICE\fbadmin:(OI)(CI)M&quot; /Q" />
     <CustomAction Id="AddFirewallRule" Directory="DATAFOLDER" Execute="deferred" Impersonate="no" Return="ignore"
                   ExeCommand="&quot;[System64Folder]netsh.exe&quot; advfirewall firewall add rule name=fbadmin dir=in action=allow protocol=TCP localport=[FWPORT]" />
     <CustomAction Id="RemoveFirewallRule" Directory="DATAFOLDER" Execute="deferred" Impersonate="no" Return="ignore"

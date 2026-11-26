@@ -400,6 +400,8 @@ jobs:
           Write-Host ($acl -join "`n")
           if (-not ($acl -match 'NT SERVICE\\fbadmin')) { throw "the service has no access to its data directory" }
           if ($acl -match 'BUILTIN\\Users') { throw "every user can read the data directory" }
+          $fileAcl = icacls "$env:ProgramData\fbadmin\fbadmin.toml"
+          if (-not ($fileAcl -match 'NT SERVICE\\fbadmin')) { Write-Host ($fileAcl -join "`n"); throw "the service cannot read fbadmin.toml" }
           if (-not (Get-NetFirewallRule -DisplayName fbadmin -ErrorAction SilentlyContinue)) { throw "no firewall rule" }
 
           # a service restart stops fbadmin cleanly (Ctrl+C from WinSW) and starts it again
