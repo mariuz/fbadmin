@@ -397,13 +397,15 @@ jobs:
           Write-Host "health: $($h.status) $($h.version)"
           (Invoke-WebRequest https://127.0.0.1:5110/ -UseBasicParsing -SkipCertificateCheck).Content | Select-String 'id="root"' | Out-Null
           if (-not $?) { throw "UI not served" }
-          if ((Invoke-RestMethod https://127.0.0.1:5110/api/version -SkipCertificateCheck).update_check) { throw "the update check should be off" }
 
           # server mode with the administrator from ADMIN_USER / ADMIN_PASSWORD; the one-time file is gone
           $st = Invoke-RestMethod https://127.0.0.1:5110/api/auth/status -SkipCertificateCheck
           if (-not $st.server_mode -or $st.needs_setup) { $st | ConvertTo-Json | Write-Host; throw "server mode with an administrator expected" }
           $login = @{ username = "ops"; password = $pw } | ConvertTo-Json
-          Invoke-RestMethod https://127.0.0.1:5110/api/auth/login -Method Post -ContentType application/json -Body $login -SkipCertificateCheck | Out-Null
+          Invoke-RestMethod https://127.0.0.1:5110/api/auth/login -Method Post -ContentType application/json -Body $login `
+            -SkipCertificateCheck -SessionVariable web | Out-Null
+          # server mode: the rest of the API needs the login (its session cookie)
+          if ((Invoke-RestMethod https://127.0.0.1:5110/api/version -SkipCertificateCheck -WebSession $web).update_check) { throw "the update check should be off" }
           if (Test-Path "$env:ProgramData\fbadmin\initial-admin.ini") { throw "initial-admin.ini (with the password) was not deleted" }
           if (Select-String -Path install.log -SimpleMatch $pw -Quiet) { throw "the password is in the MSI log" }
 
