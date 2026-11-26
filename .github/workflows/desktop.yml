@@ -1,4 +1,5 @@
-# Desktop app (pywebview shell + PyInstaller) for Windows, macOS and Linux.
+# Desktop app (pywebview shell + PyInstaller) for Windows, macOS and Linux, and the server edition (issue #11):
+#   Windows Server: fbadmin-server MSI (headless build, WinSW service); Linux: fbadmin-server deb/rpm (systemd).
 #   Windows: zipped one-folder build + MSI (WiX)
 #   macOS:   fbadmin.app in a .dmg (arm64 and x86_64)
 #   Linux:   AppImage, .deb and .rpm (fpm), Flatpak bundle
@@ -19,6 +20,8 @@ on:
       - backend/fbadmin/updater.py
       - backend/fbadmin/embedded.py
       - backend/fbadmin/native.py
+      - backend/fbadmin/configfile.py
+      - backend/fbadmin/__main__.py
       - .github/workflows/desktop.yml
   pull_request:
     paths:
@@ -270,6 +273,178 @@ jobs:
           path: dist/packages/*
           if-no-files-found: error
 
+  # --- server edition (issue #11): headless build as a Windows service (MSI + WinSW) and a systemd service -----
+  server-windows:
+    name: Server MSI (Windows x64)
+    runs-on: windows-latest
+    env:
+      WINDOWS_CERT_PFX: ${{ secrets.WINDOWS_CERT_PFX }}
+      WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+      WINSW_VERSION: "2.12.0"
+      WINSW_SHA256: "05B82D46AD331CC16BDC00DE5C6332C1EF818DF8CEEFCD49C726553209B3A0DA"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Version
+        id: v
+        shell: bash
+        run: echo "version=$(python -c "import re; print(re.search(r'__version__ = \"([^\"]+)\"', open('backend/fbadmin/__init__.py').read()).group(1))")" >> "$GITHUB_OUTPUT"
+      - name: Build the web UI
+        working-directory: frontend
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+      - name: Install fbadmin and PyInstaller
+        run: pip install --only-binary cryptography ./backend pyinstaller
+      - name: PyInstaller (headless server build)
+        run: pyinstaller packaging/pyinstaller/fbadmin-server.spec --noconfirm
+      - name: WinSW (pinned release, SHA-256 checked)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force build | Out-Null
+          Invoke-WebRequest "https://github.com/winsw/winsw/releases/download/v$env:WINSW_VERSION/WinSW-x64.exe" -OutFile build/WinSW-x64.exe
+          $h = (Get-FileHash build/WinSW-x64.exe -Algorithm SHA256).Hash
+          if ($h -ne $env:WINSW_SHA256) { throw "WinSW checksum mismatch: $h" }
+      - name: Sign the executable (Authenticode)
+        if: env.WINDOWS_CERT_PFX != ''
+        shell: pwsh
+        run: |
+          [IO.File]::WriteAllBytes("$env:RUNNER_TEMP\cert.pfx", [Convert]::FromBase64String($env:WINDOWS_CERT_PFX))
+          $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" | Sort-Object FullName | Select-Object -Last 1
+          "SIGNTOOL=$($signtool.FullName)" >> $env:GITHUB_ENV
+          & $signtool.FullName sign /f "$env:RUNNER_TEMP\cert.pfx" /p $env:WINDOWS_CERT_PASSWORD /fd SHA256 `
+            /tr http://timestamp.digicert.com /td SHA256 dist\fbadmin-server\fbadmin-server.exe
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: MSI (WiX)
+        shell: pwsh
+        run: |
+          dotnet tool install --global wix --version 5.0.2
+          New-Item -ItemType Directory -Force dist/packages | Out-Null
+          $src = (Resolve-Path dist\fbadmin-server).Path
+          $winsw = (Resolve-Path build\WinSW-x64.exe).Path
+          $msi = "dist/packages/fbadmin-server-${{ steps.v.outputs.version }}-x64.msi"
+          wix build packaging/windows/server/fbadmin-server.wxs -arch x64 -wx -d "SourceDir=$src" -d "WinSW=$winsw" `
+            -d Version=${{ steps.v.outputs.version }} -o $msi
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Remove-Item dist/packages/*.wixpdb -ErrorAction SilentlyContinue
+          if ($env:WINDOWS_CERT_PFX) {
+            & $env:SIGNTOOL sign /f "$env:RUNNER_TEMP\cert.pfx" /p $env:WINDOWS_CERT_PASSWORD /fd SHA256 `
+              /tr http://timestamp.digicert.com /td SHA256 (Resolve-Path $msi).Path
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            Remove-Item "$env:RUNNER_TEMP\cert.pfx"
+          }
+      - name: Silent install, service, health, restart, uninstall
+        timeout-minutes: 15
+        shell: pwsh
+        run: |
+          function Wait-Health($port) {
+            for ($i = 0; $i -lt 90; $i++) {
+              try { return Invoke-RestMethod "http://127.0.0.1:$port/api/health" } catch { Start-Sleep 1 }
+            }
+            Get-ChildItem "$env:ProgramData\fbadmin\logs" -ErrorAction SilentlyContinue | ForEach-Object { Get-Content $_.FullName -Tail 40 }
+            throw "no health answer on port $port"
+          }
+          $msi = (Get-ChildItem dist/packages/fbadmin-server-*.msi | Select-Object -First 1).FullName
+          $p = Start-Process msiexec -ArgumentList "/i `"$msi`" /qn /l*v install.log PORT=5110 HOST=127.0.0.1 FIREWALL=1" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { Get-Content install.log -Tail 80; exit $p.ExitCode }
+
+          $svc = Get-CimInstance Win32_Service -Filter "Name='fbadmin'"
+          Write-Host "service: $($svc.State), start $($svc.StartMode), account $($svc.StartName)"
+          if ($svc.StartName -ne 'NT SERVICE\fbadmin') { throw "unexpected service account $($svc.StartName)" }
+          if ($svc.StartMode -ne 'Auto') { throw "the service does not start automatically" }
+          $h = Wait-Health 5110
+          Write-Host "health: $($h.status) $($h.version)"
+          (Invoke-WebRequest http://127.0.0.1:5110/ -UseBasicParsing).Content | Select-String 'id="root"' | Out-Null
+          if (-not $?) { throw "UI not served" }
+          if ((Invoke-RestMethod http://127.0.0.1:5110/api/version).update_check) { throw "the update check should be off" }
+
+          $toml = Get-Content "$env:ProgramData\fbadmin\fbadmin.toml" -Raw
+          if ($toml -notmatch '(?m)^port=5110') { Write-Host $toml; throw "PORT was not written to fbadmin.toml" }
+          $acl = icacls "$env:ProgramData\fbadmin"
+          Write-Host ($acl -join "`n")
+          if (-not ($acl -match 'NT SERVICE\\fbadmin')) { throw "the service has no access to its data directory" }
+          if ($acl -match 'BUILTIN\\Users') { throw "every user can read the data directory" }
+          if (-not (Get-NetFirewallRule -DisplayName fbadmin -ErrorAction SilentlyContinue)) { throw "no firewall rule" }
+
+          # a service restart stops fbadmin cleanly (Ctrl+C from WinSW) and starts it again
+          Restart-Service fbadmin
+          Wait-Health 5110 | Out-Null
+          Get-ChildItem "$env:ProgramData\fbadmin\logs" | ForEach-Object { Write-Host "--- $($_.Name)"; Get-Content $_.FullName -Tail 15 }
+
+          $p = Start-Process msiexec -ArgumentList "/x `"$msi`" /qn /norestart /l*v uninstall.log" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { Get-Content uninstall.log -Tail 80; exit $p.ExitCode }
+          if (Get-Service fbadmin -ErrorAction SilentlyContinue) { throw "the service is still registered" }
+          if (Test-Path "$env:ProgramFiles\fbadmin-server\fbadmin-server.exe") { throw "uninstall left the program behind" }
+          if (Get-NetFirewallRule -DisplayName fbadmin -ErrorAction SilentlyContinue) { throw "the firewall rule is still there" }
+          if (-not (Test-Path "$env:ProgramData\fbadmin\fbadmin.toml")) { throw "uninstall removed the settings" }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-server-windows-x64
+          path: dist/packages/*
+          if-no-files-found: error
+
+  server-linux:
+    name: Server deb/rpm (Linux x86_64, systemd)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Version
+        id: v
+        run: echo "version=$(python -c "import re; print(re.search(r'__version__ = \"([^\"]+)\"', open('backend/fbadmin/__init__.py').read()).group(1))")" >> "$GITHUB_OUTPUT"
+      - name: Build the web UI
+        working-directory: frontend
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+      - name: Build tools (fpm, rpm), fbadmin and PyInstaller
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rpm ruby-dev build-essential
+          sudo gem install --no-document fpm
+          pip install ./backend pyinstaller
+      - name: PyInstaller (headless server build) and packages
+        run: |
+          pyinstaller packaging/pyinstaller/fbadmin-server.spec --noconfirm
+          packaging/linux/build-server-packages.sh "${{ steps.v.outputs.version }}" deb rpm
+      - name: Install the deb, service, health, config change, removal
+        run: |
+          health() { for _ in $(seq 1 60); do curl -fsS "http://127.0.0.1:$1/api/health" && return 0; sleep 1; done
+                     sudo journalctl -u fbadmin --no-pager | tail -40; return 1; }
+          sudo apt-get install -y ./dist/packages/fbadmin-server_*.deb
+          systemctl is-enabled fbadmin && systemctl is-active fbadmin
+          health 5050
+          curl -fsS http://127.0.0.1:5050/ | grep -q 'id="root"'
+          ps -o user= -C fbadmin-server | grep -v root   # a dynamic user, not root
+          sudo sed -i 's/^port = 5050/port = 5151/' /etc/fbadmin/fbadmin.toml
+          sudo systemctl restart fbadmin
+          health 5151
+          sudo journalctl -u fbadmin --no-pager | grep -q "Application shutdown complete"
+          sudo apt-get remove -y fbadmin-server
+          if systemctl is-active --quiet fbadmin; then echo 'still running after removal'; exit 1; fi
+          test -f /etc/fbadmin/fbadmin.toml   # a config file: kept on remove (purge deletes it)
+          rpm -qip dist/packages/fbadmin-server-*.rpm
+          rpm -qlp dist/packages/fbadmin-server-*.rpm | grep -q /usr/lib/systemd/system/fbadmin.service
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-server-linux-x64
+          path: dist/packages/*
+          if-no-files-found: error
+
   flatpak:
     name: Flatpak (Linux x86_64)
     runs-on: ubuntu-latest
@@ -303,7 +478,7 @@ jobs:
 
   attach:
     name: Attach to the GitHub Release
-    needs: [build, flatpak]
+    needs: [build, flatpak, server-windows, server-linux]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:

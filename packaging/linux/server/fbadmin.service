@@ -1,0 +1,32 @@
+# systemd unit of the fbadmin server packages (issue #11).
+# Settings: /etc/fbadmin/fbadmin.toml; data: /var/lib/fbadmin; restart after a change:
+#   sudo systemctl restart fbadmin
+[Unit]
+Description=fbadmin web administration for Firebird SQL
+Documentation=https://mariuz.github.io/fbadmin/admin/service/
+After=network-online.target firebird.service
+Wants=network-online.target
+
+[Service]
+Type=exec
+# a system user that exists only while the service runs; it owns /var/lib/fbadmin and /var/log/fbadmin
+DynamicUser=yes
+StateDirectory=fbadmin
+StateDirectoryMode=0700
+LogsDirectory=fbadmin
+ConfigurationDirectory=fbadmin
+Environment=FBADMIN_DATA_DIR=/var/lib/fbadmin
+ExecStart=/opt/fbadmin-server/fbadmin-server serve --no-browser --config /etc/fbadmin/fbadmin.toml
+Restart=on-failure
+RestartSec=5
+# SIGTERM: fbadmin finishes running requests (FBADMIN_SHUTDOWN_TIMEOUT) and shuts down
+TimeoutStopSec=30
+UMask=0077
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+
+[Install]
+WantedBy=multi-user.target

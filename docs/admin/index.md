@@ -14,6 +14,7 @@ fbadmin runs in one of two shapes:
 |---|---|
 | [Configuration](configuration.md) | Environment variables, logging, request limits, driver choice, connection pool |
 | [Deployment](deployment.md) | Docker image, Docker Compose, Helm chart, Kubernetes example with Firebird |
+| [Running as a service](service.md) | Windows Server MSI (a Windows service), Linux deb/rpm (systemd), `fbadmin.toml`, HTTPS with IIS or Caddy |
 | [Privacy](../PRIVACY.md) | What fbadmin sends over the network (nothing, unless you opt in to the update check) |
 
 ## Checklist for a shared installation

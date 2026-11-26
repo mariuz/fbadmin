@@ -1,0 +1,32 @@
+# fbadmin server settings (Windows service). Restart the service after a change:
+#   Restart-Service fbadmin
+# Every setting is also an environment variable (FBADMIN_<NAME>); the full list is in
+# https://mariuz.github.io/fbadmin/admin/configuration/
+# The data directory of the service is %ProgramData%\fbadmin (this folder).
+
+[server]
+# Address and port to listen on. 127.0.0.1 = this machine only; 0.0.0.0 = every network interface
+# (then also turn on server mode below, and HTTPS or a reverse proxy).
+host="127.0.0.1"
+port=5050
+
+# Multi-user mode with logins (recommended whenever other machines can reach fbadmin).
+# server_mode = true
+
+# HTTPS with a certificate (PEM files), or put IIS / Caddy in front (see the documentation).
+# ssl_certfile = 'C:\ProgramData\fbadmin\tls\fbadmin.crt'
+# ssl_keyfile = 'C:\ProgramData\fbadmin\tls\fbadmin.key'
+# behind a reverse proxy on this machine:
+# proxy_headers = true
+
+# Log level and format (the service log is in logs\fbadmin-service.*.log).
+# log_level = "info"
+# log_format = "json"
+
+# The server edition does not check GitHub for new versions: roll out updates with your
+# software distribution. "ask" lets administrators check from the About dialog.
+update_check="off"
+
+[env]
+# Any other setting by its environment variable name, e.g.
+# FBADMIN_MAX_UPLOAD_BYTES = 2147483648

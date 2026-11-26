@@ -1,12 +1,15 @@
 # Configuration
 
-fbadmin is configured with command-line options and environment variables.
+fbadmin is configured with command-line options, environment variables and, optionally, a configuration file
+(`fbadmin.toml`, see [Running as a service](service.md#the-configuration-file)): command-line options win over
+environment variables, which win over the file.
 
 ## Command line
 
 ```text
-fbadmin [--host HOST] [--port PORT] [--no-browser] [--reload]
-        [--log-level {critical,error,warning,info,debug}] [--log-format {text,json}]
+fbadmin [serve] [--config PATH] [--host HOST] [--port PORT] [--no-browser] [--reload]
+        [--log-level {critical,error,warning,info,debug}] [--log-format {text,json}] [--log-file PATH]
+        [--server-mode] [--ssl-certfile PEM --ssl-keyfile PEM] [--proxy-headers] [--forwarded-allow-ips IPS]
 fbadmin-desktop [--port PORT] [--browser] [--log-level LEVEL]
 ```
 
@@ -16,6 +19,11 @@ fbadmin-desktop [--port PORT] [--browser] [--log-level LEVEL]
 |---|---|---|
 | `FBADMIN_DATA_DIR` | `~/.fbadmin` | Data directory (`servers.json`, mode 0600) |
 | `FBADMIN_HOST` / `FBADMIN_PORT` | `127.0.0.1` / `5050` | Bind address |
+| `FBADMIN_CONFIG` | `<data dir>/fbadmin.toml` when it exists | Configuration file ([format](service.md#the-configuration-file)) |
+| `FBADMIN_OPEN_BROWSER` | `1` | `0`: do not open a browser window at start (`--no-browser`) |
+| `FBADMIN_SSL_CERTFILE` / `FBADMIN_SSL_KEYFILE` | | Serve HTTPS with these PEM files (`--ssl-certfile`, `--ssl-keyfile`) |
+| `FBADMIN_PROXY_HEADERS` / `FBADMIN_FORWARDED_ALLOW_IPS` | `0` / `127.0.0.1` | Trust `X-Forwarded-*` from these proxies (`--proxy-headers`) |
+| `FBADMIN_SHUTDOWN_TIMEOUT` | `10` | Seconds a stop (SIGTERM, Ctrl+C, service stop) waits for running requests |
 | `FBADMIN_MAX_ROWS` | `1000` | Default row limit per query result |
 | `FBADMIN_SESSION_IDLE_TIMEOUT` | `3600` | Seconds before an idle Query Tool connection is closed |
 | `FBADMIN_LOG_LEVEL` | `info` | Same as `--log-level` |
@@ -55,6 +63,10 @@ With `--log-format json` every line is one JSON object:
 
 Requests for static assets are logged at `debug` level, server errors (5xx) at `error`.
 Query text and parameters are never logged.
+
+The log goes to standard error. `--log-file PATH` (`FBADMIN_LOG_FILE`) also writes it to a file, in the same
+format; a relative path is in the data directory. The file is rotated when it reaches `FBADMIN_LOG_MAX_BYTES`
+(default 10 MiB), keeping `FBADMIN_LOG_BACKUPS` old files (default 5: `fbadmin.log.1` … `fbadmin.log.5`).
 
 ## Request limits
 

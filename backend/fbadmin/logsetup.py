@@ -2,7 +2,9 @@
 
 Configured from the command line (``--log-level``, ``--log-format``) or the environment
 (``FBADMIN_LOG_LEVEL``, ``FBADMIN_LOG_FORMAT=json|text``, ``FBADMIN_ACCESS_LOG=0`` to turn
-request logging off). Request logs go to the ``fbadmin.access`` logger with the method, path,
+request logging off). ``--log-file`` / ``FBADMIN_LOG_FILE`` also writes the log to a file (a relative path is in
+the data directory), rotated at ``FBADMIN_LOG_MAX_BYTES`` (default 10 MiB) keeping ``FBADMIN_LOG_BACKUPS`` old
+files (default 5). Request logs go to the ``fbadmin.access`` logger with the method, path,
 status and duration in milliseconds as structured fields; uvicorn's own access log is
 disabled so every request is logged exactly once.
 """
@@ -45,13 +47,45 @@ class TextFormatter(logging.Formatter):
         super().__init__("%(asctime)s %(levelname)-7s %(name)s: %(message)s")
 
 
-def configure_logging(level: str | None = None, fmt: str | None = None) -> dict:
+def log_file_path(log_file: str | None = None) -> str | None:
+    """The log file (absolute), from the argument or ``FBADMIN_LOG_FILE``; relative paths are in the data dir."""
+    from pathlib import Path
+
+    from .config import settings
+
+    name = log_file or os.environ.get("FBADMIN_LOG_FILE")
+    if not name:
+        return None
+    p = Path(name).expanduser()
+    if not p.is_absolute():
+        p = settings.data_dir / p
+    p.parent.mkdir(parents=True, exist_ok=True)
+    return str(p)
+
+
+def _int_env(name: str, default: int) -> int:
+    try:
+        return int(os.environ.get(name, default))
+    except ValueError:
+        return default
+
+
+def configure_logging(level: str | None = None, fmt: str | None = None, log_file: str | None = None) -> dict:
     """Configure the root, fbadmin and uvicorn loggers. Returns a uvicorn ``log_config``."""
     level = (level or os.environ.get("FBADMIN_LOG_LEVEL") or "info").lower()
     fmt = (fmt or os.environ.get("FBADMIN_LOG_FORMAT") or "text").lower()
     if level not in LEVELS:
         raise ValueError(f"invalid log level {level!r}; choose one of {', '.join(LEVELS)}")
     formatter = "json" if fmt == "json" else "text"
+    handlers = {
+        "default": {"class": "logging.StreamHandler", "formatter": formatter, "stream": "ext://sys.stderr"},
+    }
+    path = log_file_path(log_file)
+    if path:
+        handlers["file"] = {"class": "logging.handlers.RotatingFileHandler", "formatter": formatter,
+                            "filename": path, "encoding": "utf-8",
+                            "maxBytes": _int_env("FBADMIN_LOG_MAX_BYTES", 10 * 1024 * 1024),
+                            "backupCount": _int_env("FBADMIN_LOG_BACKUPS", 5)}
     return {
         "version": 1,
         "disable_existing_loggers": False,
@@ -59,11 +93,9 @@ def configure_logging(level: str | None = None, fmt: str | None = None) -> dict:
             "json": {"()": JsonFormatter},
             "text": {"()": TextFormatter},
         },
-        "handlers": {
-            "default": {"class": "logging.StreamHandler", "formatter": formatter, "stream": "ext://sys.stderr"},
-        },
+        "handlers": handlers,
         "loggers": {
-            "": {"handlers": ["default"], "level": level.upper()},
+            "": {"handlers": list(handlers), "level": level.upper()},
             "uvicorn": {"handlers": [], "level": level.upper(), "propagate": True},
             "uvicorn.error": {"handlers": [], "level": level.upper(), "propagate": True},
             # Requests are logged by RequestLogMiddleware instead (with timing).

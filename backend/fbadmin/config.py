@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from pathlib import Path
 
 
@@ -32,3 +32,10 @@ class Settings:
 
 
 settings = Settings()
+
+
+def reload_settings() -> None:
+    """Read the environment again (after the configuration file set variables), keeping the same object."""
+    fresh = Settings()
+    for f in fields(Settings):
+        setattr(settings, f.name, getattr(fresh, f.name))

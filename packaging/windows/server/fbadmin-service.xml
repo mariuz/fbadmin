@@ -1,0 +1,27 @@
+<!--
+  WinSW (https://github.com/winsw/winsw, MIT) configuration of the fbadmin Windows service (issue #11).
+  The MSI installs WinSW as fbadmin-service.exe next to this file; Windows runs it as the service
+  "fbadmin" (account NT SERVICE\fbadmin), and it runs fbadmin-server.exe, restarts it when it fails and
+  stops it with Ctrl+C (fbadmin then shuts down cleanly).
+
+  Settings are in %ProgramData%\fbadmin\fbadmin.toml (kept on upgrade and uninstall). Restart the
+  service after a change: Restart-Service fbadmin
+-->
+<service>
+  <id>fbadmin</id>
+  <name>fbadmin (Firebird administration)</name>
+  <description>fbadmin web administration for Firebird SQL. Settings: %ProgramData%\fbadmin\fbadmin.toml</description>
+  <executable>%BASE%\fbadmin-server.exe</executable>
+  <arguments>serve --no-browser --config "%ProgramData%\fbadmin\fbadmin.toml"</arguments>
+  <workingdirectory>%ProgramData%\fbadmin</workingdirectory>
+  <env name="FBADMIN_DATA_DIR" value="%ProgramData%\fbadmin" />
+  <stoptimeout>20 sec</stoptimeout>
+  <onfailure action="restart" delay="10 sec" />
+  <onfailure action="restart" delay="30 sec" />
+  <resetfailure>1 hour</resetfailure>
+  <logpath>%ProgramData%\fbadmin\logs</logpath>
+  <log mode="roll-by-size">
+    <sizeThreshold>10240</sizeThreshold>
+    <keepFiles>5</keepFiles>
+  </log>
+</service>

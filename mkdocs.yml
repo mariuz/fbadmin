@@ -99,6 +99,7 @@ nav:
       - Configuration: admin/configuration.md
       - Database drivers (pure Python and native): DRIVERS.md
       - Deployment (Docker, Kubernetes): admin/deployment.md
+      - Running as a service (Windows Server, Linux): admin/service.md
       - Kubernetes operator clusters: KUBERNETES.md
       - Command-line tool: CLI.md
       - Local databases (embedded engine): EMBEDDED.md

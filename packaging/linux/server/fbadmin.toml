@@ -1,0 +1,28 @@
+# fbadmin server settings (systemd service). Restart after a change: sudo systemctl restart fbadmin
+# Every setting is also an environment variable (FBADMIN_<NAME>); the full list is in
+# https://mariuz.github.io/fbadmin/admin/configuration/
+# The data directory is /var/lib/fbadmin. Keep secrets out of this file (it is readable by every user):
+# passwords saved in fbadmin are encrypted in the data directory.
+
+[server]
+# 127.0.0.1 = this machine only; 0.0.0.0 = every interface (then turn on server mode and HTTPS).
+host = "127.0.0.1"
+port = 5050
+
+# Multi-user mode with logins (recommended whenever other machines can reach fbadmin).
+# server_mode = true
+
+# HTTPS (PEM files readable by the service, e.g. in /etc/fbadmin/tls), or a reverse proxy in front.
+# ssl_certfile = "/etc/fbadmin/tls/fbadmin.crt"
+# ssl_keyfile = "/etc/fbadmin/tls/fbadmin.key"
+# proxy_headers = true
+
+# A log file next to the journal, rotated by size (FBADMIN_LOG_MAX_BYTES, FBADMIN_LOG_BACKUPS).
+# log_file = "/var/log/fbadmin/fbadmin.log"
+
+# Updates come with the package manager.
+update_check = "off"
+
+[env]
+# Any other setting by its environment variable name, e.g.
+# FBADMIN_MAX_UPLOAD_BYTES = 2147483648

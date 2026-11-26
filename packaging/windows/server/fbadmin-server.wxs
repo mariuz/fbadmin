@@ -1,0 +1,84 @@
+<!--
+  MSI of the fbadmin server edition for Windows Server (issue #11; WiX Toolset v5: `dotnet tool install -g wix`).
+
+    wix build packaging/windows/server/fbadmin-server.wxs -arch x64 -wx ^
+        -d SourceDir=%CD%\dist\fbadmin-server -d WinSW=%CD%\build\WinSW-x64.exe -d Version=2.2.0 ^
+        -o dist\fbadmin-server-2.2.0-x64.msi
+
+  SourceDir: the headless PyInstaller build (packaging/pyinstaller/fbadmin-server.spec), ABSOLUTE path.
+  WinSW: WinSW-x64.exe v2 (https://github.com/winsw/winsw), installed as fbadmin-service.exe.
+
+  It installs into Program Files\fbadmin-server and registers the service "fbadmin" (automatic start,
+  account NT SERVICE\fbadmin: a virtual account, no password to manage), started at the end of the
+  install. Settings and data are in %ProgramData%\fbadmin (fbadmin.toml, servers, keys, history, logs):
+  kept on upgrade and on uninstall; only SYSTEM, Administrators and the service can open them.
+
+  Silent install, e.g. with GPO / Intune / SCCM:
+    msiexec /i fbadmin-server-2.2.0-x64.msi /qn PORT=5050 HOST=0.0.0.0 FIREWALL=1
+  PORT, HOST: written into fbadmin.toml when given (an upgrade without them keeps the file as it is).
+  FIREWALL=1: an inbound Windows Firewall rule "fbadmin" for the port (removed on uninstall).
+  It is not code-signed unless the release workflow has a certificate (docs/PACKAGING.md).
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package Name="fbadmin Server" Manufacturer="fbadmin contributors" Version="$(Version)"
+           UpgradeCode="0b9d2f6e-7c1a-4e55-9d3b-5a8e1c2f4b71" Scope="perMachine" InstallerVersion="500">
+    <MajorUpgrade DowngradeErrorMessage="A newer version of fbadmin Server is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+    <Icon Id="fbadmin.ico" SourceFile="packaging\icons\fbadmin.ico" />
+    <Property Id="ARPPRODUCTICON" Value="fbadmin.ico" />
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/mariuz/fbadmin" />
+    <Property Id="ARPCOMMENTS" Value="Web administration for Firebird SQL, as a Windows service" />
+
+    <!-- the firewall rule's port: PORT when given, else the default -->
+    <Property Id="FWPORT" Value="5050" />
+    <SetProperty Id="FWPORT" Value="[PORT]" After="CostFinalize" Condition="PORT" Sequence="execute" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="fbadmin-server">
+        <Files Include="$(SourceDir)\**" />
+        <Component Id="Service">
+          <File Id="WinSW" Source="$(WinSW)" Name="fbadmin-service.exe" KeyPath="yes" />
+          <File Id="WinSWConfig" Source="packaging\windows\server\fbadmin-service.xml" Name="fbadmin-service.xml" />
+          <ServiceInstall Id="fbadminService" Name="fbadmin" DisplayName="fbadmin (Firebird administration)"
+                          Description="fbadmin web administration for Firebird SQL. Settings: %ProgramData%\fbadmin\fbadmin.toml"
+                          Type="ownProcess" Start="auto" ErrorControl="normal" Account="NT SERVICE\fbadmin" Vital="yes" />
+          <ServiceControl Id="fbadminServiceControl" Name="fbadmin" Start="install" Stop="both" Remove="uninstall" Wait="yes" />
+        </Component>
+      </Directory>
+    </StandardDirectory>
+
+    <StandardDirectory Id="CommonAppDataFolder">
+      <Directory Id="DATAFOLDER" Name="fbadmin">
+        <!-- the default settings: installed once, never overwritten, kept on uninstall -->
+        <Component Id="ConfigFile" NeverOverwrite="yes" Permanent="yes">
+          <File Id="fbadminToml" Source="packaging\windows\server\fbadmin.toml" Name="fbadmin.toml" KeyPath="yes" />
+        </Component>
+        <Component Id="ConfigPort" Condition="PORT" Permanent="yes">
+          <IniFile Id="PortValue" Action="addLine" Directory="DATAFOLDER" Name="fbadmin.toml" Section="server" Key="port" Value="[PORT]" />
+          <RegistryValue Root="HKLM" Key="Software\fbadmin-server" Name="port" Type="string" Value="[PORT]" KeyPath="yes" />
+        </Component>
+        <Component Id="ConfigHost" Condition="HOST" Permanent="yes">
+          <IniFile Id="HostValue" Action="addLine" Directory="DATAFOLDER" Name="fbadmin.toml" Section="server" Key="host" Value="&quot;[HOST]&quot;" />
+          <RegistryValue Root="HKLM" Key="Software\fbadmin-server" Name="host" Type="string" Value="[HOST]" KeyPath="yes" />
+        </Component>
+      </Directory>
+    </StandardDirectory>
+
+    <!-- After the service exists (its virtual account can be named only then) and before it starts: only
+         SYSTEM (S-1-5-18), Administrators (S-1-5-32-544) and the service may open the data directory, which
+         holds saved passwords and keys (ProgramData lets every user read by default). -->
+    <CustomAction Id="SecureDataFolder" Directory="DATAFOLDER" Execute="deferred" Impersonate="no" Return="check"
+                  ExeCommand="&quot;[System64Folder]icacls.exe&quot; &quot;[DATAFOLDER].&quot; /inheritance:r /grant:r *S-1-5-18:(OI)(CI)F *S-1-5-32-544:(OI)(CI)F &quot;NT SERVICE\fbadmin:(OI)(CI)M&quot; /T /C /Q" />
+    <CustomAction Id="AddFirewallRule" Directory="DATAFOLDER" Execute="deferred" Impersonate="no" Return="ignore"
+                  ExeCommand="&quot;[System64Folder]netsh.exe&quot; advfirewall firewall add rule name=fbadmin dir=in action=allow protocol=TCP localport=[FWPORT]" />
+    <CustomAction Id="RemoveFirewallRule" Directory="DATAFOLDER" Execute="deferred" Impersonate="no" Return="ignore"
+                  ExeCommand="&quot;[System64Folder]netsh.exe&quot; advfirewall firewall delete rule name=fbadmin" />
+    <InstallExecuteSequence>
+      <Custom Action="SecureDataFolder" After="InstallServices" Condition="NOT REMOVE" />
+      <!-- before adding it again (no duplicates), and on uninstall; not when an upgrade removes the old version -->
+      <Custom Action="RemoveFirewallRule" After="SecureDataFolder"
+              Condition="(FIREWALL=&quot;1&quot; AND NOT REMOVE) OR (REMOVE=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE)" />
+      <Custom Action="AddFirewallRule" After="RemoveFirewallRule" Condition="FIREWALL=&quot;1&quot; AND NOT REMOVE" />
+    </InstallExecuteSequence>
+  </Package>
+</Wix>
