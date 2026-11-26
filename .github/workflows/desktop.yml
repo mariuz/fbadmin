@@ -407,7 +407,11 @@ jobs:
           # server mode: the rest of the API needs the login (its session cookie)
           if ((Invoke-RestMethod https://127.0.0.1:5110/api/version -SkipCertificateCheck -WebSession $web).update_check) { throw "the update check should be off" }
           if (Test-Path "$env:ProgramData\fbadmin\initial-admin.ini") { throw "initial-admin.ini (with the password) was not deleted" }
-          if (Select-String -Path install.log -SimpleMatch $pw -Quiet) { throw "the password is in the MSI log" }
+          $leaks = Select-String -Path install.log -SimpleMatch $pw
+          if ($leaks) {
+            $leaks | ForEach-Object { Write-Host ("install.log:" + $_.LineNumber + ": " + $_.Line.Replace($pw, "********")) }
+            throw "the password is in the MSI log"
+          }
 
           $toml = Get-Content "$env:ProgramData\fbadmin\fbadmin.toml" -Raw
           if ($toml -notmatch '(?m)^port=5110') { Write-Host $toml; throw "PORT was not written to fbadmin.toml" }
