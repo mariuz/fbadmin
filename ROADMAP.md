@@ -12,7 +12,7 @@ scope.
 
 **Status:** milestones 0.1 to 2.0, the engineering backlog and the phone and tablet layout are
 implemented and verified in CI against real services. Firebird 6.0 final support waits for the
-6.0 release. Milestone 2.2 is done and 2.3 lacks only push notifications; milestones 2.4 and 2.5 are done; milestones 2.1, 2.6 and 3.0 below are planned. The current release is **2.1.1** ([release notes](docs/release-notes/v2.1.1.md)): on
+6.0 release. Milestone 2.2 is done and 2.3 lacks only push notifications; milestones 2.4 and 2.5 are done; milestones 2.1, 2.6 and 3.0 below are planned. The current release is **2.2.0** ([release notes](docs/release-notes/v2.2.0.md)): on
 [PyPI](https://pypi.org/project/firebird-admin/) (`pip install firebird-admin`), on
 [GitHub Releases](https://github.com/mariuz/fbadmin/releases) with desktop installers for Windows,
 macOS and Linux, as a Docker image, and documented at https://mariuz.github.io/fbadmin/.
@@ -292,7 +292,8 @@ Also fixed in this milestone:
 
 - ✅ **Reported issues:** fixed the issues reported on GitHub ([mariuz/fbadmin issues](https://github.com/mariuz/fbadmin/issues)): Disconnect really disconnects: tabs closed, node collapsed, no silent reconnect until Connect, everything disconnected when the last tab closes and at start (#9); restore uploads over 32 MB are streamed, limited by `FBADMIN_MAX_UPLOAD_BYTES` and free space (#10); autocompletion quotes only when needed, resolves aliases and `$` names (#2, #7, #8); Fetch all and complete exports in the Query Tool (#5, #6); tabs that scroll (#4); the All statements trace shows statements when they start (#1)
 - ✅ **Server edition for Windows Server and Linux ([#11](https://github.com/mariuz/fbadmin/issues/11)):** `fbadmin-server` MSI that installs a Windows service (WinSW host, `NT SERVICE\fbadmin` virtual account, data and settings in ProgramData kept on upgrade, silent install with `PORT`, `HOST`, `FIREWALL`, update check off), deb/rpm with a systemd unit (dynamic user), the `fbadmin.toml` configuration file with environment overrides, a rotated log file, and CI that installs, checks `/api/health`, restarts and uninstalls
-- ⬜ **Release 2.2.0:** release notes for milestones 2.2 to 2.5, the version bump, and fresh documentation screenshots of the new pages
+- ✅ **Release 2.2.0:** release notes for milestones 2.2 to 2.5, the reported issues and the server edition ([docs/release-notes/v2.2.0.md](docs/release-notes/v2.2.0.md)), and the version bump
+- ⬜ **Fresh documentation screenshots** of the pages added in 2.2 to 2.5
 - ⬜ **Production guard and database tags:** tag databases (production, staging, test), show the tag in the tree and the Query Tool, confirm DML and DDL on production, optionally allow DDL there only through change requests; tags filter the fleet page, maintenance windows and digests
 - ⬜ **@mentions and personal notifications:** `@user` in comments and change requests notifies that user; authors hear when their request is approved, rejected or applied
 - ⬜ **Incident view:** pick a time and see the timeline, alerts, trace errors, slow statements and lock waits around it on one time axis
