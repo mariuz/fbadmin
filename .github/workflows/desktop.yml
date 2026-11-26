@@ -44,7 +44,7 @@ jobs:
       matrix:
         include:
           - { name: Windows x64, os: windows-latest, kind: windows, fb: windows-x64 }
-          - { name: macOS arm64, os: macos-14, kind: macos, arch: arm64, fb: macos-arm64 }
+          - { name: macOS arm64, os: macos-15, kind: macos, arch: arm64, fb: macos-arm64 }
           - { name: macOS x86_64, os: macos-15-intel, kind: macos, arch: x86_64, fb: macos-x64 }
           # 22.04 keeps the glibc baseline low so the AppImage runs on older distributions.
           - { name: Linux x86_64, os: ubuntu-22.04, kind: linux, fb: linux-x64 }
@@ -460,7 +460,8 @@ jobs:
           systemctl is-enabled fbadmin && systemctl is-active fbadmin
           health 5050
           curl -fsS http://127.0.0.1:5050/ | grep -q 'id="root"'
-          ps -o user= -C fbadmin-server | grep -v root   # a dynamic user, not root
+          pgrep -x fbadmin-server >/dev/null
+          if pgrep -u root -x fbadmin-server; then echo 'runs as root, not as its dynamic user'; exit 1; fi
           sudo sed -i 's/^port = 5050/port = 5151/' /etc/fbadmin/fbadmin.toml
           sudo systemctl restart fbadmin
           health 5151

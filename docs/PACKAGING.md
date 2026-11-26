@@ -17,7 +17,7 @@ The version lives in one place: `__version__` in `backend/fbadmin/__init__.py`
 2. Run `scripts/gen-api-types.sh` if the API changed; make sure CI is green.
 3. Write the release notes in `docs/release-notes/vX.Y.Z.md`; the release workflow puts them
    at the top of the GitHub Release, above the generated list of changes.
-4. Tag and push: `git tag -a v2.1.1 -m "fbadmin 2.1.1" && git push origin v2.1.1`.
+4. Tag and push: `git tag -a v2.2.0 -m "fbadmin 2.2.0" && git push origin v2.2.0`.
 
 The tag starts three workflows:
 
@@ -25,7 +25,7 @@ The tag starts three workflows:
 |---|---|
 | `release.yml` | sdist + wheel (with the UI) → PyPI (trusted publishing) and a GitHub Release |
 | `docker.yml` | `ghcr.io/mariuz/fbadmin:1.0.0`, `:1.0`, `:latest` for amd64 and arm64 |
-| `desktop.yml` | Windows zip + MSI, macOS dmg (arm64, x86_64), Linux AppImage/deb/rpm, attached to the release |
+| `desktop.yml` | Windows zip + MSI, macOS dmg (arm64, x86_64), Linux AppImage/deb/rpm, and the server edition (`fbadmin-server` MSI, deb, rpm), attached to the release |
 
 `release.yml` refuses to publish when the tag does not match `__version__`.
 
@@ -90,7 +90,7 @@ wix build packaging/windows/fbadmin.wxs -arch x64 -wx -d SourceDir=%CD%\dist\fba
 | Platform | Format | How |
 |---|---|---|
 | Windows | `.zip` (portable), `.msi` | `Compress-Archive`; WiX v5 (`packaging/windows/fbadmin.wxs`) |
-| macOS | `.dmg` with `fbadmin.app` | PyInstaller `BUNDLE` + `hdiutil` (arm64 on macos-14, x86_64 on macos-15-intel) |
+| macOS | `.dmg` with `fbadmin.app` | PyInstaller `BUNDLE` + `hdiutil` (arm64 on macos-15, x86_64 on macos-15-intel) |
 | Linux | AppImage, `.deb`, `.rpm` | `packaging/linux/build-packages.sh` (appimagetool, fpm) on Ubuntu 22.04 |
 | Linux | Flatpak | `packaging/flatpak/io.github.mariuz.fbadmin.yml` (GNOME runtime). The `flatpak` job in `desktop.yml` builds a `.flatpak` bundle, and a failure there doesn't fail the workflow. |
 
