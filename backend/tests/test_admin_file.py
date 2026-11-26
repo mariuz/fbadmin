@@ -44,3 +44,18 @@ def test_desktop_mode_leaves_the_file(tmp_path, monkeypatch):
     from fbadmin.api import deps
 
     deps.reset_state()
+
+
+def test_write_admin_file_takes_the_password_literally(tmp_path):
+    from fbadmin import admin_file
+
+    target = tmp_path / "initial-admin.ini"
+    pw = 'a "quoted" pass\\word --user=x '
+    raw = f'"C:\\Program Files\\fbadmin-server\\fbadmin-server.exe" write-admin-file "{target}" --user=ops ' \
+          f'--email= --password={pw}'
+    assert admin_file.main(raw) == 0
+    assert read_admin_file(target) == {"username": "ops", "password": pw}
+    # nothing to write without a password; a missing --password= is an error
+    other = tmp_path / "other.ini"
+    assert admin_file.main(f'x write-admin-file "{other}" --user=ops --password=') == 0 and not other.exists()
+    assert admin_file.main(f'x write-admin-file "{other}" --user=ops') == 2

@@ -100,17 +100,11 @@
           <IniFile Id="KeyFileValue" Action="addLine" Directory="DATAFOLDER" Name="fbadmin.toml" Section="server" Key="ssl_keyfile" Value="'[KEYFILE]'" />
           <RegistryValue Root="HKLM" Key="Software\fbadmin-server" Name="ssl_keyfile" Type="string" Value="[KEYFILE]" KeyPath="yes" />
         </Component>
-        <!-- the first administrator: a one-time file fbadmin deletes once the account exists (no secret in the
-             registry or in fbadmin.toml) -->
+        <!-- the first administrator: a one-time file (written by the WriteAdminFile action below) that fbadmin
+             deletes once the account exists; here only its name goes into fbadmin.toml -->
         <Component Id="AdminFile" Condition="ADMIN_PASSWORD" Permanent="yes">
-          <IniFile Id="AdminUserValue" Action="addLine" Directory="DATAFOLDER" Name="initial-admin.ini" Section="admin" Key="username" Value="&quot;[ADMINUSERVAL]&quot;" />
-          <IniFile Id="AdminPasswordValue" Action="addLine" Directory="DATAFOLDER" Name="initial-admin.ini" Section="admin" Key="password" Value="&quot;[ADMIN_PASSWORD]&quot;" />
           <IniFile Id="AdminFileSetting" Action="addLine" Directory="DATAFOLDER" Name="fbadmin.toml" Section="server" Key="admin_file" Value="&quot;initial-admin.ini&quot;" />
           <RegistryValue Root="HKLM" Key="Software\fbadmin-server" Name="admin_file" Type="integer" Value="1" KeyPath="yes" />
-        </Component>
-        <Component Id="AdminEmail" Condition="ADMIN_PASSWORD AND ADMIN_EMAIL" Permanent="yes">
-          <IniFile Id="AdminEmailValue" Action="addLine" Directory="DATAFOLDER" Name="initial-admin.ini" Section="admin" Key="email" Value="&quot;[ADMIN_EMAIL]&quot;" />
-          <RegistryValue Root="HKLM" Key="Software\fbadmin-server" Name="admin_email" Type="integer" Value="1" KeyPath="yes" />
         </Component>
       </Directory>
     </StandardDirectory>
@@ -124,6 +118,11 @@
          folder in ProgramData would otherwise be readable by every user for a moment. -->
     <CustomAction Id="LockDataFolder" Directory="DATAFOLDER" Execute="deferred" Impersonate="no" Return="check"
                   ExeCommand="&quot;[System64Folder]icacls.exe&quot; &quot;[DATAFOLDER].&quot; /inheritance:r /grant:r *S-1-5-18:(OI)(CI)F *S-1-5-32-544:(OI)(CI)F /Q" />
+    <!-- The administrator file, written by the installed program (fbadmin/admin_file.py): MSI's IniFile action would
+         log the password; this command line is hidden in the log (HideTarget), and the password is read from it
+         literally (everything after \-\-password=). -->
+    <CustomAction Id="WriteAdminFile" Directory="INSTALLFOLDER" Execute="deferred" Impersonate="no" Return="check" HideTarget="yes"
+                  ExeCommand="&quot;[INSTALLFOLDER]fbadmin-server.exe&quot; write-admin-file &quot;[DATAFOLDER]initial-admin.ini&quot; --user=[ADMINUSERVAL] --email=[ADMIN_EMAIL] --password=[ADMIN_PASSWORD]" />
     <CustomAction Id="SecureDataFolder" Directory="DATAFOLDER" Execute="deferred" Impersonate="no" Return="check"
                   ExeCommand="&quot;[System64Folder]icacls.exe&quot; &quot;[DATAFOLDER].&quot; /inheritance:r /grant:r *S-1-5-18:(OI)(CI)F *S-1-5-32-544:(OI)(CI)F &quot;NT SERVICE\fbadmin:(OI)(CI)M&quot; /Q" />
     <CustomAction Id="AddFirewallRule" Directory="DATAFOLDER" Execute="deferred" Impersonate="no" Return="ignore"
@@ -132,6 +131,7 @@
                   ExeCommand="&quot;[System64Folder]netsh.exe&quot; advfirewall firewall delete rule name=fbadmin" />
     <InstallExecuteSequence>
       <Custom Action="LockDataFolder" Before="WriteIniValues" Condition="NOT REMOVE" />
+      <Custom Action="WriteAdminFile" After="LockDataFolder" Condition="ADMIN_PASSWORD AND NOT REMOVE" />
       <Custom Action="SecureDataFolder" After="InstallServices" Condition="NOT REMOVE" />
       <!-- before adding it again (no duplicates), and on uninstall; not when an upgrade removes the old version -->
       <Custom Action="RemoveFirewallRule" After="SecureDataFolder"

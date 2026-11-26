@@ -33,6 +33,10 @@ def _remote_command(argv: list[str], commands) -> bool:
 
 def main(argv: list[str] | None = None) -> None:
     argv = list(sys.argv[1:] if argv is None else argv)
+    if argv and argv[0] == "write-admin-file":  # internal: the Windows server MSI (fbadmin/admin_file.py)
+        from .admin_file import main as write_admin_file
+
+        sys.exit(write_admin_file())
     from .cli import COMMANDS
 
     if argv and (argv[0] in COMMANDS or _remote_command(argv, COMMANDS)):
