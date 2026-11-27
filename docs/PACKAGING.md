@@ -164,8 +164,9 @@ The headless build (`packaging/pyinstaller/fbadmin-server.spec`, no pywebview) i
 `fbadmin-server-<version>-x64.msi` (WiX, `packaging/windows/server/`, with [WinSW](https://github.com/winsw/winsw)
 v2.12.0 as the service host, pinned by SHA-256 in the workflow) and as `fbadmin-server` deb/rpm with a systemd unit
 (`packaging/linux/build-server-packages.sh`). The jobs *server-windows* and *server-linux* of
-`.github/workflows/desktop.yml` build them, install them silently, wait for `/api/health`, restart the service and
-uninstall; on a release tag they are attached with the desktop packages (and in `SHA256SUMS`). The desktop
+`.github/workflows/desktop.yml` build them, upgrade the latest release's packages to them (checking that the
+settings, the data, the service and the firewall rule survive), install them silently, wait for `/api/health`,
+restart the service and uninstall; on a release tag they are attached with the desktop packages (and in `SHA256SUMS`). The desktop
 auto-updater only picks `fbadmin-<version>-…` packages, never the server ones. See
 [Running as a service](admin/service.md).
 

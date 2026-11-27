@@ -351,6 +351,53 @@ jobs:
           for ($i = 0; $i -lt 60; $i++) { try { Invoke-RestMethod http://127.0.0.1:5109/api/health | Out-Null; $ok = $true; break } catch { Start-Sleep 1 } }
           Stop-Process -Id $app.Id -Force -ErrorAction SilentlyContinue
           if (-not $ok) { Get-Content srv.out, srv.err -ErrorAction SilentlyContinue; throw "the frozen server did not start" }
+      - name: Upgrade from the latest release (settings, data, service, firewall rule survive)
+        timeout-minutes: 15
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          function Wait-Up($port) {
+            for ($i = 0; $i -lt 90; $i++) { try { return Invoke-RestMethod "http://127.0.0.1:$port/api/health" } catch { Start-Sleep 1 } }
+            Get-ChildItem "$env:ProgramData\fbadmin\logs" -ErrorAction SilentlyContinue | ForEach-Object { Get-Content $_.FullName -Tail 40 | Out-Host }
+            throw "no health answer on port $port"
+          }
+          New-Item -ItemType Directory -Force prev | Out-Null
+          gh release download --repo ${{ github.repository }} --pattern "fbadmin-server-*-x64.msi" --dir prev
+          $old = Get-ChildItem prev/*.msi -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $old) { Write-Host "::notice::The latest release has no server MSI: the upgrade is not tested"; exit 0 }
+          $new = (Get-ChildItem dist/packages/fbadmin-server-*.msi | Select-Object -First 1).FullName
+          Write-Host "upgrading $($old.Name) -> $(Split-Path $new -Leaf)"
+
+          # the released version, with a custom setting, a registered server and a firewall rule
+          $p = Start-Process msiexec -ArgumentList "/i `"$($old.FullName)`" /qn /l*v old.log PORT=5120 FIREWALL=1" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { Get-Content old.log -Tail 80; exit $p.ExitCode }
+          Wait-Up 5120 | Out-Null
+          $srv = @{ name = "kept across the upgrade"; host = "db.example"; port = 3050; user = "SYSDBA" } | ConvertTo-Json
+          Invoke-RestMethod http://127.0.0.1:5120/api/servers -Method Post -ContentType application/json -Body $srv | Out-Null
+          Add-Content "$env:ProgramData\fbadmin\fbadmin.toml" "`n# edited by the administrator"
+
+          # the new build over it, without properties
+          $p = Start-Process msiexec -ArgumentList "/i `"$new`" /qn /l*v upgrade.log" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { Get-Content upgrade.log -Tail 80; exit $p.ExitCode }
+          $products = Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*" | Where-Object DisplayName -eq "fbadmin Server"
+          if (@($products).Count -ne 1) { $products | Format-List DisplayName, DisplayVersion, PSChildName | Out-Host; throw "expected one installed fbadmin Server, found $(@($products).Count)" }
+          $installed = (Get-FileHash "$env:ProgramFiles\fbadmin-server\fbadmin-server.exe").Hash
+          if ($installed -ne (Get-FileHash dist\fbadmin-server\fbadmin-server.exe).Hash) { throw "the program was not replaced by the new build" }
+          $svc = Get-CimInstance Win32_Service -Filter "Name='fbadmin'"
+          if ($svc.StartName -ne 'NT SERVICE\fbadmin' -or $svc.StartMode -ne 'Auto') { throw "service after the upgrade: $($svc.StartName) $($svc.StartMode)" }
+          Wait-Up 5120 | Out-Null   # the port from the kept fbadmin.toml
+          $names = (Invoke-RestMethod http://127.0.0.1:5120/api/servers).name
+          if ($names -notcontains "kept across the upgrade") { throw "the registered server is gone: $names" }
+          $toml = Get-Content "$env:ProgramData\fbadmin\fbadmin.toml" -Raw
+          if ($toml -notmatch "edited by the administrator" -or $toml -notmatch '(?m)^port=5120') { Write-Host $toml; throw "fbadmin.toml was not kept" }
+          if (-not (Get-NetFirewallRule -DisplayName fbadmin -ErrorAction SilentlyContinue)) { throw "the upgrade removed the firewall rule" }
+
+          # clean up for the fresh install below
+          $p = Start-Process msiexec -ArgumentList "/x `"$new`" /qn /norestart" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { exit $p.ExitCode }
+          Remove-Item "$env:ProgramData\fbadmin" -Recurse -Force
+          Remove-Item "HKLM:\SOFTWARE\fbadmin-server" -Recurse -Force -ErrorAction SilentlyContinue
       - name: Silent install, service, health, restart, uninstall
         timeout-minutes: 15
         shell: pwsh
@@ -473,20 +520,39 @@ jobs:
         run: |
           pyinstaller packaging/pyinstaller/fbadmin-server.spec --noconfirm
           packaging/linux/build-server-packages.sh "${{ steps.v.outputs.version }}" deb rpm
-      - name: Install the deb, service, health, config change, removal
+      - name: Install the latest release's deb, upgrade to this build, removal
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           health() { for _ in $(seq 1 60); do curl -fsS "http://127.0.0.1:$1/api/health" && return 0; sleep 1; done
                      sudo journalctl -u fbadmin --no-pager | tail -40; return 1; }
-          sudo apt-get install -y ./dist/packages/fbadmin-server_*.deb
+          new=$(ls dist/packages/fbadmin-server_*.deb)
+          gh release download --repo ${{ github.repository }} --pattern 'fbadmin-server_*_amd64.deb' --dir prev || true
+          old=$(ls prev/*.deb 2>/dev/null | head -1 || true)
+          if [ -z "$old" ]; then echo "::notice::The latest release has no server deb: the upgrade is not tested"; fi
+          sudo apt-get install -y "./${old:-$new}"
           systemctl is-enabled fbadmin && systemctl is-active fbadmin
           health 5050
           curl -fsS http://127.0.0.1:5050/ | grep -q 'id="root"'
           pgrep -x fbadmin-server >/dev/null
           if pgrep -u root -x fbadmin-server; then echo 'runs as root, not as its dynamic user'; exit 1; fi
+          # data and a changed setting, which must survive the upgrade
+          curl -fsS -X POST -H 'Content-Type: application/json' http://127.0.0.1:5050/api/servers \
+            -d '{"name": "kept across the upgrade", "host": "db.example", "port": 3050, "user": "SYSDBA"}' >/dev/null
           sudo sed -i 's/^port = 5050/port = 5151/' /etc/fbadmin/fbadmin.toml
           sudo systemctl restart fbadmin
           health 5151
           sudo journalctl -u fbadmin --no-pager | grep -q "Application shutdown complete"
+          if [ -n "$old" ]; then
+            echo "upgrading $old -> $new"
+            # dpkg -i also replaces a package of the same version; keep the changed configuration file
+            sudo dpkg -i --force-confold "$new"
+            cmp /opt/fbadmin-server/fbadmin-server dist/fbadmin-server/fbadmin-server   # the new build is installed
+            systemctl is-enabled fbadmin && systemctl is-active fbadmin
+            grep -q '^port = 5151' /etc/fbadmin/fbadmin.toml
+            health 5151
+            curl -fsS http://127.0.0.1:5151/api/servers | grep -q "kept across the upgrade"
+          fi
           sudo apt-get remove -y fbadmin-server
           if systemctl is-active --quiet fbadmin; then echo 'still running after removal'; exit 1; fi
           test -f /etc/fbadmin/fbadmin.toml   # a config file: kept on remove (purge deletes it)

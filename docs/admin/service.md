@@ -17,6 +17,10 @@ fbadmin as `pip install firebird-admin`, built without the desktop window.
 The packages are attached to every [GitHub release](https://github.com/mariuz/fbadmin/releases). Settings and data are
 kept on upgrade and on removal.
 
+**Upgrading:** install the new package over the old one (`msiexec /i` with the new MSI; `apt install` or `dnf upgrade`
+with the new package). The service is stopped, replaced and started again; `fbadmin.toml`, the data, the service
+account and the firewall rule stay. CI checks this on every build, from the latest release to the new package.
+
 ## Windows Server
 
 Install interactively, or silently with your software distribution (Group Policy, Intune, SCCM):

@@ -27,7 +27,9 @@
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
   <Package Name="fbadmin Server" Manufacturer="fbadmin contributors" Version="$(Version)"
            UpgradeCode="0b9d2f6e-7c1a-4e55-9d3b-5a8e1c2f4b71" Scope="perMachine" InstallerVersion="500">
-    <MajorUpgrade DowngradeErrorMessage="A newer version of fbadmin Server is already installed." />
+    <!-- AllowSameVersionUpgrades: a rebuilt package of the same version (CI, a fixed build) replaces the installed one
+         instead of being installed next to it -->
+    <MajorUpgrade DowngradeErrorMessage="A newer version of fbadmin Server is already installed." AllowSameVersionUpgrades="yes" />
     <MediaTemplate EmbedCab="yes" />
     <Icon Id="fbadmin.ico" SourceFile="packaging\icons\fbadmin.ico" />
     <Property Id="ARPPRODUCTICON" Value="fbadmin.ico" />
